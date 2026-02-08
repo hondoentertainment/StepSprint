@@ -1,0 +1,102 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  PARTICIPANT
+}
+
+model User {
+  id          String           @id @default(cuid())
+  email       String           @unique
+  name        String?
+  role        Role             @default(PARTICIPANT)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  memberships TeamMember[]
+  submissions StepSubmission[]
+  auditLogs   AuditLog[]       @relation("AuditActor")
+}
+
+model Challenge {
+  id          String           @id @default(cuid())
+  name        String
+  startDate   DateTime         @db.Date
+  endDate     DateTime         @db.Date
+  timezone    String
+  teamSize    Int
+  locked      Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  teams       Team[]
+  members     TeamMember[]
+  submissions StepSubmission[]
+  auditLogs   AuditLog[]
+
+  @@index([startDate, endDate])
+}
+
+model Team {
+  id          String       @id @default(cuid())
+  name        String
+  challengeId String
+  challenge   Challenge    @relation(fields: [challengeId], references: [id])
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  members     TeamMember[]
+
+  @@unique([challengeId, name])
+}
+
+model TeamMember {
+  id          String     @id @default(cuid())
+  userId      String
+  challengeId String
+  teamId      String?
+  isLeader    Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  user        User       @relation(fields: [userId], references: [id])
+  challenge   Challenge  @relation(fields: [challengeId], references: [id])
+  team        Team?      @relation(fields: [teamId], references: [id])
+
+  @@unique([userId, challengeId])
+  @@index([teamId])
+}
+
+model StepSubmission {
+  id          String     @id @default(cuid())
+  userId      String
+  challengeId String
+  date        DateTime   @db.Date
+  steps       Int
+  isFlagged   Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  user        User       @relation(fields: [userId], references: [id])
+  challenge   Challenge  @relation(fields: [challengeId], references: [id])
+
+  @@unique([userId, challengeId, date])
+  @@index([challengeId, date])
+}
+
+model AuditLog {
+  id          String     @id @default(cuid())
+  action      String
+  reason      String?
+  metadata    Json?
+  actorId     String?
+  challengeId String?
+  createdAt   DateTime   @default(now())
+  actor       User?      @relation("AuditActor", fields: [actorId], references: [id])
+  challenge   Challenge? @relation(fields: [challengeId], references: [id])
+
+  @@index([challengeId])
+  @@index([actorId])
+}
