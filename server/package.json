@@ -17,7 +17,10 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@prisma/adapter-better-sqlite3": "^7.3.0",
     "@prisma/client": "^7.3.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "better-sqlite3": "^12.6.2",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "dotenv": "^17.2.4",
@@ -38,7 +41,7 @@
     "typescript": "^5.9.3"
   },
   "prisma": {
-    "schema": "../prisma/schema.prisma",
-    "seed": "tsx ../prisma/seed.ts"
+    "schema": "./prisma/schema.prisma",
+    "seed": "tsx src/seed.ts"
   }
 }
