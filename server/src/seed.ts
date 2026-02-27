@@ -1,6 +1,7 @@
 import { PrismaClient, Role } from "@prisma/client";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { DateTime } from "luxon";
+import bcrypt from "bcryptjs";
 import path from "path";
 
 const dbPath = path.resolve(__dirname, "../dev.db");
@@ -8,19 +9,22 @@ const adapter = new PrismaBetterSqlite3({ url: `file:${dbPath}` });
 const prisma = new PrismaClient({ adapter });
 
 const TZ = "America/Chicago";
+const DEFAULT_PASSWORD = "password123";
 
 async function main() {
+  const passwordHash = await bcrypt.hash(DEFAULT_PASSWORD, 12);
   const now = DateTime.now().setZone(TZ);
   const start = now.startOf("month").toISODate();
   const end = now.endOf("month").toISODate();
 
   const admin = await prisma.user.upsert({
     where: { email: "admin@stepsprint.local" },
-    update: {},
+    update: { passwordHash },
     create: {
       email: "admin@stepsprint.local",
       name: "Admin User",
       role: Role.ADMIN,
+      passwordHash,
     },
   });
 
@@ -28,11 +32,12 @@ async function main() {
     Array.from({ length: 12 }).map((_, idx) =>
       prisma.user.upsert({
         where: { email: `user${idx + 1}@stepsprint.local` },
-        update: {},
+        update: { passwordHash },
         create: {
           email: `user${idx + 1}@stepsprint.local`,
           name: `Walker ${idx + 1}`,
           role: Role.PARTICIPANT,
+          passwordHash,
         },
       })
     )

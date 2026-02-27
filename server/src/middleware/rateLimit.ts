@@ -13,3 +13,10 @@ export const apiLimiter = rateLimit({
   max: 120,
   message: { error: "Too many requests, please try again later." },
 });
+
+/** Stricter rate limit for password reset requests */
+export const passwordResetLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5,
+  message: { error: "Too many password reset requests. Please try again later." },
+});

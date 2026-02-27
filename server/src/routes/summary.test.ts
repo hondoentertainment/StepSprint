@@ -15,7 +15,7 @@ describe("Summary routes", () => {
   it("GET /api/me/summary returns 400 without challengeId", async () => {
     const loginRes = await request(app)
       .post("/api/auth/login")
-      .send({ email: "user1@stepsprint.local" });
+      .send({ email: "user1@stepsprint.local", password: "password123" });
     const cookie = loginRes.headers["set-cookie"];
     if (!cookie) return;
 
@@ -28,7 +28,7 @@ describe("Summary routes", () => {
   it("GET /api/me/summary returns summary when enrolled", async () => {
     const loginRes = await request(app)
       .post("/api/auth/login")
-      .send({ email: "user1@stepsprint.local" });
+      .send({ email: "user1@stepsprint.local", password: "password123" });
     const cookie = loginRes.headers["set-cookie"];
     const challenge = await prisma.challenge.findFirst();
     if (!cookie || !challenge) return;
