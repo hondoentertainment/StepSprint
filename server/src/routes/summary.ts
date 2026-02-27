@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { DateTime } from "luxon";
 import { prisma } from "../prisma";
 import { authRequired, AuthenticatedRequest } from "../middleware/auth";
 import { getTodayRange, getWeekRange, getMonthRange } from "../utils/dates";
@@ -101,6 +102,69 @@ router.get("/", authRequired, async (req: AuthenticatedRequest, res) => {
   const topTotal = sortedTotals[0]?.steps ?? 0;
   const rank = sortedTotals.findIndex((entry) => entry.userId === req.user?.id) + 1;
 
+  const challengeStart = DateTime.fromJSDate(challenge.startDate, { zone: challenge.timezone }).startOf(
+    "day"
+  );
+  const challengeEnd = DateTime.fromJSDate(challenge.endDate, { zone: challenge.timezone }).startOf("day");
+  const today = DateTime.now().setZone(challenge.timezone).startOf("day");
+  const scoringEnd = today < challengeEnd ? today : challengeEnd;
+  const hasScoringWindow = scoringEnd >= challengeStart;
+
+  const activitySubmissions = hasScoringWindow
+    ? await prisma.stepSubmission.findMany({
+        where: {
+          challengeId,
+          userId: req.user.id,
+          steps: { gt: 0 },
+          date: {
+            gte: challengeStart.toJSDate(),
+            lte: scoringEnd.endOf("day").toJSDate(),
+          },
+        },
+        select: { date: true },
+      })
+    : [];
+
+  const activeDays: Set<string> = new Set(
+    activitySubmissions
+      .map((submission) => DateTime.fromJSDate(submission.date, { zone: challenge.timezone }).toISODate())
+      .filter((isoDate): isoDate is string => Boolean(isoDate))
+  );
+
+  const elapsedDays = hasScoringWindow
+    ? Math.max(0, Math.floor(scoringEnd.diff(challengeStart, "days").days) + 1)
+    : 0;
+  const consistencyScore =
+    elapsedDays > 0 ? Math.round((activeDays.size / elapsedDays) * 100) : 0;
+
+  let currentStreakDays = 0;
+  if (hasScoringWindow) {
+    let cursor = scoringEnd;
+    let cursorIso = cursor.toISODate();
+    while (cursorIso && activeDays.has(cursorIso)) {
+      currentStreakDays += 1;
+      cursor = cursor.minus({ days: 1 });
+      cursorIso = cursor.toISODate();
+    }
+  }
+
+  let longestStreakDays = 0;
+  const orderedActiveDays = Array.from(activeDays).sort();
+  let streakRun = 0;
+  let previousDay: DateTime | null = null;
+  for (const isoDate of orderedActiveDays) {
+    const day = DateTime.fromISO(isoDate, { zone: challenge.timezone }).startOf("day");
+    if (previousDay && Math.round(day.diff(previousDay, "days").days) === 1) {
+      streakRun += 1;
+    } else {
+      streakRun = 1;
+    }
+    if (streakRun > longestStreakDays) {
+      longestStreakDays = streakRun;
+    }
+    previousDay = day;
+  }
+
   res.json({
     personalTotals: {
       today: todayTotal._sum.steps ?? 0,
@@ -113,6 +177,15 @@ router.get("/", authRequired, async (req: AuthenticatedRequest, res) => {
     },
     rank: rank || null,
     gapToFirst: Math.max(0, topTotal - userTotal),
+    streak: {
+      currentDays: currentStreakDays,
+      longestDays: longestStreakDays,
+    },
+    consistency: {
+      activeDays: activeDays.size,
+      elapsedDays,
+      score: consistencyScore,
+    },
   });
 });
 

@@ -19,6 +19,11 @@ dist-ssr
 .DS_Store
 *.suo
 *.ntvs*
+test-results
+playwright-report
+playwright/.cache
+coverage
+*.lcov
 *.njsproj
 *.sln
 *.sw?

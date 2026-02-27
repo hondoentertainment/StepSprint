@@ -73,8 +73,9 @@ router.get("/weekly", async (req, res) => {
   const leaderboard = Array.from(totals.values())
     .map((entry) => {
       const prev = prevTotals.get(entry.userId) ?? 0;
-      const trend = entry.steps > prev ? "up" : entry.steps < prev ? "down" : "same";
-      return { ...entry, trend };
+      const delta = entry.steps - prev;
+      const trend = delta > 0 ? "up" : delta < 0 ? "down" : "same";
+      return { ...entry, trend, delta };
     })
     .sort((a, b) => b.steps - a.steps);
 
@@ -87,14 +88,18 @@ router.get("/teams", async (req, res) => {
     res.status(400).json({ error: "challengeId required" });
     return;
   }
-  const teams = await prisma.team.findMany({
-    where: { challengeId },
-    include: { members: { include: { user: true } }, challenge: true },
-  });
+  const [teams, unassignedMembers, submissions] = await Promise.all([
+    prisma.team.findMany({
+      where: { challengeId },
+      include: { members: { include: { user: true } }, challenge: true },
+    }),
+    prisma.teamMember.findMany({
+      where: { challengeId, teamId: null },
+      include: { user: true },
+    }),
+    prisma.stepSubmission.findMany({ where: { challengeId } }),
+  ]);
 
-  const submissions = await prisma.stepSubmission.findMany({
-    where: { challengeId },
-  });
   const stepsByUser = new Map<string, number>();
   submissions.forEach((submission) => {
     stepsByUser.set(
@@ -117,11 +122,30 @@ router.get("/teams", async (req, res) => {
         teamName: team.name,
         totalSteps,
         avgSteps,
-        leaderName: leader?.member.user.name ?? "",
+        leaderName: leader?.member.user.name ?? leader?.member.user.email ?? "",
         leaderSteps: leader?.steps ?? 0,
       };
     })
     .sort((a, b) => b.totalSteps - a.totalSteps);
+
+  if (unassignedMembers.length > 0) {
+    const memberSteps = unassignedMembers.map((member) => ({
+      member,
+      steps: stepsByUser.get(member.userId) ?? 0,
+    }));
+    const totalSteps = memberSteps.reduce((sum, entry) => sum + entry.steps, 0);
+    const leader = memberSteps.sort((a, b) => b.steps - a.steps)[0];
+    const avgSteps = memberSteps.length ? Math.round(totalSteps / memberSteps.length) : 0;
+    leaderboard.push({
+      teamId: "unassigned",
+      teamName: "Unassigned",
+      totalSteps,
+      avgSteps,
+      leaderName: leader?.member.user.name ?? leader?.member.user.email ?? "",
+      leaderSteps: leader?.steps ?? 0,
+    });
+    leaderboard.sort((a, b) => b.totalSteps - a.totalSteps);
+  }
 
   const topTotal = leaderboard[0]?.totalSteps ?? 0;
   const withGap = leaderboard.map((entry) => ({

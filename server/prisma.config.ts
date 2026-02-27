@@ -6,4 +6,8 @@ export default defineConfig({
   datasource: {
     url: "file:./dev.db",
   },
+  migrations: {
+    seed: "tsx src/seed.ts",
+  },
 });
+

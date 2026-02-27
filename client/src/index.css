@@ -1,26 +1,70 @@
 :root {
-  font-family: "Inter", "Segoe UI", system-ui, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-  color: #111827;
-  background-color: #f1f5f9;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  --font-sans: "Outfit", system-ui, sans-serif;
+
+  /* Dark fitness theme */
+  --bg-base: #0a0a0c;
+  --bg-elevated: #121214;
+  --bg-card: #161618;
+  --bg-card-hover: #1a1a1d;
+
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+
+  --accent: #f97316;
+  --accent-hover: #fb923c;
+  --accent-muted: rgba(249, 115, 22, 0.15);
+  --accent-gradient: linear-gradient(135deg, #f97316 0%, #fb923c 50%, #fbbf24 100%);
+
+  --success: #22c55e;
+  --success-muted: rgba(34, 197, 94, 0.2);
+  --error: #ef4444;
+  --error-muted: rgba(239, 68, 68, 0.15);
+  --warning: #eab308;
+
+  --border: rgba(255, 255, 255, 0.06);
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.5);
 }
 
 * {
   box-sizing: border-box;
 }
 
-a {
-  color: inherit;
+html {
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background: #f1f5f9;
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.5;
+  font-weight: 400;
+  color: var(--text-primary);
+  background: var(--bg-base);
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(249, 115, 22, 0.12), transparent),
+    radial-gradient(ellipse 60% 40% at 100% 0%, rgba(251, 146, 60, 0.06), transparent);
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--accent-hover);
 }

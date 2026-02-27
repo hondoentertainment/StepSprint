@@ -260,13 +260,17 @@ router.post("/challenges/:id/assign-teams", async (req, res) => {
 
 router.get("/submissions", async (req, res) => {
   const query = typeof req.query.query === "string" ? req.query.query : "";
+  const challengeId = typeof req.query.challengeId === "string" ? req.query.challengeId : undefined;
+  const where: Record<string, unknown> = {};
+  if (challengeId) where.challengeId = challengeId;
+  if (query) {
+    where.OR = [
+      { user: { email: { contains: query, mode: "insensitive" } } },
+      { user: { name: { contains: query, mode: "insensitive" } } },
+    ];
+  }
   const submissions = await prisma.stepSubmission.findMany({
-    where: {
-      OR: [
-        { user: { email: { contains: query, mode: "insensitive" } } },
-        { user: { name: { contains: query, mode: "insensitive" } } },
-      ],
-    },
+    where,
     include: { user: true, challenge: true },
     orderBy: { date: "desc" },
     take: 200,

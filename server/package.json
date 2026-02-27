@@ -10,7 +10,10 @@
     "prisma": "prisma",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
-    "db:seed": "prisma db seed"
+    "db:seed": "prisma db seed",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage"
   },
   "keywords": [],
   "author": "",
@@ -25,6 +28,7 @@
     "cors": "^2.8.6",
     "dotenv": "^17.2.4",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.2.1",
     "jsonwebtoken": "^9.0.3",
     "luxon": "^3.7.2",
     "zod": "^4.3.6"
@@ -37,8 +41,10 @@
     "@types/luxon": "^3.7.0",
     "@types/node": "^24.3.1",
     "prisma": "^7.3.0",
+    "supertest": "^7.0.0",
     "tsx": "^4.20.5",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^3.0.0"
   },
   "prisma": {
     "schema": "./prisma/schema.prisma",

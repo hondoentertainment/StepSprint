@@ -31,7 +31,7 @@ async function main() {
         update: {},
         create: {
           email: `user${idx + 1}@stepsprint.local`,
-          name: `Runner ${idx + 1}`,
+          name: `Walker ${idx + 1}`,
           role: Role.PARTICIPANT,
         },
       })

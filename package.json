@@ -1,0 +1,19 @@
+{
+  "name": "schaffer-shufflers",
+  "private": true,
+  "scripts": {
+    "test": "npm run test:client && npm run test:server",
+    "test:client": "cd client && npm run test:run",
+    "test:server": "cd server && npm run test:run",
+    "test:coverage": "npm run test:coverage:client && npm run test:coverage:server",
+    "test:coverage:client": "cd client && npm run test:coverage",
+    "test:coverage:server": "cd server && npm run test:coverage",
+    "test:e2e": "cd client && npm run test:e2e"
+  },
+  "devDependencies": {
+    "prisma": "^6.19.2"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.2"
+  }
+}
