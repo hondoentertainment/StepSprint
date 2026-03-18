@@ -98,7 +98,7 @@ function AuthenticatedApp() {
 }
 
 function App() {
-  const { user, setUser, isLoading, login, register, logout } = useAuth();
+  const { user, setUser, isLoading, login, register } = useAuth();
 
   if (isLoading) {
     return (
