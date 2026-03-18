@@ -18,7 +18,7 @@ type Props = {
 
 export function Admin({
   user,
-  challenges,
+  challenges: _challenges,
   selectedChallengeId,
   selectedChallenge,
   onChallengesRefresh,
