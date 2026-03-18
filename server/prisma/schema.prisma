@@ -12,15 +12,38 @@ enum Role {
 }
 
 model User {
-  id          String           @id @default(cuid())
-  email       String           @unique
-  name        String?
-  role        Role             @default(PARTICIPANT)
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  memberships TeamMember[]
-  submissions StepSubmission[]
-  auditLogs   AuditLog[]       @relation("AuditActor")
+  id                     String                  @id @default(cuid())
+  email                  String                  @unique
+  name                   String?
+  passwordHash           String?
+  role                   Role                    @default(PARTICIPANT)
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  memberships            TeamMember[]
+  submissions            StepSubmission[]
+  auditLogs              AuditLog[]              @relation("AuditActor")
+  resetTokens            PasswordResetToken[]
+  notificationPreference NotificationPreference?
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model NotificationPreference {
+  id            String  @id @default(cuid())
+  userId        String  @unique
+  dailyReminder Boolean @default(false)
+  user          User    @relation(fields: [userId], references: [id])
 }
 
 model Challenge {

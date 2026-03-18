@@ -11,6 +11,11 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(16),
   APP_ORIGIN: z.string().default("http://localhost:5173"),
   DEFAULT_CHALLENGE_TZ: z.string().default("America/Chicago"),
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.string().optional(),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  SMTP_FROM: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -26,4 +31,13 @@ export const config = {
   appOrigin: parsed.data.APP_ORIGIN,
   defaultChallengeTz: parsed.data.DEFAULT_CHALLENGE_TZ,
   cookieName: "stepsprint_session",
+  smtp: parsed.data.SMTP_HOST
+    ? {
+        host: parsed.data.SMTP_HOST,
+        port: Number(parsed.data.SMTP_PORT ?? "587"),
+        user: parsed.data.SMTP_USER,
+        pass: parsed.data.SMTP_PASS,
+        from: parsed.data.SMTP_FROM ?? "noreply@stepsprint.local",
+      }
+    : null,
 };

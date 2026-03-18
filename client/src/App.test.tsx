@@ -25,6 +25,6 @@ describe("App", () => {
     render(<App />);
     await screen.findByRole("heading", { name: /Schafer Shufflers/i });
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /get started/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /sign in/i })).toBeInTheDocument();
   });
 });

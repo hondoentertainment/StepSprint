@@ -13,10 +13,22 @@ export function useAuth() {
       .finally(() => setIsLoading(false));
   }, []);
 
-  async function login(email: string, name?: string) {
+  async function login(email: string, password: string) {
     const data = await api<{ user: User }>("/api/auth/login", {
       method: "POST",
-      body: JSON.stringify({ email, name: name || undefined }),
+      body: JSON.stringify({ email, password }),
+    });
+    setUser(data.user);
+    if (typeof sessionStorage !== "undefined") {
+      sessionStorage.setItem("stepSprintJustLoggedIn", "1");
+    }
+    return data.user;
+  }
+
+  async function register(email: string, password: string, name?: string) {
+    const data = await api<{ user: User }>("/api/auth/register", {
+      method: "POST",
+      body: JSON.stringify({ email, password, name: name || undefined }),
     });
     setUser(data.user);
     if (typeof sessionStorage !== "undefined") {
@@ -30,5 +42,5 @@ export function useAuth() {
     setUser(null);
   }
 
-  return { user, setUser, isLoading, login, logout };
+  return { user, setUser, isLoading, login, register, logout };
 }

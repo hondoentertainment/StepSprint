@@ -20,7 +20,7 @@ describe("Submissions routes", () => {
   it("POST /api/submissions returns 400 for invalid payload", async () => {
     const loginRes = await request(app)
       .post("/api/auth/login")
-      .send({ email: "user1@stepsprint.local" });
+      .send({ email: "user1@stepsprint.local", password: "password123" });
     const cookie = loginRes.headers["set-cookie"];
     if (!cookie) return;
 
