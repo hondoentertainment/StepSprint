@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
 import { ApiError, getErrorMessage } from "../api";
+import { track } from "../analytics";
 import type { Challenge } from "../types";
 import type { Summary } from "../types";
 
@@ -64,6 +65,7 @@ export function Home({
   useEffect(() => {
     if (!challengeId) return;
 
+    track("challenge_viewed", { challengeId });
     setIsLoading(true);
     setError("");
     api<Summary>(`/api/me/summary?challengeId=${challengeId}`)

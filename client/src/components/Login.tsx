@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { getErrorMessage } from "../api";
 import { isValidEmail } from "../utils";
+import { identify } from "../analytics";
 import type { User } from "../types";
 
 type Props = {
@@ -74,15 +75,17 @@ export function Login({ onLogin, onRegister }: Props) {
     try {
       setBusy(true);
       setError("");
+      let user: User;
       if (mode === "login") {
-        await onLogin(email.trim(), password);
+        user = await onLogin(email.trim(), password);
       } else {
-        await onRegister(
+        user = await onRegister(
           email.trim(),
           password,
           name?.trim() || undefined
         );
       }
+      identify(user.id);
     } catch (err) {
       const msg = getErrorMessage(err);
       if (msg === "PASSWORD_SETUP_REQUIRED") {

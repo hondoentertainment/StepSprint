@@ -2,6 +2,7 @@ import { useState } from "react";
 import { api } from "../api";
 import { getErrorMessage } from "../api";
 import { todayInTimezone, isFutureDate } from "../utils";
+import { track } from "../analytics";
 import type { Challenge } from "../types";
 import type { Summary } from "../types";
 
@@ -63,6 +64,7 @@ export function Submit({
           steps: Number(steps),
         }),
       });
+      track("submission_created", { challengeId, steps: Number(steps) });
       setSteps(8000);
       resetDate();
       setSuccess("Steps submitted successfully.");
