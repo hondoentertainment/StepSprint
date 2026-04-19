@@ -4,7 +4,7 @@ import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
 import { config } from "./config";
 import { logger } from "./logger";
-import { authLimiter, apiLimiter } from "./middleware/rateLimit";
+import { authLimiter, apiLimiter, generalLimiter } from "./middleware/rateLimit";
 import authRoutes from "./routes/auth";
 import adminRoutes from "./routes/admin";
 import challengeRoutes from "./routes/challenges";
@@ -38,6 +38,7 @@ app.use(
 );
 
 if (isProduction) {
+  app.use(generalLimiter);
   app.use("/api", apiLimiter);
 }
 
