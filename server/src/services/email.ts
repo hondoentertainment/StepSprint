@@ -1,4 +1,5 @@
 import { config } from "../config";
+import { logger } from "../logger";
 
 interface EmailPayload {
   to: string;
@@ -25,10 +26,13 @@ export async function sendEmail(payload: EmailPayload): Promise<void> {
       html: payload.html,
     });
   } else {
-    console.log("=== EMAIL (dev mode — no SMTP configured) ===");
-    console.log(`To: ${payload.to}`);
-    console.log(`Subject: ${payload.subject}`);
-    console.log(payload.text);
-    console.log("=== END EMAIL ===");
+    logger.info(
+      {
+        to: payload.to,
+        subject: payload.subject,
+        body: payload.text,
+      },
+      "EMAIL (dev mode — no SMTP configured)"
+    );
   }
 }

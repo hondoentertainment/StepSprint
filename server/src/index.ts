@@ -1,6 +1,7 @@
 import app from "./app";
 import { config } from "./config";
+import { logger } from "./logger";
 
 app.listen(config.port, () => {
-  console.log(`StepSprint server running on port ${config.port}`);
+  logger.info({ port: config.port }, "StepSprint server listening");
 });

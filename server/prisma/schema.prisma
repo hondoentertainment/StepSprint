@@ -47,19 +47,21 @@ model NotificationPreference {
 }
 
 model Challenge {
-  id          String           @id @default(cuid())
-  name        String
-  startDate   DateTime
-  endDate     DateTime
-  timezone    String
-  teamSize    Int
-  locked      Boolean          @default(false)
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  teams       Team[]
-  members     TeamMember[]
-  submissions StepSubmission[]
-  auditLogs   AuditLog[]
+  id                   String           @id @default(cuid())
+  name                 String
+  startDate            DateTime
+  endDate              DateTime
+  timezone             String
+  teamSize             Int
+  locked               Boolean          @default(false)
+  inviteCode           String?          @unique
+  inviteCodeExpiresAt  DateTime?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  teams                Team[]
+  members              TeamMember[]
+  submissions          StepSubmission[]
+  auditLogs            AuditLog[]
 
   @@index([startDate, endDate])
 }
