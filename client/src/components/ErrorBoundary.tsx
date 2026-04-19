@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { captureException } from "../sentry";
 
 type Props = {
   children: ReactNode;
@@ -10,12 +11,6 @@ type State = {
   error: Error | null;
 };
 
-/**
- * Top-level error boundary. Catches render-time errors anywhere below it,
- * shows a friendly fallback, and logs to the console.
- *
- * TODO: forward errors to Sentry (or equivalent) once monitoring is wired up.
- */
 export class ErrorBoundary extends Component<Props, State> {
   state: State = { hasError: false, error: null };
 
@@ -23,8 +18,11 @@ export class ErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, info: ErrorInfo): void {
-    console.error("[ErrorBoundary] Uncaught error:", error, info);
+  componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
+    console.error("[ErrorBoundary] Uncaught error:", error, errorInfo);
+    captureException(error, {
+      componentStack: errorInfo.componentStack,
+    });
   }
 
   reset = (): void => {
