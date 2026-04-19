@@ -10,23 +10,40 @@ export function useChallenges() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    setIsLoading(true);
-    setError("");
-    api<{ challenges: Challenge[] }>("/api/challenges")
-      .then((data) => {
+    let cancelled = false;
+
+    async function loadChallenges() {
+      try {
+        const data = await api<{ challenges: Challenge[] }>("/api/challenges");
+        if (cancelled) return;
         setChallenges(data.challenges);
         setSelectedChallengeId((current) => current || data.challenges[0]?.id || "");
-      })
-      .catch((err) => setError(getErrorMessage(err)))
-      .finally(() => setIsLoading(false));
+      } catch (err) {
+        if (cancelled) return;
+        setError(getErrorMessage(err));
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    }
 
-    api<{ challenge: Challenge | null }>("/api/challenges/active")
-      .then((data) => {
+    async function loadActive() {
+      try {
+        const data = await api<{ challenge: Challenge | null }>("/api/challenges/active");
+        if (cancelled) return;
         if (data.challenge) {
           setSelectedChallengeId(data.challenge.id);
         }
-      })
-      .catch(() => null);
+      } catch {
+        // ignore; active-challenge lookup is best-effort
+      }
+    }
+
+    void loadChallenges();
+    void loadActive();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const selectedChallenge = useMemo(

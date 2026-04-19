@@ -2,7 +2,8 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import "./App.css";
 import { useAuth } from "./hooks/useAuth";
 import { useChallenges } from "./hooks/useChallenges";
-import { WeekProvider, useWeek } from "./contexts/WeekContext";
+import { WeekProvider } from "./contexts/WeekContext";
+import { useWeek } from "./contexts/useWeek";
 import { Login } from "./components/Login";
 import { ForgotPassword } from "./components/ForgotPassword";
 import { ResetPassword } from "./components/ResetPassword";
@@ -81,7 +82,6 @@ function AuthenticatedApp() {
             ) : (
               <Admin
                 user={user}
-                challenges={challenges}
                 selectedChallengeId={selectedChallengeId}
                 selectedChallenge={selectedChallenge}
                 onChallengesRefresh={refreshChallenges}

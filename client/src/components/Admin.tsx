@@ -8,7 +8,6 @@ import type { Submission } from "../types";
 
 type Props = {
   user: User;
-  challenges: Challenge[];
   selectedChallengeId: string;
   selectedChallenge: Challenge | null;
   onChallengesRefresh: () => Promise<Challenge[]>;
@@ -18,7 +17,6 @@ type Props = {
 
 export function Admin({
   user,
-  challenges: _challenges,
   selectedChallengeId,
   selectedChallenge,
   onChallengesRefresh,
