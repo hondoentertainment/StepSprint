@@ -29,7 +29,7 @@ DATABASE_URL="postgresql://user:password@host:5432/stepsprint?schema=public"
 
 ### 3. Use the PostgreSQL Prisma schema
 
-Copy `prisma/schema.postgresql.prisma` to `prisma/schema.prisma` (or rename), then:
+Copy `server/prisma/schema.postgresql.prisma` over `server/prisma/schema.prisma` (or rename), then:
 
 ```bash
 cd server
@@ -133,7 +133,6 @@ FROM node:20-alpine
 WORKDIR /app
 COPY server/package*.json server/
 RUN cd server && npm ci --omit=dev
-COPY prisma prisma/
 COPY server server/
 RUN cd server && npm run build && npx prisma generate
 EXPOSE 3001

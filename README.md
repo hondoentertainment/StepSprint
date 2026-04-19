@@ -5,8 +5,9 @@ StepSprint is a month-long step challenge platform with teams, leaderboards, and
 ## Workspace layout
 
 - `client/` - Vite React + TypeScript frontend
-- `server/` - Express + TypeScript API
-- `prisma/` - Prisma schema, migrations, and seed data
+- `server/` - Express + TypeScript API (includes `server/prisma/` — the
+  canonical Prisma schema, migrations, and the seed entry point at
+  `server/src/seed.ts`)
 
 ## Setup
 
