@@ -32,7 +32,10 @@ export function Layout({
 
   return (
     <div className="app">
-      <header className="topbar" role="banner">
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
+      <header className="topbar" role="banner" aria-label="Site header">
         <div>
           <h1>Schafer Shufflers</h1>
           <p>Welcome, {user.name ?? user.email}</p>
@@ -42,6 +45,7 @@ export function Layout({
             value={selectedChallengeId}
             onChange={(e) => onChallengeChange(e.target.value)}
             disabled={challengesLoading || challenges.length === 0}
+            aria-label="Select challenge"
           >
             {!challenges.length && <option value="">No challenges available</option>}
             {challenges.map((c) => (
@@ -69,7 +73,7 @@ export function Layout({
         ))}
       </nav>
 
-      <main>
+      <main id="main-content" tabIndex={-1}>
         <Outlet />
       </main>
     </div>
