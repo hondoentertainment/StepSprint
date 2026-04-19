@@ -1,10 +1,15 @@
+// PostgreSQL schema for production. To use:
+// 1. Copy this file over server/prisma/schema.prisma (or swap as needed)
+// 2. Set DATABASE_URL to your PostgreSQL connection string
+// 3. Run: npx prisma migrate dev (or deploy in prod)
+
 generator client {
   provider = "prisma-client-js"
-  output   = "../server/node_modules/.prisma/client"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 enum Role {

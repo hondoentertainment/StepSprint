@@ -7,7 +7,7 @@ dotenv.config();
 
 const envSchema = z.object({
   PORT: z.string().optional(),
-  DATABASE_URL: z.string().optional(),
+  DATABASE_URL: z.string().min(1).default("file:./dev.db"),
   JWT_SECRET: z.string().min(16),
   APP_ORIGIN: z.string().default("http://localhost:5173"),
   DEFAULT_CHALLENGE_TZ: z.string().default("America/Chicago"),

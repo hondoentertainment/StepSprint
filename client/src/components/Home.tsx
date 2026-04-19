@@ -35,20 +35,35 @@ export function Home({
   const [summary, setSummary] = useState<Summary | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const [welcomeMessage, setWelcomeMessage] = useState(false);
+  const [welcomeMessage] = useState(() => {
+    if (typeof sessionStorage === "undefined") return false;
+    return sessionStorage.getItem("stepSprintJustLoggedIn") !== null;
+  });
   const [dailyReminder, setDailyReminder] = useState(false);
 
   useEffect(() => {
-    if (typeof sessionStorage !== "undefined" && sessionStorage.getItem("stepSprintJustLoggedIn")) {
+    if (welcomeMessage && typeof sessionStorage !== "undefined") {
       sessionStorage.removeItem("stepSprintJustLoggedIn");
-      setWelcomeMessage(true);
     }
+    // Only run on mount to clear the one-time flag; subsequent toggles don't retrigger storage clearing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    api<{ dailyReminder: boolean }>("/api/me/notifications/preferences")
-      .then((prefs) => setDailyReminder(prefs.dailyReminder))
-      .catch(() => null);
+    let cancelled = false;
+    async function loadPreferences() {
+      try {
+        const prefs = await api<{ dailyReminder: boolean }>("/api/me/notifications/preferences");
+        if (cancelled) return;
+        setDailyReminder(prefs.dailyReminder);
+      } catch {
+        // ignore; notification preferences are best-effort
+      }
+    }
+    void loadPreferences();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   function toggleDailyReminder() {
@@ -64,19 +79,33 @@ export function Home({
   useEffect(() => {
     if (!challengeId) return;
 
-    setIsLoading(true);
-    setError("");
-    api<Summary>(`/api/me/summary?challengeId=${challengeId}`)
-      .then(setSummary)
-      .catch((err) => {
+    let cancelled = false;
+
+    async function loadSummary() {
+      setIsLoading(true);
+      setError("");
+      try {
+        const data = await api<Summary>(`/api/me/summary?challengeId=${challengeId}`);
+        if (cancelled) return;
+        setSummary(data);
+      } catch (err) {
+        if (cancelled) return;
         setSummary(null);
         if (err instanceof ApiError && err.status === 403) {
           setError("You are not enrolled in this challenge yet.");
-          return;
+        } else {
+          setError(getErrorMessage(err));
         }
-        setError(getErrorMessage(err));
-      })
-      .finally(() => setIsLoading(false));
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    }
+
+    void loadSummary();
+
+    return () => {
+      cancelled = true;
+    };
   }, [challengeId]);
 
   return (
