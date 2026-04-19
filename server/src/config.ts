@@ -16,6 +16,8 @@ const envSchema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().optional(),
+  SENTRY_DSN: z.string().optional(),
+  NODE_ENV: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -31,6 +33,8 @@ export const config = {
   appOrigin: parsed.data.APP_ORIGIN,
   defaultChallengeTz: parsed.data.DEFAULT_CHALLENGE_TZ,
   cookieName: "stepsprint_session",
+  sentryDsn: parsed.data.SENTRY_DSN,
+  nodeEnv: parsed.data.NODE_ENV ?? "development",
   smtp: parsed.data.SMTP_HOST
     ? {
         host: parsed.data.SMTP_HOST,

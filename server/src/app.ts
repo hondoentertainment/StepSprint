@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import * as Sentry from "@sentry/node";
 import { config } from "./config";
 import { authLimiter, apiLimiter } from "./middleware/rateLimit";
 import authRoutes from "./routes/auth";
@@ -44,6 +45,11 @@ app.use("/api/me/summary", summaryRoutes);
 app.use("/api/invites", inviteRoutes);
 app.use("/api/integrations", integrationsRoutes);
 app.use("/api/me/notifications", notificationsRoutes);
+
+// Sentry must be attached AFTER all routes and BEFORE any custom error
+// handler so uncaught route errors flow into Sentry first.
+// Safe no-op when SENTRY_DSN is unset.
+Sentry.setupExpressErrorHandler(app);
 
 app.use((_req, res) => {
   res.status(404).json({ error: "Not found" });
