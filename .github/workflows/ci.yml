@@ -30,7 +30,11 @@ jobs:
 
       - name: Create SQLite schema
         working-directory: server
-        run: npx prisma db push --skip-generate
+        run: npx prisma db push
+
+      - name: Seed database
+        working-directory: server
+        run: npx prisma db seed
 
       - name: Run server tests
         working-directory: server
