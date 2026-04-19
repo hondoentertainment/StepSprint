@@ -11,11 +11,14 @@ Note: `package.json` still names the root workspace `schaffer-shufflers` — thi
 ## Workspace layout
 
 ```
-client/     Vite + React 19 + TypeScript frontend (React Router 7)
-server/     Express 5 + TypeScript API (JWT auth, Zod validation)
-prisma/     Prisma schema (SQLite active, PostgreSQL variant alongside), seed
-docs/       Screenshots and design notes
-vercel.json Frontend deploy config (API deployment is not yet wired)
+client/           Vite + React 19 + TypeScript frontend (React Router 7)
+server/           Express 5 + TypeScript API (JWT auth, Zod validation)
+  prisma/         Canonical Prisma schema (SQLite active;
+                  PostgreSQL variant at schema.postgresql.prisma)
+                  and migrations
+  src/seed.ts     Seed entry point (wired via server/prisma.config.ts)
+docs/             Screenshots and design notes
+vercel.json       Frontend deploy config (API deployment is not yet wired)
 ```
 
 ## Commands
@@ -83,7 +86,7 @@ Team assignment supports random and snake-draft strategies at challenge creation
 
 ## Known gaps / gotchas
 
-- `.env.example` lists PostgreSQL but the active Prisma provider is SQLite via `better-sqlite3`. A `schema.postgresql.prisma` exists alongside `schema.prisma` but isn't wired in. Confirm which provider is in use before touching migrations.
+- `.env.example` lists PostgreSQL but the active Prisma provider is SQLite via `better-sqlite3`. A `server/prisma/schema.postgresql.prisma` exists alongside `server/prisma/schema.prisma` but isn't wired in. Confirm which provider is in use before touching migrations.
 - GitHub Actions only deploys the client; there is **no server CI and no server deploy path** configured.
 - Nodemailer is wired but no real SMTP provider is configured — password reset emails will no-op without one.
 - Rate limiting currently applies to auth routes only in production.
@@ -96,5 +99,5 @@ Team assignment supports random and snake-draft strategies at challenge creation
 - Run the relevant workspace's tests (`npm run test:run`) before declaring done; run Playwright when touching auth, submissions, leaderboards, or admin flows.
 - Lint the client (`cd client && npm run lint`) after UI changes.
 - If you change the Prisma schema, generate a migration (`db:migrate`) and update `seed.ts` if the shape of seed data changes.
-- Keep both `schema.prisma` and `schema.postgresql.prisma` in sync if you modify models, until one is removed.
+- Keep both `server/prisma/schema.prisma` and `server/prisma/schema.postgresql.prisma` in sync if you modify models, until one is removed.
 - Don't rename the root package from `schaffer-shufflers` as part of unrelated work — it appears in lockfiles and would create noisy diffs; do it as its own change.
