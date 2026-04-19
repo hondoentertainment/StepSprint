@@ -1,7 +1,9 @@
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import pinoHttp from "pino-http";
 import { config } from "./config";
+import { logger } from "./logger";
 import { authLimiter, apiLimiter } from "./middleware/rateLimit";
 import authRoutes from "./routes/auth";
 import adminRoutes from "./routes/admin";
@@ -16,6 +18,24 @@ import notificationsRoutes from "./routes/notifications";
 
 const app = express();
 const isProduction = process.env.NODE_ENV === "production";
+
+app.use(
+  pinoHttp({
+    logger,
+    // `genReqId` is built-in; explicitly enabling it guarantees a request id
+    // is attached to each request's logger even if upstream does not send one.
+    genReqId: (req, res) => {
+      const existing = req.headers["x-request-id"];
+      if (typeof existing === "string" && existing.length > 0) {
+        res.setHeader("x-request-id", existing);
+        return existing;
+      }
+      const id = crypto.randomUUID();
+      res.setHeader("x-request-id", id);
+      return id;
+    },
+  })
+);
 
 if (isProduction) {
   app.use("/api", apiLimiter);
