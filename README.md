@@ -53,6 +53,12 @@ For UI mode: `npm run test:e2e:ui`
 
 The test suite will start both client and server automatically. Tests use `user1@stepsprint.local` from the seed data.
 
+## Database configuration
+
+- The active development database is **SQLite**, wired up via `@prisma/adapter-better-sqlite3`. The schema lives in `prisma/schema.prisma` and the default `DATABASE_URL` in `.env.example` is `file:./dev.db`.
+- `prisma/schema.postgresql.prisma` is the **planned production schema** for when StepSprint migrates to PostgreSQL. It is kept in the repo intentionally; do not delete it.
+- When modifying models, update **both** `prisma/schema.prisma` and `prisma/schema.postgresql.prisma` so the two stay in sync. This keeps the future Postgres migration a straightforward swap.
+
 ## Notes
 
 - The API runs on `http://localhost:3001` by default.

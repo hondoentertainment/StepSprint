@@ -2,6 +2,8 @@
   "name": "schaffer-shufflers",
   "private": true,
   "scripts": {
+    "lint": "cd client && npm run lint",
+    "build": "cd client && npm run build && cd ../server && npm run build",
     "test": "npm run test:client && npm run test:server",
     "test:client": "cd client && npm run test:run",
     "test:server": "cd server && npm run test:run",
