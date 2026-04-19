@@ -955,6 +955,30 @@
 }
 
 /* ========== Accessibility ========== */
+.skip-link {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 0.6rem 1rem;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.9rem;
+  border-radius: 0 0 var(--radius-md) 0;
+  text-decoration: none;
+  z-index: 1000;
+  /* Visually hidden until focused */
+  transform: translateY(-120%);
+  transition: transform 0.15s ease;
+}
+
+.skip-link:focus,
+.skip-link:focus-visible {
+  transform: translateY(0);
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
