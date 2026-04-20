@@ -1,0 +1,35 @@
+# StepSprint Render blueprint.
+# Deploy via `render blueprint` -- see docs/DEPLOYMENT.md.
+# Provisions the API web service (Docker) and a managed Postgres instance.
+
+databases:
+  - name: stepsprint-db
+    plan: free
+    databaseName: stepsprint
+    postgresMajorVersion: "16"
+
+services:
+  - type: web
+    name: stepsprint-api
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    dockerContext: ./server
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3001"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: stepsprint-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: APP_ORIGIN
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
