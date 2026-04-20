@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import "./App.css";
 import { useAuth } from "./hooks/useAuth";
@@ -11,9 +12,26 @@ import { InvitePage } from "./components/InvitePage";
 import { Layout } from "./components/Layout";
 import { Home } from "./components/Home";
 import { Submit } from "./components/Submit";
-import { WeeklyLeaderboard } from "./components/WeeklyLeaderboard";
-import { TeamStandings } from "./components/TeamStandings";
-import { Admin } from "./components/Admin";
+
+// Route-based code splitting: lazy-load heavier, less critical-path routes.
+// Home, Login, and Submit stay eager as they're on the primary user journey.
+const WeeklyLeaderboard = lazy(() =>
+  import("./components/WeeklyLeaderboard").then((m) => ({ default: m.WeeklyLeaderboard })),
+);
+const TeamStandings = lazy(() =>
+  import("./components/TeamStandings").then((m) => ({ default: m.TeamStandings })),
+);
+const Admin = lazy(() =>
+  import("./components/Admin").then((m) => ({ default: m.Admin })),
+);
+
+function RouteFallback() {
+  return (
+    <div className="panel" role="status" aria-live="polite">
+      Loading…
+    </div>
+  );
+}
 
 function AuthenticatedApp() {
   const { user, logout } = useAuth();
@@ -70,24 +88,35 @@ function AuthenticatedApp() {
         <Route
           path="weekly"
           element={
-            <WeeklyLeaderboard challengeId={selectedChallengeId} selectedChallenge={selectedChallenge} />
+            <Suspense fallback={<RouteFallback />}>
+              <WeeklyLeaderboard challengeId={selectedChallengeId} selectedChallenge={selectedChallenge} />
+            </Suspense>
           }
         />
-        <Route path="teams" element={<TeamStandings challengeId={selectedChallengeId} user={user} />} />
+        <Route
+          path="teams"
+          element={
+            <Suspense fallback={<RouteFallback />}>
+              <TeamStandings challengeId={selectedChallengeId} user={user} />
+            </Suspense>
+          }
+        />
         <Route
           path="admin"
           element={
             user.role !== "ADMIN" ? (
               <Navigate to="/home" replace />
             ) : (
-              <Admin
-                user={user}
-                selectedChallengeId={selectedChallengeId}
-                selectedChallenge={selectedChallenge}
-                onChallengesRefresh={refreshChallenges}
-                weekYear={week.year}
-                weekNumber={week.week}
-              />
+              <Suspense fallback={<RouteFallback />}>
+                <Admin
+                  user={user}
+                  selectedChallengeId={selectedChallengeId}
+                  selectedChallenge={selectedChallenge}
+                  onChallengesRefresh={refreshChallenges}
+                  weekYear={week.year}
+                  weekNumber={week.week}
+                />
+              </Suspense>
             )
           }
         />
