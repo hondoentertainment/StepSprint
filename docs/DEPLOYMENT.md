@@ -147,3 +147,9 @@ CMD ["node", "server/dist/index.js"]
 - **Rate limiting**: The API includes basic rate limiting in production (see `server/src/middleware/rateLimit.ts`).
 - **CORS**: Ensure `APP_ORIGIN` matches your frontend URL.
 - **Cookies**: Session cookies are HTTP-only. Configure `sameSite` and `secure` for HTTPS.
+
+---
+
+## Render deploy (server)
+
+TODO: See `render.yaml` and `server/Dockerfile`.
