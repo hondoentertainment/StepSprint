@@ -86,13 +86,13 @@ Team assignment supports random and snake-draft strategies at challenge creation
 
 ## Known gaps / gotchas
 
-- `.env.example` lists PostgreSQL but the active Prisma provider is SQLite via `better-sqlite3`. A `server/prisma/schema.postgresql.prisma` exists alongside `server/prisma/schema.prisma` but isn't wired in. Confirm which provider is in use before touching migrations.
-- GitHub Actions only deploys the client; there is **no server CI and no server deploy path** configured.
+- The active Prisma provider is SQLite via `better-sqlite3`; `.env.example` is aligned with SQLite. A `server/prisma/schema.postgresql.prisma` variant exists for a future Postgres cutover but isn't wired in. Confirm which provider is in use before touching migrations.
 - Nodemailer is wired but no real SMTP provider is configured — password reset emails will no-op without one.
-- Rate limiting currently applies to auth routes only in production.
-- Logging is ad-hoc `console.log`; no structured logger yet.
-- No i18n, no PWA manifest, no product analytics/telemetry.
 - Health-sync integrations (Apple Health / Google Fit / Fitbit) are not implemented — `routes/integrations.ts` is scaffolding.
+- `npm audit` on the client reports 4 high-severity advisories after `npm audit fix` (all in the `vite-plugin-pwa > workbox-build > @rollup/plugin-terser > serialize-javascript` chain); resolving them requires a breaking downgrade and is deferred.
+- Sentry and PostHog are wired on both client and server, but DSNs/keys are no-ops until the corresponding env vars (`VITE_SENTRY_DSN`, `VITE_POSTHOG_KEY`, `SENTRY_DSN`) are set in production.
+- Route-based code splitting is applied to `Admin`, `WeeklyLeaderboard`, and `TeamStandings`; `Home`, `Login`, and `Submit` stay eager (critical path).
+- No server deploy target is configured yet — a `Dockerfile` and `render.yaml` are tracked separately under `docs/DEPLOYMENT.md` (see "Server deploy").
 
 ## When making changes
 

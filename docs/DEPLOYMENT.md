@@ -82,6 +82,41 @@ Serve the `client/dist` folder with a static file server (nginx, Cloudflare Page
 
 ---
 
+## Client deploy
+
+The client is deployed via Vercel, configured in `vercel.json` at the repo
+root. Production deploys run automatically on push to `main`, using the
+Vercel GitHub integration — there's no separate GitHub Actions workflow
+required for Vercel.
+
+A GitHub Pages workflow (`.github/workflows/deploy-pages.yml`) also exists
+as a fallback / preview target; see the "GitHub Pages" section below.
+
+Client-specific build-time env vars (set in the Vercel project):
+
+- `VITE_API_URL` — API base URL (required when the API is on a different origin)
+- `VITE_SENTRY_DSN` — optional; enables Sentry error reporting in the browser
+- `VITE_POSTHOG_KEY` / `VITE_POSTHOG_HOST` — optional; enables PostHog analytics
+
+---
+
+## Server deploy
+
+**TODO — not yet wired.** A `Dockerfile` and `render.yaml` are being added in
+a separate track (owned by another agent). Once those land, this section
+should document:
+
+- Building and pushing the container image
+- The `render.yaml` service definition (web service + managed Postgres)
+- Required runtime env vars (`DATABASE_URL`, `JWT_SECRET`, `APP_ORIGIN`,
+  `SENTRY_DSN`, `DEFAULT_CHALLENGE_TZ`, SMTP credentials)
+- Running `prisma migrate deploy` as a release step
+
+Until that track merges, the API must be deployed manually (see "API server"
+under "Build & Run" above, or the sample `Dockerfile` under "Docker").
+
+---
+
 ## GitHub Pages (Frontend)
 
 The frontend deploys to GitHub Pages on push to `main`/`master` via `.github/workflows/deploy-pages.yml`.
