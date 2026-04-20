@@ -116,16 +116,17 @@ Team assignment supports random and snake-draft at challenge creation.
 
 ## Known gaps / gotchas
 
-- **Sentry and PostHog are no-ops in dev**: SDKs wired but silent until `SENTRY_DSN` / `VITE_SENTRY_DSN` / `VITE_POSTHOG_KEY` are set.
+- **Sentry and PostHog are no-ops in dev**: SDKs wired on client + server but silent until `SENTRY_DSN` / `VITE_SENTRY_DSN` / `VITE_POSTHOG_KEY` are set.
 - **No real SMTP provider**: Nodemailer wired, password reset emails no-op without SMTP env.
 - **i18n coverage is thin**: only `Login` is translated via `useTranslation`; all other components still hardcode English.
 - **Health-sync integrations** (Apple Health / Google Fit / Fitbit): `routes/integrations.ts` is scaffolding; no OAuth flows yet.
 - **Push notifications**: daily reminders are email-only; no Web Push / VAPID yet.
 - **CSP not pinned**: helmet defaults are on but CSP is disabled — lock down once asset origins stabilize.
-- **Server not deployed**: `render.yaml` + `Dockerfile` exist; provisioning is manual and not yet done.
-- **Postgres cutover pending**: dev uses SQLite; `schema.postgresql.prisma` is kept in sync but not yet the live schema.
-- **Dependency vulnerabilities**: `npm audit` still reports a few moderate/high vulns after `audit fix` — `--force` not applied to avoid breaking builds.
-- **Bundle size**: admin routes are code-split, but initial bundle is still ~100 KB gzipped — room for more splitting, image optimization, and response caching.
+- **CSRF deferred**: auth is cookie-based; server-side CSRF was intentionally not added this round because it requires a paired change to `client/src/api.ts`. Tracked inline in `server/src/app.ts`.
+- **Server not deployed**: `render.yaml` + `server/Dockerfile` exist; provisioning is manual and not yet done. See `docs/DEPLOYMENT.md` → "Server deploy".
+- **Postgres cutover pending**: dev uses SQLite; `server/prisma/schema.postgresql.prisma` is kept in sync but not yet the live schema.
+- **Dependency vulnerabilities**: 4 high advisories in `vite-plugin-pwa > workbox-build > @rollup/plugin-terser > serialize-javascript` (client) and 3 moderate in `@prisma/dev > @hono/node-server` (server) remain after `npm audit fix`. Resolving either chain requires `--force` with breaking downgrades, so they're deferred.
+- **Bundle size**: `Admin`, `WeeklyLeaderboard`, `TeamStandings` are code-split; `Home`, `Login`, `Submit` stay eager (critical path). Initial bundle is ~97 KB gzipped — room for more splitting, image optimization, and response caching.
 
 ## When making changes
 

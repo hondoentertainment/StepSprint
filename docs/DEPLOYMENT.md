@@ -82,6 +82,45 @@ Serve the `client/dist` folder with a static file server (nginx, Cloudflare Page
 
 ---
 
+## Client deploy
+
+The client is deployed via Vercel, configured in `vercel.json` at the repo
+root. Production deploys run automatically on push to `main`, using the
+Vercel GitHub integration — there's no separate GitHub Actions workflow
+required for Vercel.
+
+A GitHub Pages workflow (`.github/workflows/deploy-pages.yml`) also exists
+as a fallback / preview target; see the "GitHub Pages" section below.
+
+Client-specific build-time env vars (set in the Vercel project):
+
+- `VITE_API_URL` — API base URL (required when the API is on a different origin)
+- `VITE_SENTRY_DSN` — optional; enables Sentry error reporting in the browser
+- `VITE_POSTHOG_KEY` / `VITE_POSTHOG_HOST` — optional; enables PostHog analytics
+
+---
+
+## Server deploy (Render)
+
+`render.yaml` at the repo root defines a blueprint with:
+- `stepsprint-api` — Docker web service built from `server/Dockerfile`
+- `stepsprint-db` — managed Postgres (free tier)
+
+**Steps:**
+
+1. Push the branch to GitHub.
+2. In Render: **New** → **Blueprint** → select the repo. Render reads `render.yaml`.
+3. Set the non-synced env vars in the Render dashboard:
+   - `SENTRY_DSN` (optional)
+   - `APP_ORIGIN` — your client origin (e.g. `https://stepsprint.vercel.app`)
+   - SMTP vars if password reset email is needed
+4. `JWT_SECRET` is auto-generated; `DATABASE_URL` is wired from `stepsprint-db`.
+5. On each deploy, the container runs `prisma migrate deploy && node dist/index.js` — migrations apply before serving.
+
+The `server/Dockerfile` is a multi-stage build targeting Postgres in prod. For local dev, keep using `npm run dev` (SQLite).
+
+---
+
 ## GitHub Pages (Frontend)
 
 The frontend deploys to GitHub Pages on push to `main`/`master` via `.github/workflows/deploy-pages.yml`.
@@ -149,6 +188,3 @@ CMD ["node", "server/dist/index.js"]
 
 ---
 
-## Render deploy (server)
-
-TODO: See `render.yaml` and `server/Dockerfile`.
