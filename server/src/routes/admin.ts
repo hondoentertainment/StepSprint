@@ -116,15 +116,28 @@ router.post("/challenges/:id/participants", async (req, res) => {
 
   const userIds = [...usersFromEmails, ...usersFromIds].map((user) => user.id);
 
-  await prisma.teamMember.createMany({
-    data: userIds.map((userId) => ({
-      userId,
-      challengeId: challenge.id,
-      teamId: null,
-      isLeader: false,
-    })),
-    skipDuplicates: true,
-  });
+  // SQLite via the @prisma/adapter-better-sqlite3 does not support
+  // createMany({ skipDuplicates: true }); pre-filter the list against
+  // the (userId, challengeId) unique constraint instead.
+  const existing = userIds.length
+    ? await prisma.teamMember.findMany({
+        where: { challengeId: challenge.id, userId: { in: userIds } },
+        select: { userId: true },
+      })
+    : [];
+  const existingIds = new Set(existing.map((m) => m.userId));
+  const newUserIds = userIds.filter((id) => !existingIds.has(id));
+
+  if (newUserIds.length > 0) {
+    await prisma.teamMember.createMany({
+      data: newUserIds.map((userId) => ({
+        userId,
+        challengeId: challenge.id,
+        teamId: null,
+        isLeader: false,
+      })),
+    });
+  }
 
   await prisma.auditLog.create({
     data: {
@@ -390,8 +403,8 @@ router.get("/export/teams", async (req, res) => {
     where: { challengeId },
     include: { members: { include: { user: true } }, challenge: true },
   });
-  const rows = [
-    ["challenge", "team", "leader", "memberEmail", "memberName"].join(","),
+  const rows: string[][] = [
+    ["challenge", "team", "leader", "memberEmail", "memberName"],
     ...teams.flatMap((team) =>
       team.members.map((member) => [
         team.challenge.name,

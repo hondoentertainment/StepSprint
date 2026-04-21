@@ -20,22 +20,54 @@ export function TeamStandings({ challengeId, user }: Props) {
   useEffect(() => {
     if (!challengeId) return;
 
-    setIsLoading(true);
-    setError("");
-    api<{ leaderboard: TeamEntry[] }>(`/api/leaderboards/teams?challengeId=${challengeId}`)
-      .then((data) => setTeams(data.leaderboard))
-      .catch((err) => {
+    let cancelled = false;
+
+    async function loadTeams() {
+      setIsLoading(true);
+      setError("");
+      try {
+        const data = await api<{ leaderboard: TeamEntry[] }>(
+          `/api/leaderboards/teams?challengeId=${challengeId}`
+        );
+        if (cancelled) return;
+        setTeams(data.leaderboard);
+      } catch (err) {
+        if (cancelled) return;
         setTeams([]);
         setError(getErrorMessage(err));
-      })
-      .finally(() => setIsLoading(false));
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    }
+
+    void loadTeams();
+
+    return () => {
+      cancelled = true;
+    };
   }, [challengeId]);
 
   useEffect(() => {
     if (!challengeId) return;
-    api<Summary>(`/api/me/summary?challengeId=${challengeId}`)
-      .then((data) => setUserTeamName(data.teamTotals.teamName || null))
-      .catch(() => setUserTeamName(null));
+
+    let cancelled = false;
+
+    async function loadSummary() {
+      try {
+        const data = await api<Summary>(`/api/me/summary?challengeId=${challengeId}`);
+        if (cancelled) return;
+        setUserTeamName(data.teamTotals.teamName || null);
+      } catch {
+        if (cancelled) return;
+        setUserTeamName(null);
+      }
+    }
+
+    void loadSummary();
+
+    return () => {
+      cancelled = true;
+    };
   }, [challengeId]);
 
   return (

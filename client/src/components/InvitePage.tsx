@@ -12,7 +12,7 @@ export function InvitePage({ onAccepted }: { onAccepted: (user: User) => void })
   const [error, setError] = useState("");
   const [challengeName, setChallengeName] = useState<string | null>(null);
 
-  const acceptInvite = useCallback(() => {
+  const acceptInvite = useCallback(async () => {
     if (!token) {
       setStatus("error");
       setError("Missing invite token");
@@ -22,28 +22,37 @@ export function InvitePage({ onAccepted }: { onAccepted: (user: User) => void })
     setStatus("loading");
     setError("");
 
-    fetch(getApiUrl(`/api/invites/accept?token=${encodeURIComponent(token)}`), { credentials: "include" })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.user) {
-          onAccepted(data.user);
-          setChallengeName(data.challengeName || null);
-          setStatus("success");
-          const targetPath = data.challengeId ? `/home?challenge=${data.challengeId}` : "/home";
-          setTimeout(() => navigate(targetPath, { replace: true }), 1500);
-        } else {
-          setStatus("error");
-          setError(data.error || "Invalid invite");
-        }
-      })
-      .catch((err) => {
+    try {
+      const res = await fetch(
+        getApiUrl(`/api/invites/accept?token=${encodeURIComponent(token)}`),
+        { credentials: "include" }
+      );
+      const data = await res.json();
+      if (data.user) {
+        onAccepted(data.user);
+        setChallengeName(data.challengeName || null);
+        setStatus("success");
+        const targetPath = data.challengeId ? `/home?challenge=${data.challengeId}` : "/home";
+        setTimeout(() => navigate(targetPath, { replace: true }), 1500);
+      } else {
         setStatus("error");
-        setError(getErrorMessage(err));
-      });
+        setError(data.error || "Invalid invite");
+      }
+    } catch (err) {
+      setStatus("error");
+      setError(getErrorMessage(err));
+    }
   }, [token, onAccepted, navigate]);
 
   useEffect(() => {
-    acceptInvite();
+    let cancelled = false;
+    (async () => {
+      if (cancelled) return;
+      await acceptInvite();
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [acceptInvite]);
 
   return (

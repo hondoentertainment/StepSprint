@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
 import request from "supertest";
 import app from "../app";
+import { prisma } from "../prisma";
+import {
+  generateResetToken,
+  hashResetToken,
+} from "../utils/resetToken";
 
 describe("Auth routes", () => {
   describe("POST /api/auth/login", () => {
@@ -111,6 +116,45 @@ describe("Auth routes", () => {
         })
         .expect(400);
       expect(res.body.error).toBe("Invalid or expired reset link");
+    });
+
+    it("reset token is single-use: second attempt fails", async () => {
+      // Seed a dedicated user so we don't clobber user1's password for
+      // other tests in the suite.
+      const email = `reset-single-use-${Date.now()}@example.com`;
+      const user = await prisma.user.create({
+        data: { email, passwordHash: "placeholder" },
+      });
+
+      const plainToken = generateResetToken();
+      const tokenHash = await hashResetToken(plainToken);
+      await prisma.passwordResetToken.create({
+        data: {
+          userId: user.id,
+          tokenHash,
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        },
+      });
+
+      // First reset succeeds.
+      const first = await request(app)
+        .post("/api/auth/reset-password")
+        .send({ token: plainToken, email, password: "brandnewpass1" })
+        .expect(200);
+      expect(first.body.ok).toBe(true);
+
+      // Second reset with the same token must be rejected (single-use).
+      const second = await request(app)
+        .post("/api/auth/reset-password")
+        .send({ token: plainToken, email, password: "anotherpass1" })
+        .expect(400);
+      expect(second.body.error).toBe("Invalid or expired reset link");
+
+      // Confirm DB state: token row is marked used.
+      const row = await prisma.passwordResetToken.findFirst({
+        where: { userId: user.id },
+      });
+      expect(row?.usedAt).not.toBeNull();
     });
   });
 

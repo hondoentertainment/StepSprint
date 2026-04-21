@@ -5,7 +5,7 @@ import { getErrorMessage } from "../api";
 import type { WeeklyEntry } from "../types";
 import { WeekPicker } from "./WeekPicker";
 import type { Challenge } from "../types";
-import { useWeek } from "../contexts/WeekContext";
+import { useWeek } from "../contexts/useWeek";
 
 type Props = {
   challengeId: string;
@@ -23,17 +23,31 @@ export function WeeklyLeaderboard({ challengeId, selectedChallenge }: Props) {
   useEffect(() => {
     if (!challengeId) return;
 
-    setIsLoading(true);
-    setError("");
-    api<{ leaderboard: WeeklyEntry[] }>(
-      `/api/leaderboards/weekly?challengeId=${challengeId}&weekYear=${weekYear}&weekNumber=${weekNumber}`
-    )
-      .then((data) => setLeaderboard(data.leaderboard))
-      .catch((err) => {
+    let cancelled = false;
+
+    async function loadLeaderboard() {
+      setIsLoading(true);
+      setError("");
+      try {
+        const data = await api<{ leaderboard: WeeklyEntry[] }>(
+          `/api/leaderboards/weekly?challengeId=${challengeId}&weekYear=${weekYear}&weekNumber=${weekNumber}`
+        );
+        if (cancelled) return;
+        setLeaderboard(data.leaderboard);
+      } catch (err) {
+        if (cancelled) return;
         setLeaderboard([]);
         setError(getErrorMessage(err));
-      })
-      .finally(() => setIsLoading(false));
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    }
+
+    void loadLeaderboard();
+
+    return () => {
+      cancelled = true;
+    };
   }, [challengeId, weekYear, weekNumber]);
 
   const biggest = leaderboard

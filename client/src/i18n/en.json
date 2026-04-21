@@ -1,0 +1,58 @@
+{
+  "app": {
+    "name": "Schafer Shufflers",
+    "tagline": "Track steps. Compete with your team. Build habits that stick."
+  },
+  "login": {
+    "title": {
+      "login": "Sign in",
+      "register": "Create account",
+      "setup": "Set your password"
+    },
+    "hint": {
+      "login": "Enter your email and password to sign in.",
+      "register": "Create an account to join a step challenge.",
+      "setup": "Your account was created before passwords were required. Please set a password to continue."
+    },
+    "email": "Email",
+    "name": "Name (optional)",
+    "password": "Password",
+    "confirmPassword": "Confirm password",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "show": "Show",
+    "hide": "Hide",
+    "submit": {
+      "login": "Sign in",
+      "register": "Create account",
+      "loggingIn": "Signing in...",
+      "registering": "Creating account..."
+    },
+    "links": {
+      "forgot": "Forgot password?",
+      "toRegister": "Don't have an account? Sign up",
+      "toLogin": "Already have an account? Sign in",
+      "backToLogin": "Back to sign in"
+    },
+    "requirements": {
+      "length": "At least 8 characters",
+      "letter": "At least one letter",
+      "number": "At least one number"
+    },
+    "strength": {
+      "tooShort": "Too short",
+      "weak": "Weak",
+      "fair": "Fair",
+      "strong": "Strong"
+    },
+    "errors": {
+      "emailRequired": "Please enter your email address.",
+      "emailInvalid": "Please enter a valid email address (e.g. you@example.com).",
+      "passwordRequired": "Please enter a password.",
+      "passwordTooShort": "Password must be at least 8 characters.",
+      "passwordNeedsLetter": "Password must contain at least one letter.",
+      "passwordNeedsNumber": "Password must contain at least one number.",
+      "passwordsDoNotMatch": "Passwords do not match."
+    }
+  }
+}
