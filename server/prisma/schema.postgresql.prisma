@@ -30,6 +30,7 @@ model User {
   auditLogs              AuditLog[]              @relation("AuditActor")
   resetTokens            PasswordResetToken[]
   notificationPreference NotificationPreference?
+  pushSubscriptions      PushSubscription[]
 }
 
 model PasswordResetToken {
@@ -50,6 +51,18 @@ model NotificationPreference {
   userId        String  @unique
   dailyReminder Boolean @default(false)
   user          User    @relation(fields: [userId], references: [id])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Challenge {

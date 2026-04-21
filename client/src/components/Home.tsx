@@ -13,6 +13,24 @@ type Props = {
   challengesError: string;
 };
 
+/**
+ * Convert the server's URL-safe base64 VAPID public key into the raw byte
+ * array that `pushManager.subscribe({ applicationServerKey })` expects.
+ * Returns an ArrayBuffer so the result is a plain BufferSource regardless
+ * of the DOM lib's stricter Uint8Array generic parameterisation.
+ */
+function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  const buffer = new ArrayBuffer(rawData.length);
+  const view = new Uint8Array(buffer);
+  for (let i = 0; i < rawData.length; i += 1) {
+    view[i] = rawData.charCodeAt(i);
+  }
+  return buffer;
+}
+
 function HomeSkeleton() {
   return (
     <div className="loading-skeleton" aria-label="Loading summary">
@@ -41,6 +59,17 @@ export function Home({
     return sessionStorage.getItem("stepSprintJustLoggedIn") !== null;
   });
   const [dailyReminder, setDailyReminder] = useState(false);
+  const [pushKey, setPushKey] = useState<string | null>(null);
+  const [pushKeyLoaded, setPushKeyLoaded] = useState(false);
+  const [pushStatus, setPushStatus] = useState<
+    { kind: "success" | "error" | "info"; message: string } | null
+  >(null);
+  const [pushBusy, setPushBusy] = useState(false);
+  const pushSupported =
+    typeof window !== "undefined" &&
+    "serviceWorker" in navigator &&
+    "PushManager" in window &&
+    "Notification" in window;
 
   useEffect(() => {
     if (welcomeMessage && typeof sessionStorage !== "undefined") {
@@ -75,6 +104,72 @@ export function Home({
       method: "PATCH",
       body: JSON.stringify({ dailyReminder: next }),
     }).catch(() => setDailyReminder(prev));
+  }
+
+  useEffect(() => {
+    if (!pushSupported) {
+      setPushKeyLoaded(true);
+      return;
+    }
+    let cancelled = false;
+    async function loadPushKey() {
+      try {
+        const res = await api<{ key: string | null }>(
+          "/api/me/notifications/push/public-key"
+        );
+        if (cancelled) return;
+        setPushKey(res.key);
+      } catch {
+        if (cancelled) return;
+        setPushKey(null);
+      } finally {
+        if (!cancelled) setPushKeyLoaded(true);
+      }
+    }
+    void loadPushKey();
+    return () => {
+      cancelled = true;
+    };
+  }, [pushSupported]);
+
+  async function enablePush() {
+    if (!pushKey || !pushSupported) return;
+    setPushBusy(true);
+    setPushStatus(null);
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        setPushStatus({
+          kind: "error",
+          message: "Push permission was not granted.",
+        });
+        return;
+      }
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(pushKey),
+      });
+      const json = subscription.toJSON();
+      await api("/api/me/notifications/push/subscribe", {
+        method: "POST",
+        body: JSON.stringify({
+          endpoint: json.endpoint,
+          keys: json.keys,
+        }),
+      });
+      setPushStatus({
+        kind: "success",
+        message: "Push reminders enabled on this device.",
+      });
+    } catch (err) {
+      setPushStatus({
+        kind: "error",
+        message: getErrorMessage(err),
+      });
+    } finally {
+      setPushBusy(false);
+    }
   }
 
   useEffect(() => {
@@ -205,6 +300,35 @@ export function Home({
           <input type="checkbox" checked={dailyReminder} onChange={toggleDailyReminder} />
           Daily reminder to log steps
         </label>
+        {pushKeyLoaded && (!pushSupported || pushKey === null) ? (
+          <p className="status">Push notifications not available.</p>
+        ) : pushKeyLoaded ? (
+          <div>
+            <button
+              type="button"
+              onClick={enablePush}
+              disabled={pushBusy}
+              className="cta-secondary"
+            >
+              {pushBusy ? "Enabling..." : "Enable push reminders"}
+            </button>
+            {pushStatus && (
+              <p
+                className={
+                  pushStatus.kind === "error"
+                    ? "status status-error"
+                    : pushStatus.kind === "success"
+                      ? "status status-success"
+                      : "status"
+                }
+                role="status"
+                aria-live="polite"
+              >
+                {pushStatus.message}
+              </p>
+            )}
+          </div>
+        ) : null}
       </div>
     </section>
   );

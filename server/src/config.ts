@@ -18,6 +18,9 @@ const envSchema = z.object({
   SMTP_FROM: z.string().optional(),
   SENTRY_DSN: z.string().optional(),
   NODE_ENV: z.string().optional(),
+  VAPID_PUBLIC_KEY: z.string().optional(),
+  VAPID_PRIVATE_KEY: z.string().optional(),
+  VAPID_SUBJECT: z.string().default("mailto:admin@stepsprint.local"),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -35,6 +38,11 @@ export const config = {
   cookieName: "stepsprint_session",
   sentryDsn: parsed.data.SENTRY_DSN,
   nodeEnv: parsed.data.NODE_ENV ?? "development",
+  vapid: {
+    publicKey: parsed.data.VAPID_PUBLIC_KEY,
+    privateKey: parsed.data.VAPID_PRIVATE_KEY,
+    subject: parsed.data.VAPID_SUBJECT,
+  },
   smtp: parsed.data.SMTP_HOST
     ? {
         host: parsed.data.SMTP_HOST,
