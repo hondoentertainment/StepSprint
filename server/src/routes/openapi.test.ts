@@ -20,6 +20,18 @@ describe("OpenAPI routes", () => {
     expect(res.body.paths["/api/submissions"]).toBeDefined();
     expect(res.body.paths["/api/submissions"].post).toBeDefined();
     expect(res.body.paths["/api/submissions"].get).toBeDefined();
+
+    // Expanded coverage: challenges, leaderboards, invites, summary.
+    expect(res.body.paths["/api/challenges"]).toBeDefined();
+    expect(res.body.paths["/api/challenges"].get).toBeDefined();
+    expect(res.body.paths["/api/leaderboards/weekly"]).toBeDefined();
+    expect(res.body.paths["/api/leaderboards/weekly"].get).toBeDefined();
+    expect(res.body.paths["/api/invites/{code}"]).toBeDefined();
+    expect(res.body.paths["/api/invites/{code}"].get).toBeDefined();
+    expect(res.body.paths["/api/invites/{code}/accept"]).toBeDefined();
+    expect(res.body.paths["/api/invites/{code}/accept"].post).toBeDefined();
+    expect(res.body.paths["/api/me/summary"]).toBeDefined();
+    expect(res.body.paths["/api/me/summary"].get).toBeDefined();
   });
 
   it("GET /api/docs returns Swagger UI HTML", async () => {
