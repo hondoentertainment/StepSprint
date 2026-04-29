@@ -28,6 +28,7 @@ import summaryRoutes from "./routes/summary";
 import inviteRoutes from "./routes/invites";
 import analyticsRoutes from "./routes/analytics";
 import integrationsRoutes from "./routes/integrations";
+import oauthRoutes from "./routes/oauth";
 import notificationsRoutes from "./routes/notifications";
 import openapiRoutes from "./routes/openapi";
 
@@ -84,6 +85,7 @@ app.use("/api/leaderboards", leaderboardRoutes);
 app.use("/api/me/summary", summaryRoutes);
 app.use("/api/invites", inviteRoutes);
 app.use("/api/integrations", integrationsRoutes);
+app.use("/api/integrations", oauthRoutes);
 app.use("/api/me/notifications", notificationsRoutes);
 app.use("/api", openapiRoutes);
 

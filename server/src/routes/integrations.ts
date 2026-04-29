@@ -6,6 +6,9 @@ import { prisma } from "../prisma";
 import { authRequired, AuthenticatedRequest } from "../middleware/auth";
 import { toDateOnly, toJsDate } from "../utils/dates";
 import { logger } from "../logger";
+import { integrationSyncLimiter } from "../middleware/rateLimit";
+
+const MAX_TOKENS_PER_USER = 10;
 
 const router = Router();
 
@@ -31,7 +34,7 @@ function extractBearerToken(authHeader: string | undefined): string | null {
   return token || null;
 }
 
-/** Resolve a user from a raw integration token string. Returns null if invalid. */
+/** Resolve a user from a raw integration token string. Returns null if invalid or expired. */
 async function resolveTokenUser(plain: string) {
   const hash = hashToken(plain);
   const record = await prisma.integrationToken.findUnique({
@@ -39,6 +42,7 @@ async function resolveTokenUser(plain: string) {
     include: { user: true },
   });
   if (!record) return null;
+  if (record.expiresAt && record.expiresAt < new Date()) return null;
   // Update last-used timestamp without blocking the response
   prisma.integrationToken
     .update({ where: { id: record.id }, data: { lastUsedAt: new Date() } })
@@ -66,8 +70,9 @@ router.get("/fitness", authRequired, async (_req: AuthenticatedRequest, res) => 
 // Integration token management (JWT-authenticated)
 // ---------------------------------------------------------------------------
 
-const tokenLabelSchema = z.object({
+const tokenCreateSchema = z.object({
   label: z.string().min(1).max(80).optional(),
+  expiresAt: z.string().datetime().optional(),
 });
 
 /** POST /api/integrations/tokens — create a new integration token */
@@ -77,21 +82,31 @@ router.post("/tokens", authRequired, async (req: AuthenticatedRequest, res) => {
     return;
   }
 
-  const parsed = tokenLabelSchema.safeParse(req.body);
+  const parsed = tokenCreateSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid request body" });
     return;
   }
 
+  const existing = await prisma.integrationToken.count({ where: { userId: req.user.id } });
+  if (existing >= MAX_TOKENS_PER_USER) {
+    res.status(422).json({
+      error: `Token limit reached (max ${MAX_TOKENS_PER_USER}). Revoke an existing token first.`,
+      max: MAX_TOKENS_PER_USER,
+    });
+    return;
+  }
+
   const label = parsed.data.label ?? "Apple Watch Sync";
+  const expiresAt = parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null;
   const { plain, hash } = generateToken();
 
   await prisma.integrationToken.create({
-    data: { userId: req.user.id, tokenHash: hash, label },
+    data: { userId: req.user.id, tokenHash: hash, label, ...(expiresAt ? { expiresAt } : {}) },
   });
 
   // Return the plaintext token once — it is never stored or retrievable again.
-  res.status(201).json({ token: plain, label });
+  res.status(201).json({ token: plain, label, expiresAt: expiresAt?.toISOString() ?? null });
 });
 
 /** GET /api/integrations/tokens — list the current user's tokens (no plaintext) */
@@ -103,7 +118,7 @@ router.get("/tokens", authRequired, async (req: AuthenticatedRequest, res) => {
 
   const tokens = await prisma.integrationToken.findMany({
     where: { userId: req.user.id },
-    select: { id: true, label: true, createdAt: true, lastUsedAt: true },
+    select: { id: true, label: true, createdAt: true, lastUsedAt: true, expiresAt: true },
     orderBy: { createdAt: "desc" },
   });
 
@@ -160,7 +175,7 @@ const appleHealthSchema = z.object({
  * This is the endpoint iOS Shortcuts call automatically after reading step
  * count from Apple Health.
  */
-router.post("/apple-health", async (req, res) => {
+router.post("/apple-health", integrationSyncLimiter, async (req, res) => {
   const plain = extractBearerToken(req.headers.authorization);
   if (!plain) {
     res.status(401).json({ error: "Authorization: Bearer <token> required" });

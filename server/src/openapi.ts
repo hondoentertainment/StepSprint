@@ -471,6 +471,233 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
     },
   });
 
+  // ---------------------------------------------------------------------------
+  // Integrations — API tokens
+  // ---------------------------------------------------------------------------
+
+  const integrationTokenAuth = registry.registerComponent("securitySchemes", "integrationToken", {
+    type: "http",
+    scheme: "bearer",
+    description: "Integration token prefixed with `ssp_`. Generated via POST /api/integrations/tokens.",
+  });
+
+  const IntegrationTokenSchema = z
+    .object({
+      id: z.string(),
+      label: z.string(),
+      createdAt: z.string().datetime(),
+      lastUsedAt: z.string().datetime().nullable(),
+      expiresAt: z.string().datetime().nullable(),
+    })
+    .openapi("IntegrationToken");
+
+  registry.register("IntegrationToken", IntegrationTokenSchema);
+
+  const CreateTokenRequest = z
+    .object({
+      label: z.string().min(1).max(80).optional().openapi({ description: "Human-readable label (default: Apple Watch Sync)." }),
+      expiresAt: z.string().datetime().optional().openapi({ description: "Optional ISO 8601 expiry. Omit for no expiry." }),
+    })
+    .openapi("CreateTokenRequest");
+
+  const CreateTokenResponse = z
+    .object({
+      token: z.string().openapi({ description: "Plaintext token — shown once, never stored." }),
+      label: z.string(),
+      expiresAt: z.string().datetime().nullable(),
+    })
+    .openapi("CreateTokenResponse");
+
+  const ListTokensResponse = z
+    .object({ tokens: z.array(IntegrationTokenSchema) })
+    .openapi("ListTokensResponse");
+
+  registry.registerPath({
+    method: "post",
+    path: "/api/integrations/tokens",
+    summary: "Create API token",
+    description: "Generate a new integration token for automated step sync (e.g. iOS Shortcuts). The plaintext token is returned once and never retrievable again. Max 10 tokens per user.",
+    tags: ["Integrations"],
+    security: [{ [bearerAuth.name]: [] }],
+    request: { body: { content: { "application/json": { schema: CreateTokenRequest } } } },
+    responses: {
+      201: { description: "Token created.", content: { "application/json": { schema: CreateTokenResponse } } },
+      401: { description: "Not authenticated.", content: { "application/json": { schema: ErrorSchema } } },
+      422: { description: "Token limit (10) reached.", content: { "application/json": { schema: ErrorSchema } } },
+    },
+  });
+
+  registry.registerPath({
+    method: "get",
+    path: "/api/integrations/tokens",
+    summary: "List API tokens",
+    description: "List all integration tokens for the authenticated user. Token values are never returned.",
+    tags: ["Integrations"],
+    security: [{ [bearerAuth.name]: [] }],
+    responses: {
+      200: { description: "Token list.", content: { "application/json": { schema: ListTokensResponse } } },
+      401: { description: "Not authenticated.", content: { "application/json": { schema: ErrorSchema } } },
+    },
+  });
+
+  registry.registerPath({
+    method: "delete",
+    path: "/api/integrations/tokens/{id}",
+    summary: "Revoke API token",
+    tags: ["Integrations"],
+    security: [{ [bearerAuth.name]: [] }],
+    request: {
+      params: z.object({ id: z.string().openapi({ description: "Token id." }) }),
+    },
+    responses: {
+      204: { description: "Token revoked." },
+      401: { description: "Not authenticated.", content: { "application/json": { schema: ErrorSchema } } },
+      404: { description: "Token not found or belongs to another user.", content: { "application/json": { schema: ErrorSchema } } },
+    },
+  });
+
+  // ---------------------------------------------------------------------------
+  // Integrations — Apple Health / Watch sync
+  // ---------------------------------------------------------------------------
+
+  const AppleHealthRowSchema = z
+    .object({
+      date: z.string().openapi({ description: "ISO date YYYY-MM-DD.", example: "2026-04-01" }),
+      steps: z.number().int().min(0).max(200_000),
+    })
+    .openapi("AppleHealthRow");
+
+  const AppleHealthSyncRequest = z
+    .object({
+      challengeId: z.string(),
+      date: z.string().optional().openapi({ description: "Single-day shorthand (YYYY-MM-DD). Use instead of rows." }),
+      steps: z.number().int().min(0).max(200_000).optional(),
+      rows: z.array(AppleHealthRowSchema).min(1).max(31).optional().openapi({ description: "Batch up to 31 days. Use instead of date+steps." }),
+    })
+    .openapi("AppleHealthSyncRequest");
+
+  const SyncResponse = z
+    .object({
+      imported: z.number().int(),
+      updated: z.number().int(),
+      skipped: z.number().int(),
+    })
+    .openapi("SyncResponse");
+
+  registry.register("SyncResponse", SyncResponse);
+
+  registry.registerPath({
+    method: "post",
+    path: "/api/integrations/apple-health",
+    summary: "Sync Apple Watch / Health steps",
+    description: "Upsert step data from Apple Health. Authenticate with an integration token via `Authorization: Bearer ssp_…`. Accepts a single-day shorthand or a batch of up to 31 days.",
+    tags: ["Integrations"],
+    security: [{ [integrationTokenAuth.name]: [] }],
+    request: { body: { content: { "application/json": { schema: AppleHealthSyncRequest } } } },
+    responses: {
+      200: { description: "Steps synced.", content: { "application/json": { schema: SyncResponse } } },
+      400: { description: "Invalid payload or date outside challenge window.", content: { "application/json": { schema: ErrorSchema } } },
+      401: { description: "Missing or invalid integration token.", content: { "application/json": { schema: ErrorSchema } } },
+      403: { description: "Not enrolled in the challenge.", content: { "application/json": { schema: ErrorSchema } } },
+      404: { description: "Challenge not found.", content: { "application/json": { schema: ErrorSchema } } },
+      409: { description: "Challenge is locked.", content: { "application/json": { schema: ErrorSchema } } },
+    },
+  });
+
+  // ---------------------------------------------------------------------------
+  // Integrations — OAuth providers (Fitbit, Google Fit)
+  // ---------------------------------------------------------------------------
+
+  const OAuthProviderSchema = z
+    .object({
+      id: z.string(),
+      name: z.string(),
+      available: z.boolean().openapi({ description: "True when the server has credentials configured for this provider." }),
+      connected: z.boolean(),
+      connectedAt: z.string().datetime().nullable(),
+    })
+    .openapi("OAuthProvider");
+
+  const OAuthConnectionsResponse = z
+    .object({ providers: z.array(OAuthProviderSchema) })
+    .openapi("OAuthConnectionsResponse");
+
+  registry.registerPath({
+    method: "get",
+    path: "/api/integrations/connections",
+    summary: "List OAuth provider connections",
+    description: "Returns connection status for all supported OAuth providers (Fitbit, Google Fit).",
+    tags: ["Integrations"],
+    security: [{ [bearerAuth.name]: [] }],
+    responses: {
+      200: { description: "Provider list.", content: { "application/json": { schema: OAuthConnectionsResponse } } },
+      401: { description: "Not authenticated.", content: { "application/json": { schema: ErrorSchema } } },
+    },
+  });
+
+  for (const providerSlug of ["fitbit", "google-fit"] as const) {
+    const providerName = providerSlug === "fitbit" ? "Fitbit" : "Google Fit";
+
+    registry.registerPath({
+      method: "get",
+      path: `/api/integrations/${providerSlug}/connect`,
+      summary: `Connect ${providerName}`,
+      description: `Redirects to ${providerName}'s OAuth 2.0 authorization page. Returns 503 when the server is not configured for this provider.`,
+      tags: ["Integrations"],
+      security: [{ [bearerAuth.name]: [] }],
+      request: {
+        query: z.object({
+          challengeId: z.string().optional().openapi({ description: "Challenge to link the connection to." }),
+        }),
+      },
+      responses: {
+        302: { description: `Redirect to ${providerName} OAuth.` },
+        401: { description: "Not authenticated.", content: { "application/json": { schema: ErrorSchema } } },
+        503: { description: "Provider not configured on this server.", content: { "application/json": { schema: ErrorSchema } } },
+      },
+    });
+
+    const OAuthSyncRequest = z
+      .object({
+        challengeId: z.string(),
+        date: z.string().optional().openapi({ description: "YYYY-MM-DD. Defaults to today in challenge timezone." }),
+      })
+      .openapi(`${providerName.replace(" ", "")}SyncRequest`);
+
+    registry.registerPath({
+      method: "post",
+      path: `/api/integrations/${providerSlug}/sync`,
+      summary: `Sync ${providerName} steps`,
+      description: `Fetch step data from ${providerName} for the given date and upsert into the challenge. Requires an active OAuth connection.`,
+      tags: ["Integrations"],
+      security: [{ [bearerAuth.name]: [] }],
+      request: { body: { content: { "application/json": { schema: OAuthSyncRequest } } } },
+      responses: {
+        200: { description: "Steps synced.", content: { "application/json": { schema: SyncResponse } } },
+        401: { description: "Not authenticated or token expired.", content: { "application/json": { schema: ErrorSchema } } },
+        403: { description: "Provider not connected or not enrolled in challenge.", content: { "application/json": { schema: ErrorSchema } } },
+        404: { description: "Challenge not found.", content: { "application/json": { schema: ErrorSchema } } },
+        409: { description: "Challenge is locked.", content: { "application/json": { schema: ErrorSchema } } },
+        502: { description: `Error fetching from ${providerName} API.`, content: { "application/json": { schema: ErrorSchema } } },
+        503: { description: "Provider not configured on this server.", content: { "application/json": { schema: ErrorSchema } } },
+      },
+    });
+
+    registry.registerPath({
+      method: "delete",
+      path: `/api/integrations/${providerSlug}/disconnect`,
+      summary: `Disconnect ${providerName}`,
+      description: `Remove the stored ${providerName} OAuth connection for the authenticated user.`,
+      tags: ["Integrations"],
+      security: [{ [bearerAuth.name]: [] }],
+      responses: {
+        204: { description: "Disconnected." },
+        401: { description: "Not authenticated.", content: { "application/json": { schema: ErrorSchema } } },
+        404: { description: `${providerName} is not connected.`, content: { "application/json": { schema: ErrorSchema } } },
+      },
+    });
+  }
+
   // Summary route
   registry.registerPath({
     method: "get",

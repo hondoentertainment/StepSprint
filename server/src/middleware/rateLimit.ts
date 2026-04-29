@@ -33,3 +33,16 @@ export const passwordResetLimiter = rateLimit({
   max: 5,
   message: { error: "Too many password reset requests. Please try again later." },
 });
+
+/**
+ * Rate limit for token-authenticated integration sync endpoints
+ * (apple-health, fitbit/sync, google-fit/sync). 60 syncs per minute
+ * per IP is far more than any legitimate automation needs.
+ */
+export const integrationSyncLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 60,
+  message: { error: "Too many sync requests. Please try again later." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
