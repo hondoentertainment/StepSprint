@@ -1,7 +1,18 @@
 {
   "app": {
-    "name": "Schafer Shufflers",
-    "tagline": "Track steps. Compete with your team. Build habits that stick."
+    "name": "StepSprint",
+    "tagline": "Track steps. Compete with your team. Build habits that stick.",
+    "loading": "Loading"
+  },
+  "common": {
+    "skipToContent": "Skip to main content",
+    "loading": "Loading…",
+    "locked": "Locked",
+    "open": "Open",
+    "steps": "steps",
+    "unassigned": "Unassigned",
+    "tryAgain": "Try again",
+    "backToSignIn": "Back to sign in"
   },
   "login": {
     "title": {
@@ -54,5 +65,118 @@
       "passwordNeedsNumber": "Password must contain at least one number.",
       "passwordsDoNotMatch": "Passwords do not match."
     }
+  },
+  "layout": {
+    "welcome": "Welcome, {{name}}",
+    "noChallenges": "No challenges available",
+    "logout": "Log out",
+    "selectChallenge": "Select challenge",
+    "tabs": {
+      "Home": "Home",
+      "Submit": "Submit",
+      "Weekly Top Steppers": "Weekly Top Steppers",
+      "Team Standings": "Team Standings",
+      "Admin": "Admin"
+    }
+  },
+  "home": {
+    "title": "Participant Home",
+    "welcome": "Welcome back! You’ve signed in successfully.",
+    "noChallenges": "No active challenges yet.",
+    "notEnrolled": "You are not enrolled in this challenge yet.",
+    "stats": {
+      "today": "Today",
+      "streak": "Current streak",
+      "days_one": "{{count}} day",
+      "days_other": "{{count}} days",
+      "consistency": "Consistency",
+      "daysActive": "{{active}} of {{elapsed}} days active",
+      "thisWeek": "This week",
+      "thisMonth": "This month",
+      "teamTotal": "Team total",
+      "rank": "Rank",
+      "gapToFirst": "Gap to #1"
+    },
+    "emptyState": "No summary yet. Submit your first steps to get started!",
+    "logSteps": "Log your steps",
+    "notifications": {
+      "dailyReminder": "Daily reminder to log steps",
+      "notAvailable": "Push notifications not available.",
+      "enable": "Enable push reminders",
+      "enabling": "Enabling…",
+      "permissionDenied": "Push permission was not granted.",
+      "enabled": "Push reminders enabled on this device."
+    }
+  },
+  "submit": {
+    "title": "Submit steps",
+    "noChallengeSelected": "Choose an active challenge before submitting steps.",
+    "dateLabel": "Date",
+    "stepsLabel": "Steps",
+    "submit": "Log steps",
+    "submitting": "Submitting…",
+    "success": "Steps submitted successfully.",
+    "flaggedHint": "Submissions above 100,000 steps are flagged.",
+    "connectDevice": "Connect fitness device",
+    "comingSoon": "Coming soon"
+  },
+  "weeklyLeaderboard": {
+    "title": "Weekly Top Steppers",
+    "biggestImprovement": "Biggest improvement",
+    "vsLastWeek": "+{{delta}} steps vs last week",
+    "noChallengeSelected": "Select a challenge to view the leaderboard.",
+    "noEntries": "No entries yet for this week.",
+    "rank": "#{{rank}}",
+    "you": "You"
+  },
+  "weekPicker": {
+    "weekOf": "Week of",
+    "pickDate": "Pick a date to select its week",
+    "thisWeek": "This week",
+    "previousWeek": "Previous week",
+    "showThisWeek": "Show this week",
+    "showPreviousWeek": "Show previous week"
+  },
+  "forgotPassword": {
+    "title": "Reset password",
+    "hint": "Enter your email address and we’ll send you a link to reset your password.",
+    "emailLabel": "Email",
+    "submit": "Send reset link",
+    "sending": "Sending...",
+    "successMessage": "If an account with that email exists, a password reset link has been sent. Check your email (or server console in dev mode).",
+    "errors": {
+      "invalidEmail": "Please enter a valid email address."
+    }
+  },
+  "resetPassword": {
+    "invalidTitle": "Invalid link",
+    "invalidMessage": "This password reset link is invalid or incomplete.",
+    "requestNewLink": "Request a new reset link",
+    "title": "Set new password",
+    "hint": "Choose a new password for {{email}}.",
+    "newPasswordLabel": "New password",
+    "confirmPasswordLabel": "Confirm new password",
+    "submit": "Reset password",
+    "resetting": "Resetting...",
+    "successMessage": "Your password has been reset. You can now sign in with your new password.",
+    "signIn": "Sign in",
+    "errors": {
+      "tooShort": "Password must be at least 8 characters.",
+      "needsLetter": "Password must contain at least one letter.",
+      "needsNumber": "Password must contain at least one number.",
+      "doNotMatch": "Passwords do not match."
+    }
+  },
+  "invite": {
+    "title": "Accepting invite",
+    "loading": "Loading…",
+    "successWithChallenge": "You’ve joined {{challengeName}}. Redirecting…",
+    "successGeneric": "Welcome! Redirecting…",
+    "missingToken": "Missing invite token"
+  },
+  "errorBoundary": {
+    "title": "Something went wrong",
+    "message": "The app hit an unexpected error. You can try again, or reload the page if the problem persists.",
+    "tryAgain": "Try again"
   }
 }

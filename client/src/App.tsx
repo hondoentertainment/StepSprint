@@ -1,20 +1,29 @@
 import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import "./App.css";
 import { useAuth } from "./hooks/useAuth";
 import { useChallenges } from "./hooks/useChallenges";
 import { WeekProvider } from "./contexts/WeekContext";
 import { useWeek } from "./contexts/useWeek";
 import { Login } from "./components/Login";
-import { ForgotPassword } from "./components/ForgotPassword";
-import { ResetPassword } from "./components/ResetPassword";
-import { InvitePage } from "./components/InvitePage";
 import { Layout } from "./components/Layout";
 import { Home } from "./components/Home";
 import { Submit } from "./components/Submit";
 
 // Route-based code splitting: lazy-load heavier, less critical-path routes.
 // Home, Login, and Submit stay eager as they're on the primary user journey.
+// Auth-utility pages (ForgotPassword, ResetPassword, InvitePage) are lazy
+// because they're rarely visited and not needed on first paint.
+const ForgotPassword = lazy(() =>
+  import("./components/ForgotPassword").then((m) => ({ default: m.ForgotPassword })),
+);
+const ResetPassword = lazy(() =>
+  import("./components/ResetPassword").then((m) => ({ default: m.ResetPassword })),
+);
+const InvitePage = lazy(() =>
+  import("./components/InvitePage").then((m) => ({ default: m.InvitePage })),
+);
 const WeeklyLeaderboard = lazy(() =>
   import("./components/WeeklyLeaderboard").then((m) => ({ default: m.WeeklyLeaderboard })),
 );
@@ -26,9 +35,10 @@ const Admin = lazy(() =>
 );
 
 function RouteFallback() {
+  const { t } = useTranslation();
   return (
     <div className="panel" role="status" aria-live="polite">
-      Loading…
+      {t("common.loading")}
     </div>
   );
 }
@@ -127,13 +137,14 @@ function AuthenticatedApp() {
 }
 
 function App() {
+  const { t } = useTranslation();
   const { user, setUser, isLoading, login, register } = useAuth();
 
   if (isLoading) {
     return (
       <div className="app">
         <section className="panel">
-          <h2>Loading<span className="loading-dots" /></h2>
+          <h2>{t("app.loading")}<span className="loading-dots" /></h2>
         </section>
       </div>
     );
@@ -142,12 +153,14 @@ function App() {
   if (!user) {
     return (
       <BrowserRouter>
-        <Routes>
-          <Route path="/invite" element={<InvitePage onAccepted={(u) => setUser(u)} />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="*" element={<Login onLogin={login} onRegister={register} />} />
-        </Routes>
+        <Suspense fallback={<div className="panel" role="status">{t("common.loading")}</div>}>
+          <Routes>
+            <Route path="/invite" element={<InvitePage onAccepted={(u) => setUser(u)} />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="*" element={<Login onLogin={login} onRegister={register} />} />
+          </Routes>
+        </Suspense>
       </BrowserRouter>
     );
   }

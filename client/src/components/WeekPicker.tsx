@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { getISOWeek, weekToDate, formatWeekRange } from "../utils";
 
 type WeekInfo = { year: number; week: number };
@@ -11,6 +12,7 @@ type Props = {
 
 /** Date-based week picker: pick a week by selecting a date within it */
 export function WeekPicker({ value, onChange, challengeStart, challengeEnd }: Props) {
+  const { t } = useTranslation();
   const mondayOfWeek = weekToDate(value.year, value.week);
   const min = challengeStart || "2020-01-01";
   const max = challengeEnd || "2030-12-31";
@@ -41,14 +43,14 @@ export function WeekPicker({ value, onChange, challengeStart, challengeEnd }: Pr
     <div className="week-picker">
       <div className="week-picker row">
         <label>
-          Week of
+          {t("weekPicker.weekOf")}
           <input
             type="date"
             value={mondayOfWeek}
             onChange={(e) => handleDateChange(e.target.value)}
             min={min}
             max={max}
-            title="Pick a date to select its week"
+            title={t("weekPicker.pickDate")}
           />
         </label>
         <span className="week-picker-label" aria-live="polite">
@@ -61,17 +63,17 @@ export function WeekPicker({ value, onChange, challengeStart, challengeEnd }: Pr
           className="secondary"
           onClick={goToThisWeek}
           disabled={isThisWeek}
-          aria-label="Show this week"
+          aria-label={t("weekPicker.showThisWeek")}
         >
-          This week
+          {t("weekPicker.thisWeek")}
         </button>
         <button
           type="button"
           className="secondary"
           onClick={goToPreviousWeek}
-          aria-label="Show previous week"
+          aria-label={t("weekPicker.showPreviousWeek")}
         >
-          Previous week
+          {t("weekPicker.previousWeek")}
         </button>
       </div>
     </div>

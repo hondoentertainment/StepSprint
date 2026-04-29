@@ -1,15 +1,3 @@
-// CSRF decision: the API is primarily consumed from the first-party SPA via
-// an httpOnly session cookie (see routes/auth.ts). That makes CSRF relevant
-// for browser clients. The `authRequired` middleware also accepts an
-// `Authorization: Bearer` token, which is not automatically attached by the
-// browser and therefore is not CSRF-vulnerable. We defer wiring csrf-csrf /
-// double-submit cookies to a follow-up change that also updates the SPA's
-// api.ts to fetch and forward the CSRF token; see the TODO below and the
-// companion hardening plan. This file documents the decision so a future
-// reader does not think CSRF was simply overlooked.
-//
-// TODO(security): add csrf-csrf double-submit tokens on mutating routes and
-// expose GET /api/csrf-token once the client is ready to forward the header.
 import express from "express";
 import helmet from "helmet";
 import cors from "cors";
@@ -19,6 +7,7 @@ import * as Sentry from "@sentry/node";
 import { config } from "./config";
 import { logger } from "./logger";
 import { authLimiter, apiLimiter, generalLimiter } from "./middleware/rateLimit";
+import { csrfCookieMiddleware, csrfProtection } from "./middleware/csrf";
 import authRoutes from "./routes/auth";
 import adminRoutes from "./routes/admin";
 import challengeRoutes from "./routes/challenges";
@@ -34,12 +23,31 @@ import openapiRoutes from "./routes/openapi";
 const app = express();
 const isProduction = process.env.NODE_ENV === "production";
 
-// Mount helmet very early so every response (including errors from later
-// middleware) gets baseline security headers: x-content-type-options,
-// x-frame-options, strict-transport-security (in prod via HTTPS),
-// referrer-policy, etc. CSP is intentionally at helmet's default until we
-// pin down an actual policy for the SPA's asset origins.
-app.use(helmet());
+// Mount helmet early so every response gets protective headers. CSP is
+// configured to lock down the API server; the Swagger UI at /api/docs needs
+// 'unsafe-inline' for its bundled scripts and styles but everything else
+// is tightly scoped to 'self'.
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        baseUri: ["'self'"],
+        fontSrc: ["'self'"],
+        frameAncestors: ["'none'"],
+        formAction: ["'self'"],
+        imgSrc: ["'self'", "data:"],
+        objectSrc: ["'none'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrcAttr: ["'none'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        connectSrc: ["'self'"],
+        ...(isProduction ? { upgradeInsecureRequests: [] } : {}),
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+  })
+);
 
 app.use(
   pinoHttp({
@@ -70,8 +78,15 @@ app.use(
 );
 app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
+app.use(csrfCookieMiddleware);
+app.use(csrfProtection);
 
 app.get("/api/health", (_req, res) => {
+  res.json({ ok: true });
+});
+
+/** Returns the current CSRF token so the SPA can prime the cookie on boot. */
+app.get("/api/csrf-token", (_req, res) => {
   res.json({ ok: true });
 });
 
