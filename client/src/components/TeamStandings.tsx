@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { api } from "../api";
 import { getErrorMessage } from "../api";
 import type { TeamEntry } from "../types";
@@ -12,6 +13,7 @@ type Props = {
 };
 
 export function TeamStandings({ challengeId, user }: Props) {
+  const { t } = useTranslation();
   const [teams, setTeams] = useState<TeamEntry[]>([]);
   const [userTeamName, setUserTeamName] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -72,28 +74,28 @@ export function TeamStandings({ challengeId, user }: Props) {
 
   return (
     <section className="panel">
-      <h2>Team Leaderboard</h2>
+      <h2>{t("teamStandings.title")}</h2>
       {error && <p className="status status-error">{error}</p>}
       {isLoading ? (
         <div className="loading-skeleton">
           <div className="skeleton skeleton-row" />
           <div className="skeleton skeleton-row" />
           <div className="skeleton skeleton-row" />
-          <p className="status">Loading team standings...</p>
+          <p className="status">{t("teamStandings.loading")}</p>
         </div>
       ) : teams.length === 0 ? (
         <div className="empty-state" role="status">
           <p className="status">
             {user?.role === "ADMIN"
-              ? "No team standings yet. Add participants and assign teams to get started."
-              : "No team standings yet. Log steps to contribute, or ask your admin to assign teams."}
+              ? t("teamStandings.emptyAdmin")
+              : t("teamStandings.emptyParticipant")}
           </p>
           <Link
             to={user?.role === "ADMIN" ? "/admin" : "/submit"}
             className={user?.role === "ADMIN" ? "secondary" : "cta-primary"}
             style={{ display: "inline-block" }}
           >
-            {user?.role === "ADMIN" ? "Go to Admin" : "Log steps"}
+            {user?.role === "ADMIN" ? t("teamStandings.goToAdmin") : t("teamStandings.logSteps")}
           </Link>
         </div>
       ) : (
@@ -104,14 +106,19 @@ export function TeamStandings({ challengeId, user }: Props) {
               className={`list-row ${userTeamName && entry.teamName === userTeamName ? "list-row-my-team" : ""}`}
             >
               <div className="primary">
-                <span className="rank">#{index + 1}</span> {entry.teamName}
+                <span className="rank">{t("teamStandings.rank", { rank: index + 1 })}</span>{" "}
+                {entry.teamName}
                 {userTeamName && entry.teamName === userTeamName && (
-                  <span className="my-team-badge" aria-hidden> (your team)</span>
+                  <span className="my-team-badge" aria-hidden> {t("teamStandings.myTeam")}</span>
                 )}
               </div>
               <div className="meta">
-                {entry.totalSteps.toLocaleString()} total · Lead: {entry.leaderName || "—"} (
-                {entry.leaderSteps.toLocaleString()}) · {entry.stepsBehind.toLocaleString()} behind
+                {t("teamStandings.total", { steps: entry.totalSteps.toLocaleString() })} ·{" "}
+                {t("teamStandings.lead", {
+                  name: entry.leaderName || "—",
+                  steps: entry.leaderSteps.toLocaleString(),
+                })} ·{" "}
+                {t("teamStandings.behind", { steps: entry.stepsBehind.toLocaleString() })}
               </div>
             </div>
           ))}

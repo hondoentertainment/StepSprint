@@ -12,7 +12,9 @@
     "steps": "steps",
     "unassigned": "Unassigned",
     "tryAgain": "Try again",
-    "backToSignIn": "Back to sign in"
+    "backToSignIn": "Back to sign in",
+    "confirm": "Confirm",
+    "cancel": "Cancel"
   },
   "login": {
     "title": {
@@ -81,7 +83,7 @@
   },
   "home": {
     "title": "Participant Home",
-    "welcome": "Welcome back! You’ve signed in successfully.",
+    "welcome": "Welcome back! You've signed in successfully.",
     "noChallenges": "No active challenges yet.",
     "notEnrolled": "You are not enrolled in this challenge yet.",
     "stats": {
@@ -139,7 +141,7 @@
   },
   "forgotPassword": {
     "title": "Reset password",
-    "hint": "Enter your email address and we’ll send you a link to reset your password.",
+    "hint": "Enter your email address and we'll send you a link to reset your password.",
     "emailLabel": "Email",
     "submit": "Send reset link",
     "sending": "Sending...",
@@ -170,7 +172,7 @@
   "invite": {
     "title": "Accepting invite",
     "loading": "Loading…",
-    "successWithChallenge": "You’ve joined {{challengeName}}. Redirecting…",
+    "successWithChallenge": "You've joined {{challengeName}}. Redirecting…",
     "successGeneric": "Welcome! Redirecting…",
     "missingToken": "Missing invite token"
   },
@@ -178,5 +180,108 @@
     "title": "Something went wrong",
     "message": "The app hit an unexpected error. You can try again, or reload the page if the problem persists.",
     "tryAgain": "Try again"
+  },
+  "admin": {
+    "title": "Admin console",
+    "noAccess": "You do not have admin access.",
+    "scopedTo": "Scoped to this challenge",
+    "selectChallengeFirst": "Select a challenge first.",
+    "sections": {
+      "challengeSetup": "Challenge setup",
+      "participants": "Participants",
+      "teamAssignment": "Team assignment",
+      "moderation": "Moderation",
+      "inviteParticipant": "Invite participant",
+      "analytics": "Analytics",
+      "exports": "Exports"
+    },
+    "scope": {
+      "challenge": "{{name}}",
+      "selectPrompt": "Select a challenge",
+      "thisChallenge": "this challenge",
+      "all": "all"
+    },
+    "fields": {
+      "name": "Name",
+      "startDate": "Start date",
+      "endDate": "End date",
+      "timezone": "Timezone",
+      "teamSize": "Team size",
+      "emails": "Emails (comma separated)",
+      "strategy": "Strategy",
+      "search": "Search",
+      "searchPlaceholder": "email or name",
+      "reason": "Reason (required)",
+      "editSteps": "Edit steps (optional)",
+      "email": "Email",
+      "emailPlaceholder": "participant@example.com"
+    },
+    "strategies": {
+      "random": "Random",
+      "snake": "Snake draft"
+    },
+    "actions": {
+      "createChallenge": "Create challenge",
+      "addParticipants": "Add participants",
+      "assignTeams": "Assign teams",
+      "lockChallenge": "Lock challenge",
+      "unlockChallenge": "Unlock challenge",
+      "createInviteLink": "Create invite link",
+      "edit": "Edit",
+      "delete": "Delete"
+    },
+    "invite": {
+      "shareLink": "Share this link:"
+    },
+    "analytics": {
+      "participation": "Participation: {{rate}}%",
+      "avgActiveDays": "Avg active days: {{days}}",
+      "totalSubmissions": "Total submissions: {{count}}",
+      "totalSteps": "Total steps: {{steps}}",
+      "selectChallenge": "Select a challenge to view analytics."
+    },
+    "exports": {
+      "hint": "CSV exports open in a new tab. You must be logged in; your session cookie is sent automatically.",
+      "submissions": "Export submissions CSV",
+      "teams": "Export team leaderboard CSV",
+      "weekly": "Export weekly leaderboard CSV"
+    },
+    "confirm": {
+      "deleteTitle": "Delete submission?",
+      "editTitle": "Edit submission?",
+      "deleteMessage": "Are you sure you want to delete this submission? ({{user}} · {{date}} · {{steps}} steps) This cannot be undone.",
+      "editMessage": "Edit steps for {{user}} on {{date}}?",
+      "delete": "Delete",
+      "save": "Save"
+    },
+    "submission": {
+      "flagged": "(flagged)"
+    },
+    "feedback": {
+      "challengeCreated": "Challenge created.",
+      "participantsAdded_one": "Added {{count}} participant.",
+      "participantsAdded_other": "Added {{count}} participants.",
+      "teamsAssigned": "Teams assigned.",
+      "challengeLocked": "Challenge locked.",
+      "challengeUnlocked": "Challenge unlocked.",
+      "submissionUpdated": "Submission updated.",
+      "submissionDeleted": "Submission deleted.",
+      "inviteCreated": "Invite link created. Share it with the participant.",
+      "selectChallengeAndEmail": "Select a challenge and enter email.",
+      "selectChallenge": "Select a challenge first."
+    }
+  },
+  "teamStandings": {
+    "title": "Team Leaderboard",
+    "loading": "Loading team standings…",
+    "emptyAdmin": "No team standings yet. Add participants and assign teams to get started.",
+    "emptyParticipant": "No team standings yet. Log steps to contribute, or ask your admin to assign teams.",
+    "goToAdmin": "Go to Admin",
+    "logSteps": "Log steps",
+    "myTeam": "(your team)",
+    "rank": "#{{rank}}",
+    "total": "{{steps}} total",
+    "lead": "Lead: {{name}} ({{steps}})",
+    "behind": "{{steps}} behind"
   }
 }

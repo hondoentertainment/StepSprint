@@ -7,6 +7,20 @@ const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 const isTest = process.env.NODE_ENV === "test";
 
+/** Pure validation used by csrfProtection and directly in tests. */
+export function isCsrfValid(
+  cookieToken: string | undefined,
+  headerToken: string | string[] | undefined
+): boolean {
+  return (
+    typeof cookieToken === "string" &&
+    cookieToken.length > 0 &&
+    typeof headerToken === "string" &&
+    headerToken.length > 0 &&
+    cookieToken === headerToken
+  );
+}
+
 /**
  * Sets a non-httpOnly CSRF cookie on every response that doesn't already have
  * one. Browser JS reads the cookie and echoes it back as a header on mutating
@@ -47,12 +61,7 @@ export function csrfProtection(
   if (isTest || SAFE_METHODS.has(req.method)) { next(); return; }
   const cookieToken = req.cookies[CSRF_COOKIE] as string | undefined;
   const headerToken = req.headers[CSRF_HEADER];
-  if (
-    !cookieToken ||
-    !headerToken ||
-    typeof headerToken !== "string" ||
-    cookieToken !== headerToken
-  ) {
+  if (!isCsrfValid(cookieToken, headerToken)) {
     res.status(403).json({ error: "CSRF token mismatch" });
     return;
   }

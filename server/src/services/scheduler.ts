@@ -5,7 +5,7 @@ import { logger } from "../logger";
 
 const DAILY_REMINDER_HOUR_UTC = 8;
 
-async function sendDailyReminders(): Promise<void> {
+export async function sendDailyReminders(): Promise<void> {
   if (!isPushEnabled()) return;
 
   const preferences = await prisma.notificationPreference.findMany({
