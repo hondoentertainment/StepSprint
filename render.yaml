@@ -33,3 +33,14 @@ services:
         sync: false
       - key: SENTRY_DSN
         sync: false
+      # OAuth integrations — set these once apps are registered in each provider console.
+      # Fitbit redirect URI:     {APP_ORIGIN}/api/integrations/fitbit/callback
+      # Google Fit redirect URI: {APP_ORIGIN}/api/integrations/google-fit/callback
+      - key: FITBIT_CLIENT_ID
+        sync: false
+      - key: FITBIT_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
