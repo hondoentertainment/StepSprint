@@ -1,6 +1,8 @@
 # StepSprint Render blueprint.
-# Deploy via `render blueprint` -- see docs/DEPLOYMENT.md.
-# Provisions the API web service (Docker) and a managed Postgres instance.
+# Deploy: render.com → New → Blueprint → select this repo.
+# Provisions stepsprint-api (Docker web service) + stepsprint-db (Postgres 16).
+# All required env vars are pre-filled below; only SENTRY_DSN and the four
+# OAuth vars need manual values — leave them blank to deploy without them.
 
 databases:
   - name: stepsprint-db
@@ -29,13 +31,16 @@ services:
           property: connectionString
       - key: JWT_SECRET
         generateValue: true
+      # The Vercel client URL — used for CORS and OAuth redirect validation.
+      # Update this value if you use a custom domain on Vercel.
       - key: APP_ORIGIN
-        sync: false
+        value: https://step-sprint.vercel.app
       - key: SENTRY_DSN
         sync: false
-      # OAuth integrations — set these once apps are registered in each provider console.
-      # Fitbit redirect URI:     {APP_ORIGIN}/api/integrations/fitbit/callback
-      # Google Fit redirect URI: {APP_ORIGIN}/api/integrations/google-fit/callback
+      # OAuth integrations (optional — server starts and runs without these).
+      # Register apps in each provider's developer console, then paste the values here.
+      # Fitbit redirect URI:     https://stepsprint-api.onrender.com/api/integrations/fitbit/callback
+      # Google Fit redirect URI: https://stepsprint-api.onrender.com/api/integrations/google-fit/callback
       - key: FITBIT_CLIENT_ID
         sync: false
       - key: FITBIT_CLIENT_SECRET
