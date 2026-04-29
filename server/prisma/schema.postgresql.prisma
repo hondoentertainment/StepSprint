@@ -31,6 +31,7 @@ model User {
   resetTokens            PasswordResetToken[]
   notificationPreference NotificationPreference?
   pushSubscriptions      PushSubscription[]
+  integrationTokens      IntegrationToken[]
 }
 
 model PasswordResetToken {
@@ -125,6 +126,18 @@ model StepSubmission {
 
   @@unique([userId, challengeId, date])
   @@index([challengeId, date])
+}
+
+model IntegrationToken {
+  id         String    @id @default(cuid())
+  userId     String
+  tokenHash  String    @unique
+  label      String    @default("Apple Watch Sync")
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model AuditLog {

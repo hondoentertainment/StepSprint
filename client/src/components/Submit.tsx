@@ -5,6 +5,7 @@ import { todayInTimezone, isFutureDate } from "../utils";
 import { track } from "../analytics";
 import type { Challenge } from "../types";
 import type { Summary } from "../types";
+import { AppleHealthSync } from "./AppleHealthSync";
 
 const MIN_STEPS = 0;
 const MAX_STEPS = 999999;
@@ -27,6 +28,7 @@ export function Submit({
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showAppleHealth, setShowAppleHealth] = useState(false);
 
   function resetDate() {
     setDate(todayInTimezone(selectedChallenge?.timezone));
@@ -112,12 +114,13 @@ export function Submit({
         <button
           type="button"
           className="link-button"
-          onClick={() => api("/api/integrations/fitness").then((d) => alert((d as { message: string }).message))}
+          onClick={() => setShowAppleHealth((v) => !v)}
+          disabled={!challengeId}
         >
-          Connect fitness device
-        </button>{" "}
-        <span className="badge-coming-soon">Coming soon</span> (Google Fit, Apple Health)
+          {showAppleHealth ? "Hide Apple Watch sync" : "Sync from Apple Watch"}
+        </button>
       </p>
+      {showAppleHealth && challengeId && <AppleHealthSync challengeId={challengeId} />}
     </section>
   );
 }
