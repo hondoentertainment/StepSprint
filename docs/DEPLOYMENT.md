@@ -1,190 +1,149 @@
-# Schafer Shufflers Deployment Guide
+# StepSprint Deployment Guide
 
-## Production Checklist
+StepSprint runs as two services:
 
-- [ ] Use **PostgreSQL** (not SQLite) for production
-- [ ] Set strong `JWT_SECRET` (32+ chars)
-- [ ] Configure `APP_ORIGIN` to your frontend URL
-- [ ] Enable HTTPS
-- [ ] Run database migrations
-- [ ] Set `NODE_ENV=production`
+| Service | Platform | URL |
+|---------|----------|-----|
+| React SPA (client) | Vercel | `https://step-sprint.vercel.app` |
+| Express API (server) | Render | `https://stepsprint-api.onrender.com` |
+
+Both URLs are already wired in `vercel.json` and `render.yaml` — no manual URL configuration is needed.
 
 ---
 
-## Database: PostgreSQL
+## Quick deploy (two clicks)
 
-SQLite is fine for development. For production, use PostgreSQL.
+### 1 — API on Render
 
-### 1. Create a PostgreSQL database
+1. Go to [render.com](https://render.com) → **New** → **Blueprint** → select this repo.
+2. Render reads `render.yaml` and provisions:
+   - `stepsprint-api` — Docker web service (Express API)
+   - `stepsprint-db` — managed Postgres 16 (free tier)
+   - `JWT_SECRET` — auto-generated
+   - `DATABASE_URL` — wired from `stepsprint-db`
+   - `APP_ORIGIN` — pre-filled as `https://step-sprint.vercel.app`
+   - `PORT=3001`, `NODE_ENV=production`
+
+That's it. The API will be live at `https://stepsprint-api.onrender.com`.
+
+### 2 — Client on Vercel
+
+Vercel deployments run automatically on push to `master` via the GitHub integration.
+`vercel.json` is pre-configured:
+- Build: `cd client && npm run build`
+- `VITE_API_URL=https://stepsprint-api.onrender.com` injected at build time
+- SPA rewrites and security headers included
+
+The client will be live at `https://step-sprint.vercel.app`.
+
+---
+
+## Remaining manual steps
+
+Only two steps require human action in external consoles:
+
+### Optional: Sentry error tracking
+
+In the Render dashboard → `stepsprint-api` → **Environment** → set `SENTRY_DSN`.
+
+### Optional: Fitbit integration
+
+1. Register an app at [dev.fitbit.com](https://dev.fitbit.com/apps/new).
+2. Set the OAuth redirect URI to:
+   ```
+   https://stepsprint-api.onrender.com/api/integrations/fitbit/callback
+   ```
+3. In Render dashboard → `stepsprint-api` → **Environment**, set:
+   - `FITBIT_CLIENT_ID`
+   - `FITBIT_CLIENT_SECRET`
+
+### Optional: Google Fit integration
+
+1. Create a project at [console.cloud.google.com](https://console.cloud.google.com) → enable the **Fitness API**.
+2. Create OAuth 2.0 credentials. Set the redirect URI to:
+   ```
+   https://stepsprint-api.onrender.com/api/integrations/google-fit/callback
+   ```
+3. In Render dashboard → `stepsprint-api` → **Environment**, set:
+   - `GOOGLE_CLIENT_ID`
+   - `GOOGLE_CLIENT_SECRET`
+
+The server starts and runs without any of the above OAuth vars — the integration endpoints return 503 until the credentials are set.
+
+---
+
+## Environment variables reference
+
+### Server (Render)
+
+| Variable | Source | Description |
+|----------|--------|-------------|
+| `NODE_ENV` | `render.yaml` | `production` |
+| `PORT` | `render.yaml` | `3001` |
+| `DATABASE_URL` | Render (auto) | PostgreSQL connection string from `stepsprint-db` |
+| `JWT_SECRET` | Render (auto) | Random 64-char secret |
+| `APP_ORIGIN` | `render.yaml` | `https://step-sprint.vercel.app` |
+| `SENTRY_DSN` | Manual (optional) | Sentry project DSN |
+| `FITBIT_CLIENT_ID` | Manual (optional) | Fitbit OAuth app ID |
+| `FITBIT_CLIENT_SECRET` | Manual (optional) | Fitbit OAuth app secret |
+| `GOOGLE_CLIENT_ID` | Manual (optional) | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | Manual (optional) | Google OAuth client secret |
+
+### Client (Vercel)
+
+| Variable | Source | Description |
+|----------|--------|-------------|
+| `VITE_API_URL` | `vercel.json` | `https://stepsprint-api.onrender.com` |
+| `VITE_SENTRY_DSN` | Vercel dashboard (optional) | Sentry DSN for browser error reporting |
+| `VITE_POSTHOG_KEY` | Vercel dashboard (optional) | PostHog project key for analytics |
+| `VITE_POSTHOG_HOST` | Vercel dashboard (optional) | PostHog host (defaults to `app.posthog.com`) |
+
+---
+
+## Local development
 
 ```bash
-createdb stepsprint
-```
+# Clone and install
+git clone <repo>
+cd StepSprint
+npm install          # installs root + both workspaces
 
-### 2. Set DATABASE_URL
-
-```env
-DATABASE_URL="postgresql://user:password@host:5432/stepsprint?schema=public"
-```
-
-### 3. Use the PostgreSQL Prisma schema
-
-Copy `server/prisma/schema.postgresql.prisma` over `server/prisma/schema.prisma` (or rename), then:
-
-```bash
+# Database setup (SQLite)
 cd server
-npx prisma migrate deploy
-npx prisma db seed
+cp ../.env.example .env   # edit JWT_SECRET and APP_ORIGIN
+npm run db:migrate
+npm run db:seed
+
+# Run both servers
+npm run dev          # from repo root (server :3001, client :5173)
 ```
 
----
-
-## Environment Variables
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `DATABASE_URL` | For PostgreSQL | — | PostgreSQL connection string |
-| `JWT_SECRET` | Yes | — | Min 16 chars; use a long random string |
-| `APP_ORIGIN` | No | `http://localhost:5173` | Frontend origin for CORS |
-| `PORT` | No | `3001` | API server port |
-| `NODE_ENV` | No | — | Set to `production` in prod |
-
-**Client (build-time):**
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `VITE_API_URL` | When API is on different origin | — | Full API base URL (e.g. `https://api.example.com`) |
+Seed accounts (password `password123` for all):
+- Admin: `admin@stepsprint.local`
+- Participant: `user1@stepsprint.local`
 
 ---
 
-## Build & Run
+## Architecture notes
 
-### API server
-
-```bash
-cd server
-npm install
-npm run build
-npm run db:migrate   # or: npx prisma migrate deploy
-npm run db:seed      # optional
-npm start
-```
-
-### Frontend
-
-```bash
-cd client
-npm install
-npm run build
-```
-
-Serve the `client/dist` folder with a static file server (nginx, Cloudflare Pages, Vercel, etc.). Point the client to your API URL via `VITE_API_URL`.
+- **Dev DB**: SQLite via `@prisma/adapter-better-sqlite3` (auto-detected when `DATABASE_URL` starts with `file:`)
+- **Prod DB**: PostgreSQL via bare `PrismaClient()` (Render managed Postgres)
+- The Docker build copies `schema.postgresql.prisma` over `schema.prisma` and runs `prisma db push` on startup
+- CSRF protection is enabled in production (double-submit cookie pattern); Bearer token requests bypass it
+- Rate limiting is production-only (auth, API, and general tiers)
+- Content Security Policy is pinned in both `vercel.json` (client) and helmet (server)
 
 ---
 
-## Client deploy
+## Security checklist
 
-The client is deployed via Vercel, configured in `vercel.json` at the repo
-root. Production deploys run automatically on push to `main`, using the
-Vercel GitHub integration — there's no separate GitHub Actions workflow
-required for Vercel.
-
-A GitHub Pages workflow (`.github/workflows/deploy-pages.yml`) also exists
-as a fallback / preview target; see the "GitHub Pages" section below.
-
-Client-specific build-time env vars (set in the Vercel project):
-
-- `VITE_API_URL` — API base URL (required when the API is on a different origin)
-- `VITE_SENTRY_DSN` — optional; enables Sentry error reporting in the browser
-- `VITE_POSTHOG_KEY` / `VITE_POSTHOG_HOST` — optional; enables PostHog analytics
-
----
-
-## Server deploy (Render)
-
-`render.yaml` at the repo root defines a blueprint with:
-- `stepsprint-api` — Docker web service built from `server/Dockerfile`
-- `stepsprint-db` — managed Postgres (free tier)
-
-**Steps:**
-
-1. Push the branch to GitHub.
-2. In Render: **New** → **Blueprint** → select the repo. Render reads `render.yaml`.
-3. Set the non-synced env vars in the Render dashboard:
-   - `SENTRY_DSN` (optional)
-   - `APP_ORIGIN` — your client origin (e.g. `https://stepsprint.vercel.app`)
-   - SMTP vars if password reset email is needed
-4. `JWT_SECRET` is auto-generated; `DATABASE_URL` is wired from `stepsprint-db`.
-5. On each deploy, the container runs `prisma migrate deploy && node dist/index.js` — migrations apply before serving.
-
-The `server/Dockerfile` is a multi-stage build targeting Postgres in prod. For local dev, keep using `npm run dev` (SQLite).
-
----
-
-## GitHub Pages (Frontend)
-
-The frontend deploys to GitHub Pages on push to `main`/`master` via `.github/workflows/deploy-pages.yml`.
-
-### Setup
-
-1. **Push to GitHub**  
-   Ensure the repo is on GitHub with the workflow committed.
-
-2. **Enable GitHub Pages**  
-   Repo → **Settings** → **Pages** → Source: **GitHub Actions**.
-
-3. **Optional: API URL**  
-   If your API runs elsewhere, add a repository variable:  
-   **Settings** → **Secrets and variables** → **Actions** → **Variables** → `VITE_API_URL` = `https://your-api.example.com`
-
-4. **Deploy**  
-   Push to `main`/`master` or run the workflow manually. The site will be at `https://<username>.github.io/<repo>/`.
-
----
-
-## Vercel (Frontend)
-
-### Setup
-
-1. **Connect repo**  
-   Go to [vercel.com](https://vercel.com) → **Add New** → **Project** → Import your GitHub repo.
-
-2. **Configure**  
-   `vercel.json` is preconfigured with `rootDirectory: client`, Vite build, and SPA rewrites.
-
-3. **Environment variables**  
-   In Vercel → Project → **Settings** → **Environment Variables**, add:
-   - `VITE_API_URL` = `https://your-api.example.com` (Production/Preview)
-
-4. **Deploy**  
-   Deployments run automatically on push. Production branch is typically `main`.
-
-**Note:** The API must be hosted separately (Railway, Render, Fly.io, etc.). Set `APP_ORIGIN` on the API to your Vercel URL (e.g. `https://your-app.vercel.app`) for CORS and cookies.
-
----
-
-## Docker (optional)
-
-Example `Dockerfile` for the API:
-
-```dockerfile
-FROM node:20-alpine
-WORKDIR /app
-COPY server/package*.json server/
-RUN cd server && npm ci --omit=dev
-COPY server server/
-RUN cd server && npm run build && npx prisma generate
-EXPOSE 3001
-CMD ["node", "server/dist/index.js"]
-```
-
----
-
-## Security Notes
-
-- **Rate limiting**: The API includes basic rate limiting in production (see `server/src/middleware/rateLimit.ts`).
-- **CORS**: Ensure `APP_ORIGIN` matches your frontend URL.
-- **Cookies**: Session cookies are HTTP-only. Configure `sameSite` and `secure` for HTTPS.
-
----
-
+- [x] `JWT_SECRET` auto-generated (Render)
+- [x] HTTPS enforced (Render + Vercel handle TLS)
+- [x] CORS restricted to `https://step-sprint.vercel.app`
+- [x] CSRF protection (double-submit cookie, production)
+- [x] Rate limiting (production)
+- [x] Helmet security headers (server)
+- [x] CSP headers (client via `vercel.json`, server via helmet)
+- [x] HTTP-only cookies
+- [ ] SMTP for password reset emails (optional — configure Nodemailer env vars)
+- [ ] Sentry DSN (optional)
