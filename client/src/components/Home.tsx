@@ -5,6 +5,16 @@ import { ApiError, getErrorMessage } from "../api";
 import { track } from "../analytics";
 import type { Challenge } from "../types";
 import type { Summary } from "../types";
+import {
+  IconFootstep,
+  IconFlame,
+  IconTarget,
+  IconCalendarWeek,
+  IconCalendarMonth,
+  IconTeam,
+  IconTrophy,
+  IconArrowUp,
+} from "./Icons";
 
 type Props = {
   challengeId: string;
@@ -31,6 +41,8 @@ function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
   return buffer;
 }
 
+const STREAK_MILESTONES = [7, 14, 21, 30, 60, 90];
+
 function HomeSkeleton() {
   return (
     <div className="loading-skeleton" aria-label="Loading summary">
@@ -40,6 +52,58 @@ function HomeSkeleton() {
         <div className="skeleton skeleton-card" />
         <div className="skeleton skeleton-card" />
         <div className="skeleton skeleton-card" />
+      </div>
+    </div>
+  );
+}
+
+function ChallengeProgress({ challenge }: { challenge: Challenge }) {
+  const start = new Date(challenge.startDate).getTime();
+  const end = new Date(challenge.endDate).getTime();
+  const now = Date.now();
+  const totalMs = end - start;
+  const elapsedMs = Math.max(0, Math.min(now - start, totalMs));
+  const pct = totalMs > 0 ? Math.round((elapsedMs / totalMs) * 100) : 0;
+  const totalDays = Math.round(totalMs / 86400000);
+  const elapsedDays = Math.round(elapsedMs / 86400000);
+  const remainingDays = Math.max(0, totalDays - elapsedDays);
+
+  if (challenge.locked || pct >= 100) return null;
+
+  return (
+    <div className="challenge-progress">
+      <div className="challenge-progress-bar">
+        <div className="challenge-progress-fill" style={{ width: `${pct}%` }} />
+      </div>
+      <p className="challenge-progress-label">
+        Day {elapsedDays} of {totalDays} &mdash; {remainingDays} day{remainingDays === 1 ? "" : "s"} left
+      </p>
+    </div>
+  );
+}
+
+function StreakToast({ days, onDismiss }: { days: number; onDismiss: () => void }) {
+  useEffect(() => {
+    const timer = setTimeout(onDismiss, 5000);
+    return () => clearTimeout(timer);
+  }, [onDismiss]);
+
+  return (
+    <div className="streak-toast" role="alert" aria-live="assertive">
+      <div className="streak-toast-inner">
+        <IconFlame size={20} className="streak-toast-icon" />
+        <div>
+          <strong className="streak-toast-title">{days}-day streak!</strong>
+          <span className="streak-toast-body">You&apos;re on fire. Keep it up!</span>
+        </div>
+        <button
+          type="button"
+          className="streak-toast-close"
+          onClick={onDismiss}
+          aria-label="Dismiss"
+        >
+          &times;
+        </button>
       </div>
     </div>
   );
@@ -65,6 +129,8 @@ export function Home({
     { kind: "success" | "error" | "info"; message: string } | null
   >(null);
   const [pushBusy, setPushBusy] = useState(false);
+  const [streakMilestone, setStreakMilestone] = useState<number | null>(null);
+
   const pushSupported =
     typeof window !== "undefined" &&
     "serviceWorker" in navigator &&
@@ -186,6 +252,17 @@ export function Home({
         const data = await api<Summary>(`/api/me/summary?challengeId=${challengeId}`);
         if (cancelled) return;
         setSummary(data);
+
+        // Check for streak milestones — show toast once per milestone per session
+        const days = data.streak.currentDays;
+        const hit = STREAK_MILESTONES.find((m) => days === m);
+        if (hit && typeof sessionStorage !== "undefined") {
+          const key = `streakMilestone_${hit}`;
+          if (!sessionStorage.getItem(key)) {
+            sessionStorage.setItem(key, "1");
+            setStreakMilestone(hit);
+          }
+        }
       } catch (err) {
         if (cancelled) return;
         setSummary(null);
@@ -208,7 +285,10 @@ export function Home({
 
   return (
     <section className="panel">
-      <h2>Participant Home</h2>
+      {streakMilestone !== null && (
+        <StreakToast days={streakMilestone} onDismiss={() => setStreakMilestone(null)} />
+      )}
+      <h2>Your Dashboard</h2>
       {welcomeMessage && (
         <p className="status status-success" role="status" aria-live="polite">
           Welcome back! You&apos;ve signed in successfully.
@@ -216,13 +296,21 @@ export function Home({
       )}
       {challengesError && <p className="status status-error">{challengesError}</p>}
       {selectedChallenge && (
-        <span
-          className={`challenge-badge ${selectedChallenge.locked ? "locked" : "open"}`}
-        >
-          {selectedChallenge.name} · {selectedChallenge.timezone} ·{" "}
-          {selectedChallenge.locked ? "Locked" : "Open"}
-        </span>
+        <div className="challenge-header">
+          <span
+            className={`challenge-badge ${selectedChallenge.locked ? "locked" : "open"}`}
+          >
+            {selectedChallenge.name} &middot; {selectedChallenge.timezone} &middot;{" "}
+            {selectedChallenge.locked ? "Locked" : "Open"}
+          </span>
+          {!selectedChallenge.locked && (
+            <Link to="/submit" className="btn-primary-sm">
+              Log today&apos;s steps
+            </Link>
+          )}
+        </div>
       )}
+      {selectedChallenge && <ChallengeProgress challenge={selectedChallenge} />}
       {challengesLoading ? (
         <HomeSkeleton />
       ) : !challengeId ? (
@@ -235,11 +323,11 @@ export function Home({
         <div className="stats-grid">
           <div className="stats-hero">
             <div className="card card-hero">
-              <h3>Today</h3>
+              <h3><IconFootstep size={13} className="card-icon" /> Today</h3>
               <p>{summary.personalTotals.today.toLocaleString()} steps</p>
             </div>
             <div className="card card-streak">
-              <h3>Current streak</h3>
+              <h3><IconFlame size={13} className="card-icon" /> Current streak</h3>
               <p>
                 {summary.streak.currentDays} day
                 {summary.streak.currentDays === 1 ? "" : "s"}
@@ -257,40 +345,40 @@ export function Home({
               </div>
             </div>
             <div className="progress-ring-content">
-              <strong>Consistency</strong>
+              <strong><IconTarget size={13} className="card-icon card-icon-inline" /> Consistency</strong>
               <span>
                 {summary.consistency.activeDays} of {summary.consistency.elapsedDays} days active
               </span>
             </div>
           </div>
           <div className="card">
-            <h3>This week</h3>
+            <h3><IconCalendarWeek size={13} className="card-icon" /> This week</h3>
             <p>{summary.personalTotals.week.toLocaleString()} steps</p>
           </div>
           <div className="card">
-            <h3>This month</h3>
+            <h3><IconCalendarMonth size={13} className="card-icon" /> This month</h3>
             <p>{summary.personalTotals.month.toLocaleString()} steps</p>
           </div>
           <div className="card">
-            <h3>Team total</h3>
+            <h3><IconTeam size={13} className="card-icon" /> Team total</h3>
             <p>
-              {summary.teamTotals.teamName || "Unassigned"} ·{" "}
+              {summary.teamTotals.teamName || "Unassigned"} &middot;{" "}
               {summary.teamTotals.total.toLocaleString()} steps
             </p>
           </div>
           <div className="card">
-            <h3>Rank</h3>
+            <h3><IconTrophy size={13} className="card-icon" /> Rank</h3>
             <p>{summary.rank ?? "—"}</p>
           </div>
           <div className="card">
-            <h3>Gap to #1</h3>
+            <h3><IconArrowUp size={13} className="card-icon" /> Gap to #1</h3>
             <p>{summary.gapToFirst.toLocaleString()} steps</p>
           </div>
         </div>
       ) : (
         <div className="empty-state" role="status">
           <p className="status">No summary yet. Submit your first steps to get started!</p>
-          <Link to="/submit" className="cta-primary" style={{ display: "inline-block" }}>
+          <Link to="/submit" className="btn-primary">
             Log your steps
           </Link>
         </div>
@@ -308,7 +396,7 @@ export function Home({
               type="button"
               onClick={enablePush}
               disabled={pushBusy}
-              className="cta-secondary"
+              className="secondary"
             >
               {pushBusy ? "Enabling..." : "Enable push reminders"}
             </button>

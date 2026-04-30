@@ -104,14 +104,17 @@ export function TeamStandings({ challengeId, user }: Props) {
               className={`list-row ${userTeamName && entry.teamName === userTeamName ? "list-row-my-team" : ""}`}
             >
               <div className="primary">
-                <span className="rank">#{index + 1}</span> {entry.teamName}
+                <span className="rank">#{index + 1}</span>
+                <span className="list-name" title={entry.teamName}>{entry.teamName}</span>
                 {userTeamName && entry.teamName === userTeamName && (
                   <span className="my-team-badge" aria-hidden> (your team)</span>
                 )}
               </div>
               <div className="meta">
-                {entry.totalSteps.toLocaleString()} total · Lead: {entry.leaderName || "—"} (
-                {entry.leaderSteps.toLocaleString()}) · {entry.stepsBehind.toLocaleString()} behind
+                <span className="meta-steps">{entry.totalSteps.toLocaleString()} steps</span>
+                <span className="meta-detail">
+                  {entry.leaderName || "—"} leads &middot; {entry.stepsBehind.toLocaleString()} behind
+                </span>
               </div>
             </div>
           ))}

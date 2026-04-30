@@ -3,7 +3,7 @@ import { test, expect } from "@playwright/test";
 test.describe("Mobile viewport", () => {
   test("login page renders correctly on mobile", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: /Schafer Shufflers/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /StepSprint/i })).toBeVisible();
     await expect(page.getByText(/Track steps.*Compete with your team/i)).toBeVisible();
     await expect(page.getByLabel(/email/i)).toBeVisible();
     await expect(page.getByRole("button", { name: /get started/i })).toBeVisible();
@@ -21,24 +21,24 @@ test.describe("Mobile viewport", () => {
     await page.goto("/");
     await page.getByLabel(/email/i).fill("user1@stepsprint.local");
     await page.getByRole("button", { name: /get started/i }).click();
-    await expect(page.getByRole("heading", { name: /Participant Home/i })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole("heading", { name: /Your Dashboard/i })).toBeVisible({ timeout: 15000 });
   });
 
   test("tabs are visible when logged in", async ({ page }) => {
     await page.goto("/");
     await page.getByLabel(/email/i).fill("user1@stepsprint.local");
     await page.getByRole("button", { name: /get started/i }).click();
-    await expect(page.getByRole("heading", { name: /Participant Home/i })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole("heading", { name: /Your Dashboard/i })).toBeVisible({ timeout: 15000 });
     await expect(page.getByTestId("tab-submit")).toBeVisible();
-    await expect(page.getByTestId("tab-weekly-top-steppers")).toBeVisible();
-    await expect(page.getByTestId("tab-team-standings")).toBeVisible();
+    await expect(page.getByTestId("tab-leaderboard")).toBeVisible();
+    await expect(page.getByTestId("tab-teams")).toBeVisible();
   });
 
   test("Submit tab shows form when logged in", async ({ page }) => {
     await page.goto("/");
     await page.getByLabel(/email/i).fill("user1@stepsprint.local");
     await page.getByRole("button", { name: /get started/i }).click();
-    await expect(page.getByRole("heading", { name: /Participant Home/i })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole("heading", { name: /Your Dashboard/i })).toBeVisible({ timeout: 15000 });
     await page.getByTestId("tab-submit").click();
     await expect(page.getByRole("heading", { name: /Submit steps/i })).toBeVisible({ timeout: 5000 });
   });
@@ -47,7 +47,7 @@ test.describe("Mobile viewport", () => {
     await page.goto("/");
     await page.getByLabel(/email/i).fill("user1@stepsprint.local");
     await page.getByRole("button", { name: /get started/i }).click();
-    await expect(page.getByRole("heading", { name: /Participant Home/i })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole("heading", { name: /Your Dashboard/i })).toBeVisible({ timeout: 15000 });
     await page.getByTestId("tab-submit").click();
     await expect(page.getByRole("heading", { name: /Submit steps/i })).toBeVisible();
     await expect(page.getByLabel(/Date/i)).toBeVisible();

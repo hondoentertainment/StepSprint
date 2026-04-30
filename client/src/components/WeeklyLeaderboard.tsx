@@ -56,7 +56,7 @@ export function WeeklyLeaderboard({ challengeId, selectedChallenge }: Props) {
 
   return (
     <section className="panel">
-      <h2>Weekly Top Steppers</h2>
+      <h2>Weekly Leaderboard</h2>
       {error && <p className="status status-error">{error}</p>}
       {!isLoading && biggest && (
         <div className="spotlight spotlight-improvement">
@@ -97,14 +97,17 @@ export function WeeklyLeaderboard({ challengeId, selectedChallenge }: Props) {
               tabIndex={0}
             >
               <div className="primary">
-                <span className="rank">#{index + 1}</span> {entry.name || entry.email}
+                <span className="rank">#{index + 1}</span>
+                <span className="list-name" title={entry.name || entry.email}>
+                  {entry.name || entry.email}
+                </span>
               </div>
               <div className="meta">
-                {entry.steps.toLocaleString()} steps · {entry.trend}
+                {entry.steps.toLocaleString()} steps
                 {entry.delta !== 0 && (
                   <span className="delta">
-                    ({entry.delta > 0 ? "+" : ""}
-                    {entry.delta.toLocaleString()} vs last week)
+                    {" "}({entry.delta > 0 ? "+" : ""}
+                    {entry.delta.toLocaleString()})
                   </span>
                 )}
               </div>

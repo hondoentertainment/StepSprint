@@ -20,7 +20,7 @@ async function loginAsParticipant(page: Page): Promise<void> {
     await passwordField.fill(USER_PASSWORD);
   }
   await page.getByRole("button", { name: /get started|log in|sign in/i }).first().click();
-  await expect(page.getByRole("heading", { name: /Participant Home/i })).toBeVisible({
+  await expect(page.getByRole("heading", { name: /Your Dashboard/i })).toBeVisible({
     timeout: 15_000,
   });
 }

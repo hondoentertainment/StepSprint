@@ -180,7 +180,7 @@ export function AppleHealthSync({ challengeId }: Props) {
           <code className="token-value" aria-label="API token">{newToken}</code>
           <button
             type="button"
-            className="cta-secondary"
+            className="secondary"
             onClick={() => void copyToClipboard(newToken)}
           >
             {copied ? "Copied!" : "Copy token"}
@@ -266,7 +266,7 @@ export function AppleHealthSync({ challengeId }: Props) {
         )}
         <button
           type="button"
-          className="cta-secondary"
+          className="secondary"
           onClick={() => void createToken()}
           disabled={creating}
         >
@@ -312,7 +312,7 @@ export function AppleHealthSync({ challengeId }: Props) {
                     </span>
                     <button
                       type="button"
-                      className="cta-secondary"
+                      className="secondary"
                       onClick={() => void syncProvider(p)}
                       disabled={syncing === p.id}
                     >
@@ -328,7 +328,7 @@ export function AppleHealthSync({ challengeId }: Props) {
                     </button>
                   </span>
                 ) : (
-                  <a href={connectUrl(p)} className="cta-secondary">
+                  <a href={connectUrl(p)} className="secondary">
                     Connect {p.name}
                   </a>
                 )}
