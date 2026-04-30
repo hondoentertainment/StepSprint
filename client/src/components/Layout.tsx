@@ -1,7 +1,8 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Link, Outlet, useLocation } from "react-router-dom";
 import type { User } from "../types";
 import type { Challenge } from "../types";
 import { TABS } from "../types";
+import { StepSprintLogo } from "./StepSprintLogo";
 
 type Props = {
   user: User;
@@ -21,6 +22,8 @@ export function Layout({
   challengesLoading,
 }: Props) {
   const visibleTabs = TABS.filter((t) => t !== "Admin" || user.role === "ADMIN");
+  const location = useLocation();
+  const isOnSubmit = location.pathname === "/submit";
 
   const tabToPath: Record<string, string> = {
     Home: "/home",
@@ -36,11 +39,19 @@ export function Layout({
         Skip to main content
       </a>
       <header className="topbar" role="banner" aria-label="Site header">
-        <div>
-          <h1>StepSprint</h1>
-          <p>Welcome, {user.name ?? user.email}</p>
+        <div className="topbar-brand">
+          <StepSprintLogo size={26} />
+          <div>
+            <h1>StepSprint</h1>
+            <p>Welcome, {user.name ?? user.email}</p>
+          </div>
         </div>
         <div className="topbar-actions">
+          {!isOnSubmit && selectedChallengeId && (
+            <Link to="/submit" className="topbar-log-btn" aria-label="Log today's steps">
+              + Log steps
+            </Link>
+          )}
           <select
             value={selectedChallengeId}
             onChange={(e) => onChallengeChange(e.target.value)}

@@ -5,6 +5,16 @@ import { ApiError, getErrorMessage } from "../api";
 import { track } from "../analytics";
 import type { Challenge } from "../types";
 import type { Summary } from "../types";
+import {
+  IconFootstep,
+  IconFlame,
+  IconTarget,
+  IconCalendarWeek,
+  IconCalendarMonth,
+  IconTeam,
+  IconTrophy,
+  IconArrowUp,
+} from "./Icons";
 
 type Props = {
   challengeId: string;
@@ -30,6 +40,8 @@ function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
   }
   return buffer;
 }
+
+const STREAK_MILESTONES = [7, 14, 21, 30, 60, 90];
 
 function HomeSkeleton() {
   return (
@@ -70,6 +82,33 @@ function ChallengeProgress({ challenge }: { challenge: Challenge }) {
   );
 }
 
+function StreakToast({ days, onDismiss }: { days: number; onDismiss: () => void }) {
+  useEffect(() => {
+    const timer = setTimeout(onDismiss, 5000);
+    return () => clearTimeout(timer);
+  }, [onDismiss]);
+
+  return (
+    <div className="streak-toast" role="alert" aria-live="assertive">
+      <div className="streak-toast-inner">
+        <IconFlame size={20} className="streak-toast-icon" />
+        <div>
+          <strong className="streak-toast-title">{days}-day streak!</strong>
+          <span className="streak-toast-body">You&apos;re on fire. Keep it up!</span>
+        </div>
+        <button
+          type="button"
+          className="streak-toast-close"
+          onClick={onDismiss}
+          aria-label="Dismiss"
+        >
+          &times;
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function Home({
   challengeId,
   selectedChallenge,
@@ -90,6 +129,8 @@ export function Home({
     { kind: "success" | "error" | "info"; message: string } | null
   >(null);
   const [pushBusy, setPushBusy] = useState(false);
+  const [streakMilestone, setStreakMilestone] = useState<number | null>(null);
+
   const pushSupported =
     typeof window !== "undefined" &&
     "serviceWorker" in navigator &&
@@ -211,6 +252,17 @@ export function Home({
         const data = await api<Summary>(`/api/me/summary?challengeId=${challengeId}`);
         if (cancelled) return;
         setSummary(data);
+
+        // Check for streak milestones — show toast once per milestone per session
+        const days = data.streak.currentDays;
+        const hit = STREAK_MILESTONES.find((m) => days === m);
+        if (hit && typeof sessionStorage !== "undefined") {
+          const key = `streakMilestone_${hit}`;
+          if (!sessionStorage.getItem(key)) {
+            sessionStorage.setItem(key, "1");
+            setStreakMilestone(hit);
+          }
+        }
       } catch (err) {
         if (cancelled) return;
         setSummary(null);
@@ -233,6 +285,9 @@ export function Home({
 
   return (
     <section className="panel">
+      {streakMilestone !== null && (
+        <StreakToast days={streakMilestone} onDismiss={() => setStreakMilestone(null)} />
+      )}
       <h2>Your Dashboard</h2>
       {welcomeMessage && (
         <p className="status status-success" role="status" aria-live="polite">
@@ -268,11 +323,11 @@ export function Home({
         <div className="stats-grid">
           <div className="stats-hero">
             <div className="card card-hero">
-              <h3>Today</h3>
+              <h3><IconFootstep size={13} className="card-icon" /> Today</h3>
               <p>{summary.personalTotals.today.toLocaleString()} steps</p>
             </div>
             <div className="card card-streak">
-              <h3>Current streak</h3>
+              <h3><IconFlame size={13} className="card-icon" /> Current streak</h3>
               <p>
                 {summary.streak.currentDays} day
                 {summary.streak.currentDays === 1 ? "" : "s"}
@@ -290,33 +345,33 @@ export function Home({
               </div>
             </div>
             <div className="progress-ring-content">
-              <strong>Consistency</strong>
+              <strong><IconTarget size={13} className="card-icon card-icon-inline" /> Consistency</strong>
               <span>
                 {summary.consistency.activeDays} of {summary.consistency.elapsedDays} days active
               </span>
             </div>
           </div>
           <div className="card">
-            <h3>This week</h3>
+            <h3><IconCalendarWeek size={13} className="card-icon" /> This week</h3>
             <p>{summary.personalTotals.week.toLocaleString()} steps</p>
           </div>
           <div className="card">
-            <h3>This month</h3>
+            <h3><IconCalendarMonth size={13} className="card-icon" /> This month</h3>
             <p>{summary.personalTotals.month.toLocaleString()} steps</p>
           </div>
           <div className="card">
-            <h3>Team total</h3>
+            <h3><IconTeam size={13} className="card-icon" /> Team total</h3>
             <p>
               {summary.teamTotals.teamName || "Unassigned"} &middot;{" "}
               {summary.teamTotals.total.toLocaleString()} steps
             </p>
           </div>
           <div className="card">
-            <h3>Rank</h3>
+            <h3><IconTrophy size={13} className="card-icon" /> Rank</h3>
             <p>{summary.rank ?? "—"}</p>
           </div>
           <div className="card">
-            <h3>Gap to #1</h3>
+            <h3><IconArrowUp size={13} className="card-icon" /> Gap to #1</h3>
             <p>{summary.gapToFirst.toLocaleString()} steps</p>
           </div>
         </div>

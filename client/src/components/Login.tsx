@@ -5,6 +5,7 @@ import { getErrorMessage } from "../api";
 import { isValidEmail } from "../utils";
 import { identify } from "../analytics";
 import type { User } from "../types";
+import { StepSprintLogo } from "./StepSprintLogo";
 
 type Props = {
   onLogin: (email: string, password: string) => Promise<User>;
@@ -114,7 +115,10 @@ export function Login({ onLogin, onRegister }: Props) {
   return (
     <div className="app">
       <header className="hero">
-        <h1>{t("app.name")}</h1>
+        <div className="hero-logo">
+          <StepSprintLogo size={40} />
+          <h1>{t("app.name")}</h1>
+        </div>
         <p>{t("app.tagline")}</p>
       </header>
       <section className="panel panel-login">

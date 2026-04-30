@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, getErrorMessage } from "../api";
+import { StepSprintLogo } from "./StepSprintLogo";
 
 export function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -51,7 +52,10 @@ export function ResetPassword() {
     return (
       <div className="app">
         <header className="hero">
-          <h1>StepSprint</h1>
+          <div className="hero-logo">
+            <StepSprintLogo size={40} />
+            <h1>StepSprint</h1>
+          </div>
           <p>Track steps. Compete with your team. Build habits that stick.</p>
         </header>
         <section className="panel panel-login">
