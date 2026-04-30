@@ -45,6 +45,31 @@ function HomeSkeleton() {
   );
 }
 
+function ChallengeProgress({ challenge }: { challenge: Challenge }) {
+  const start = new Date(challenge.startDate).getTime();
+  const end = new Date(challenge.endDate).getTime();
+  const now = Date.now();
+  const totalMs = end - start;
+  const elapsedMs = Math.max(0, Math.min(now - start, totalMs));
+  const pct = totalMs > 0 ? Math.round((elapsedMs / totalMs) * 100) : 0;
+  const totalDays = Math.round(totalMs / 86400000);
+  const elapsedDays = Math.round(elapsedMs / 86400000);
+  const remainingDays = Math.max(0, totalDays - elapsedDays);
+
+  if (challenge.locked || pct >= 100) return null;
+
+  return (
+    <div className="challenge-progress">
+      <div className="challenge-progress-bar">
+        <div className="challenge-progress-fill" style={{ width: `${pct}%` }} />
+      </div>
+      <p className="challenge-progress-label">
+        Day {elapsedDays} of {totalDays} &mdash; {remainingDays} day{remainingDays === 1 ? "" : "s"} left
+      </p>
+    </div>
+  );
+}
+
 export function Home({
   challengeId,
   selectedChallenge,
@@ -208,7 +233,7 @@ export function Home({
 
   return (
     <section className="panel">
-      <h2>Participant Home</h2>
+      <h2>Your Dashboard</h2>
       {welcomeMessage && (
         <p className="status status-success" role="status" aria-live="polite">
           Welcome back! You&apos;ve signed in successfully.
@@ -216,13 +241,21 @@ export function Home({
       )}
       {challengesError && <p className="status status-error">{challengesError}</p>}
       {selectedChallenge && (
-        <span
-          className={`challenge-badge ${selectedChallenge.locked ? "locked" : "open"}`}
-        >
-          {selectedChallenge.name} · {selectedChallenge.timezone} ·{" "}
-          {selectedChallenge.locked ? "Locked" : "Open"}
-        </span>
+        <div className="challenge-header">
+          <span
+            className={`challenge-badge ${selectedChallenge.locked ? "locked" : "open"}`}
+          >
+            {selectedChallenge.name} &middot; {selectedChallenge.timezone} &middot;{" "}
+            {selectedChallenge.locked ? "Locked" : "Open"}
+          </span>
+          {!selectedChallenge.locked && (
+            <Link to="/submit" className="btn-primary-sm">
+              Log today&apos;s steps
+            </Link>
+          )}
+        </div>
       )}
+      {selectedChallenge && <ChallengeProgress challenge={selectedChallenge} />}
       {challengesLoading ? (
         <HomeSkeleton />
       ) : !challengeId ? (
@@ -274,7 +307,7 @@ export function Home({
           <div className="card">
             <h3>Team total</h3>
             <p>
-              {summary.teamTotals.teamName || "Unassigned"} ·{" "}
+              {summary.teamTotals.teamName || "Unassigned"} &middot;{" "}
               {summary.teamTotals.total.toLocaleString()} steps
             </p>
           </div>
@@ -290,7 +323,7 @@ export function Home({
       ) : (
         <div className="empty-state" role="status">
           <p className="status">No summary yet. Submit your first steps to get started!</p>
-          <Link to="/submit" className="cta-primary" style={{ display: "inline-block" }}>
+          <Link to="/submit" className="btn-primary">
             Log your steps
           </Link>
         </div>
@@ -308,7 +341,7 @@ export function Home({
               type="button"
               onClick={enablePush}
               disabled={pushBusy}
-              className="cta-secondary"
+              className="secondary"
             >
               {pushBusy ? "Enabling..." : "Enable push reminders"}
             </button>

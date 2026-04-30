@@ -33,7 +33,7 @@ export function ForgotPassword() {
   return (
     <div className="app">
       <header className="hero">
-        <h1>Schafer Shufflers</h1>
+        <h1>StepSprint</h1>
         <p>Track steps. Compete with your team. Build habits that stick.</p>
       </header>
       <section className="panel panel-login">

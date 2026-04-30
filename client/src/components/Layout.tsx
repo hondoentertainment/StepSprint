@@ -25,8 +25,8 @@ export function Layout({
   const tabToPath: Record<string, string> = {
     Home: "/home",
     Submit: "/submit",
-    "Weekly Top Steppers": "/weekly",
-    "Team Standings": "/teams",
+    "Leaderboard": "/weekly",
+    "Teams": "/teams",
     Admin: "/admin",
   };
 
@@ -37,7 +37,7 @@ export function Layout({
       </a>
       <header className="topbar" role="banner" aria-label="Site header">
         <div>
-          <h1>Schafer Shufflers</h1>
+          <h1>StepSprint</h1>
           <p>Welcome, {user.name ?? user.email}</p>
         </div>
         <div className="topbar-actions">

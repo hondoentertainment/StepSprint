@@ -56,7 +56,7 @@ export function WeeklyLeaderboard({ challengeId, selectedChallenge }: Props) {
 
   return (
     <section className="panel">
-      <h2>Weekly Top Steppers</h2>
+      <h2>Weekly Leaderboard</h2>
       {error && <p className="status status-error">{error}</p>}
       {!isLoading && biggest && (
         <div className="spotlight spotlight-improvement">

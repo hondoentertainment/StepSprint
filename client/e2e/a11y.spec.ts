@@ -63,7 +63,7 @@ test.describe("Accessibility smoke", () => {
     await loginAsParticipant(page);
     // Authed root redirects to /home; wait for the Home heading to settle.
     await page.goto("/home");
-    await expect(page.getByRole("heading", { name: /Participant Home/i })).toBeVisible({
+    await expect(page.getByRole("heading", { name: /Your Dashboard/i })).toBeVisible({
       timeout: 15_000,
     });
     await expectNoSeriousAxeViolations(page);
