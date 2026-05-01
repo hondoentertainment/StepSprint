@@ -117,10 +117,11 @@ router.get("/accept", async (req, res) => {
     return;
   }
 
+  // Invite acceptance is a trust signal equivalent to email verification.
   const user = await prisma.user.upsert({
     where: { email: payload.email },
-    update: {},
-    create: { email: payload.email },
+    update: { emailVerified: true },
+    create: { email: payload.email, emailVerified: true },
   });
 
   await prisma.teamMember.upsert({

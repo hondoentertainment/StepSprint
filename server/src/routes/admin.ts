@@ -98,13 +98,14 @@ router.post("/challenges/:id/participants", async (req, res) => {
     return;
   }
 
+  // Admin-added participants are pre-verified — they'll set a password via /register.
   const usersFromEmails = parsed.data.emails
     ? await Promise.all(
         parsed.data.emails.map((email) =>
           prisma.user.upsert({
             where: { email },
-            update: {},
-            create: { email },
+            update: { emailVerified: true },
+            create: { email, emailVerified: true },
           })
         )
       )
@@ -271,9 +272,21 @@ router.post("/challenges/:id/assign-teams", async (req, res) => {
   res.json({ teams: result });
 });
 
+const submissionsQuerySchema = z.object({
+  query: z.string().optional(),
+  challengeId: z.string().optional(),
+  cursor: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+
 router.get("/submissions", async (req, res) => {
-  const query = typeof req.query.query === "string" ? req.query.query : "";
-  const challengeId = typeof req.query.challengeId === "string" ? req.query.challengeId : undefined;
+  const parsed = submissionsQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid query parameters" });
+    return;
+  }
+
+  const { query, challengeId, cursor, limit } = parsed.data;
   const where: Record<string, unknown> = {};
   if (challengeId) where.challengeId = challengeId;
   if (query) {
@@ -282,13 +295,20 @@ router.get("/submissions", async (req, res) => {
       { user: { name: { contains: query, mode: "insensitive" } } },
     ];
   }
+
   const submissions = await prisma.stepSubmission.findMany({
     where,
     include: { user: true, challenge: true },
-    orderBy: { date: "desc" },
-    take: 200,
+    orderBy: [{ date: "desc" }, { id: "desc" }],
+    take: limit + 1,
+    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
   });
-  res.json({ submissions });
+
+  const hasMore = submissions.length > limit;
+  const page = hasMore ? submissions.slice(0, limit) : submissions;
+  const nextCursor = hasMore ? page[page.length - 1]?.id : undefined;
+
+  res.json({ submissions: page, nextCursor: nextCursor ?? null, hasMore });
 });
 
 const editSchema = z.object({

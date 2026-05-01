@@ -7,24 +7,36 @@ StepSprint runs as two services:
 | React SPA (client) | Vercel | `https://step-sprint.vercel.app` |
 | Express API (server) | Render | `https://stepsprint-api.onrender.com` |
 
-Both URLs are already wired in `vercel.json` and `render.yaml` — no manual URL configuration is needed.
+Both URLs are already wired in `vercel.json` and `render.yaml` — no manual URL configuration is needed unless you use a custom domain.
 
 ---
 
-## Quick deploy (two clicks)
+## Quick deploy (two steps)
 
 ### 1 — API on Render
 
 1. Go to [render.com](https://render.com) → **New** → **Blueprint** → select this repo.
 2. Render reads `render.yaml` and provisions:
-   - `stepsprint-api` — Docker web service (Express API)
-   - `stepsprint-db` — managed Postgres 16 (free tier)
+   - `stepsprint-api` — Docker web service (Express API) — **Starter plan**
+   - `stepsprint-db` — managed Postgres 16 — **Starter plan**
    - `JWT_SECRET` — auto-generated
    - `DATABASE_URL` — wired from `stepsprint-db`
    - `APP_ORIGIN` — pre-filled as `https://step-sprint.vercel.app`
    - `PORT=3001`, `NODE_ENV=production`
 
-That's it. The API will be live at `https://stepsprint-api.onrender.com`.
+3. After the blueprint provisions, set the required env vars in **Render dashboard → stepsprint-api → Environment**:
+
+   | Variable | Required | Description |
+   |----------|----------|-------------|
+   | `RESEND_API_KEY` | **Yes** | API key from [resend.com](https://resend.com) — needed for email verification and password reset |
+   | `SMTP_FROM` | **Yes** | Sender address, e.g. `StepSprint <noreply@yourdomain.com>` |
+   | `ADMIN_PASSWORD` | **Yes (first deploy)** | Initial admin password. If omitted a random one is printed in the deploy logs — change it immediately after first login. |
+
+4. Trigger a deploy (or wait for auto-deploy on push to master).
+
+The API will be live at `https://stepsprint-api.onrender.com`.
+
+> **Note on plans**: `render.yaml` uses the `starter` plan ($7/mo each) to avoid cold starts and get automatic database backups. The free tier sleeps after 15 minutes of inactivity and has a 90-day database retention limit — not suitable for production.
 
 ### 2 — Client on Vercel
 
@@ -38,37 +50,56 @@ The client will be live at `https://step-sprint.vercel.app`.
 
 ---
 
-## Remaining manual steps
+## Post-deploy checklist
 
-Only two steps require human action in external consoles:
+After the first successful deploy, complete these steps:
 
-### Optional: Sentry error tracking
+- [ ] **Change the admin password** — log in with the password from `ADMIN_PASSWORD` (or from Render logs if auto-generated), then change it via the profile page.
+- [ ] **Verify email delivery** — register a test account and confirm the verification email arrives.
+- [ ] **Create a challenge** — log in as admin, create the first challenge, generate an invite code, and test the invite flow.
+- [ ] **Confirm database backups** — check the Render dashboard that daily backups are enabled for `stepsprint-db`.
+
+---
+
+## Optional integrations
+
+### Sentry error tracking
 
 In the Render dashboard → `stepsprint-api` → **Environment** → set `SENTRY_DSN`.
+In the Vercel dashboard → **Settings → Environment Variables** → set `VITE_SENTRY_DSN`.
 
-### Optional: Fitbit integration
+### PostHog analytics
+
+In the Vercel dashboard → set `VITE_POSTHOG_KEY` (and optionally `VITE_POSTHOG_HOST`).
+
+### Web Push notifications
+
+1. Generate VAPID keys:
+   ```bash
+   npx web-push generate-vapid-keys
+   ```
+2. In Render dashboard → `stepsprint-api` → **Environment**, set:
+   - `VAPID_PUBLIC_KEY`
+   - `VAPID_PRIVATE_KEY`
+   - `VAPID_SUBJECT` (e.g. `mailto:admin@yourdomain.com`)
+
+### Fitbit integration
 
 1. Register an app at [dev.fitbit.com](https://dev.fitbit.com/apps/new).
 2. Set the OAuth redirect URI to:
    ```
    https://stepsprint-api.onrender.com/api/integrations/fitbit/callback
    ```
-3. In Render dashboard → `stepsprint-api` → **Environment**, set:
-   - `FITBIT_CLIENT_ID`
-   - `FITBIT_CLIENT_SECRET`
+3. In Render dashboard → set `FITBIT_CLIENT_ID` and `FITBIT_CLIENT_SECRET`.
 
-### Optional: Google Fit integration
+### Google Fit integration
 
 1. Create a project at [console.cloud.google.com](https://console.cloud.google.com) → enable the **Fitness API**.
 2. Create OAuth 2.0 credentials. Set the redirect URI to:
    ```
    https://stepsprint-api.onrender.com/api/integrations/google-fit/callback
    ```
-3. In Render dashboard → `stepsprint-api` → **Environment**, set:
-   - `GOOGLE_CLIENT_ID`
-   - `GOOGLE_CLIENT_SECRET`
-
-The server starts and runs without any of the above OAuth vars — the integration endpoints return 503 until the credentials are set.
+3. In Render dashboard → set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
 
 ---
 
@@ -76,27 +107,33 @@ The server starts and runs without any of the above OAuth vars — the integrati
 
 ### Server (Render)
 
-| Variable | Source | Description |
-|----------|--------|-------------|
-| `NODE_ENV` | `render.yaml` | `production` |
-| `PORT` | `render.yaml` | `3001` |
-| `DATABASE_URL` | Render (auto) | PostgreSQL connection string from `stepsprint-db` |
-| `JWT_SECRET` | Render (auto) | Random 64-char secret |
-| `APP_ORIGIN` | `render.yaml` | `https://step-sprint.vercel.app` |
-| `SENTRY_DSN` | Manual (optional) | Sentry project DSN |
-| `FITBIT_CLIENT_ID` | Manual (optional) | Fitbit OAuth app ID |
-| `FITBIT_CLIENT_SECRET` | Manual (optional) | Fitbit OAuth app secret |
-| `GOOGLE_CLIENT_ID` | Manual (optional) | Google OAuth client ID |
-| `GOOGLE_CLIENT_SECRET` | Manual (optional) | Google OAuth client secret |
+| Variable | Source | Required | Description |
+|----------|--------|----------|-------------|
+| `NODE_ENV` | `render.yaml` | Yes | `production` |
+| `PORT` | `render.yaml` | Yes | `3001` |
+| `DATABASE_URL` | Render (auto) | Yes | PostgreSQL connection string |
+| `JWT_SECRET` | Render (auto) | Yes | Random 64-char secret |
+| `APP_ORIGIN` | `render.yaml` | Yes | `https://step-sprint.vercel.app` |
+| `RESEND_API_KEY` | Manual | **Yes** | Resend API key for transactional email |
+| `SMTP_FROM` | Manual | **Yes** | Email sender address |
+| `ADMIN_PASSWORD` | Manual | First deploy | Seed admin password |
+| `SENTRY_DSN` | Manual | No | Sentry DSN |
+| `VAPID_PUBLIC_KEY` | Manual | No | Web Push public key |
+| `VAPID_PRIVATE_KEY` | Manual | No | Web Push private key |
+| `VAPID_SUBJECT` | Manual | No | Web Push contact URI |
+| `FITBIT_CLIENT_ID` | Manual | No | Fitbit OAuth app ID |
+| `FITBIT_CLIENT_SECRET` | Manual | No | Fitbit OAuth app secret |
+| `GOOGLE_CLIENT_ID` | Manual | No | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | Manual | No | Google OAuth client secret |
 
 ### Client (Vercel)
 
-| Variable | Source | Description |
-|----------|--------|-------------|
-| `VITE_API_URL` | `vercel.json` | `https://stepsprint-api.onrender.com` |
-| `VITE_SENTRY_DSN` | Vercel dashboard (optional) | Sentry DSN for browser error reporting |
-| `VITE_POSTHOG_KEY` | Vercel dashboard (optional) | PostHog project key for analytics |
-| `VITE_POSTHOG_HOST` | Vercel dashboard (optional) | PostHog host (defaults to `app.posthog.com`) |
+| Variable | Source | Required | Description |
+|----------|--------|----------|-------------|
+| `VITE_API_URL` | `vercel.json` | Yes | `https://stepsprint-api.onrender.com` |
+| `VITE_SENTRY_DSN` | Vercel dashboard | No | Sentry DSN for browser errors |
+| `VITE_POSTHOG_KEY` | Vercel dashboard | No | PostHog project key |
+| `VITE_POSTHOG_HOST` | Vercel dashboard | No | PostHog host (defaults to `app.posthog.com`) |
 
 ---
 
@@ -110,28 +147,32 @@ npm install          # installs root + both workspaces
 
 # Database setup (SQLite)
 cd server
-cp ../.env.example .env   # edit JWT_SECRET and APP_ORIGIN
+cp ../.env.example .env   # edit JWT_SECRET at minimum
 npm run db:migrate
 npm run db:seed
 
 # Run both servers
-npm run dev          # from repo root (server :3001, client :5173)
+cd ..
+npm run dev          # server :3001, client :5173
 ```
 
-Seed accounts (password `password123` for all):
+Seed accounts (dev only, password `password123` for all):
 - Admin: `admin@stepsprint.local`
-- Participant: `user1@stepsprint.local`
+- Participants: `user1@stepsprint.local` … `user12@stepsprint.local`
+
+All seed users have `emailVerified: true` so the email verification gate doesn't block local development.
 
 ---
 
 ## Architecture notes
 
 - **Dev DB**: SQLite via `@prisma/adapter-better-sqlite3` (auto-detected when `DATABASE_URL` starts with `file:`)
-- **Prod DB**: PostgreSQL via bare `PrismaClient()` (Render managed Postgres)
-- The Docker build copies `schema.postgresql.prisma` over `schema.prisma` and runs `prisma db push` on startup
-- CSRF protection is enabled in production (double-submit cookie pattern); Bearer token requests bypass it
-- Rate limiting is production-only (auth, API, and general tiers)
-- Content Security Policy is pinned in both `vercel.json` (client) and helmet (server)
+- **Prod DB**: PostgreSQL. The Dockerfile copies `schema.postgresql.prisma` over `schema.prisma` and replaces `migrations/` with `migrations_postgres/` before running `prisma migrate deploy`. Safe on re-deploy — only pending migrations are applied.
+- **Email verification**: new self-registered users must verify their email before logging in. Admin-added participants and invite-accepted users are pre-verified (the invite itself is the trust signal).
+- **JWT revocation**: each user has a `tokenVersion` counter embedded in their JWT. Logout, password change, and password reset all increment it, immediately invalidating all outstanding tokens on other devices.
+- **CSRF protection**: double-submit cookie pattern (production only). Bearer token requests (iOS Shortcuts / OAuth flows) bypass CSRF.
+- **Rate limiting**: production-only for general/API limiters. Login endpoint is limited to 10 attempts / 15 min per IP.
+- **CSP**: strict policy on all API routes (`script-src 'self'`); relaxed only for `/api/docs` and `/api/openapi.json` to accommodate Swagger UI assets from cdn.jsdelivr.net.
 
 ---
 
@@ -141,9 +182,15 @@ Seed accounts (password `password123` for all):
 - [x] HTTPS enforced (Render + Vercel handle TLS)
 - [x] CORS restricted to `https://step-sprint.vercel.app`
 - [x] CSRF protection (double-submit cookie, production)
-- [x] Rate limiting (production)
+- [x] Rate limiting — login: 10/15 min, auth: 30/15 min, API: 120/min
 - [x] Helmet security headers (server)
-- [x] CSP headers (client via `vercel.json`, server via helmet)
-- [x] HTTP-only cookies
-- [ ] SMTP for password reset emails (optional — configure Nodemailer env vars)
-- [ ] Sentry DSN (optional)
+- [x] CSP — no `unsafe-inline` for scripts on API or client
+- [x] HTTP-only session cookies
+- [x] Email verification required before first login
+- [x] JWT revocation on logout / password change / password reset
+- [x] Admin password from env var (or auto-generated random with warning)
+- [x] Cursor-based pagination on admin submissions list
+- [x] `prisma migrate deploy` (not `db push --accept-data-loss`) on container start
+- [ ] SMTP / Resend configured (`RESEND_API_KEY` + `SMTP_FROM`) — required
+- [ ] Sentry DSN — optional
+- [ ] VAPID keys for Web Push — optional

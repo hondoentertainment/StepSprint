@@ -11,6 +11,8 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(16),
   APP_ORIGIN: z.string().default("http://localhost:5173"),
   DEFAULT_CHALLENGE_TZ: z.string().default("America/Chicago"),
+  // Resend transactional email (preferred). Falls back to raw SMTP when absent.
+  RESEND_API_KEY: z.string().optional(),
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.string().optional(),
   SMTP_USER: z.string().optional(),
@@ -20,7 +22,7 @@ const envSchema = z.object({
   NODE_ENV: z.string().optional(),
   VAPID_PUBLIC_KEY: z.string().optional(),
   VAPID_PRIVATE_KEY: z.string().optional(),
-  VAPID_SUBJECT: z.string().default("mailto:admin@stepsprint.local"),
+  VAPID_SUBJECT: z.string().optional(),
   FITBIT_CLIENT_ID: z.string().optional(),
   FITBIT_CLIENT_SECRET: z.string().optional(),
   GOOGLE_CLIENT_ID: z.string().optional(),
@@ -33,6 +35,8 @@ if (!parsed.success) {
   throw new Error(`Invalid environment: ${message}`);
 }
 
+const smtpFrom = parsed.data.SMTP_FROM ?? "noreply@stepsprint.app";
+
 export const config = {
   port: Number(parsed.data.PORT ?? "3001"),
   databaseUrl: parsed.data.DATABASE_URL,
@@ -42,10 +46,12 @@ export const config = {
   cookieName: "stepsprint_session",
   sentryDsn: parsed.data.SENTRY_DSN,
   nodeEnv: parsed.data.NODE_ENV ?? "development",
+  resendApiKey: parsed.data.RESEND_API_KEY,
+  emailFrom: smtpFrom,
   vapid: {
     publicKey: parsed.data.VAPID_PUBLIC_KEY,
     privateKey: parsed.data.VAPID_PRIVATE_KEY,
-    subject: parsed.data.VAPID_SUBJECT,
+    subject: parsed.data.VAPID_SUBJECT ?? `mailto:${smtpFrom}`,
   },
   smtp: parsed.data.SMTP_HOST
     ? {
@@ -53,7 +59,7 @@ export const config = {
         port: Number(parsed.data.SMTP_PORT ?? "587"),
         user: parsed.data.SMTP_USER,
         pass: parsed.data.SMTP_PASS,
-        from: parsed.data.SMTP_FROM ?? "noreply@stepsprint.local",
+        from: smtpFrom,
       }
     : null,
   oauth: {

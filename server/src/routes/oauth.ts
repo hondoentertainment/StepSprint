@@ -227,7 +227,7 @@ function mountProviderRoutes(provider: ProviderConfig) {
     }
 
     const challengeId = (req.query as { challengeId?: string }).challengeId ?? "";
-    const state = Buffer.from(JSON.stringify({ userId: req.user.id, challengeId })).toString(
+    const state = Buffer.from(JSON.stringify({ userId: req.user!.id, challengeId })).toString(
       "base64url"
     );
 
@@ -342,7 +342,7 @@ function mountProviderRoutes(provider: ProviderConfig) {
     const { challengeId } = parsed.data;
 
     const connection = await prisma.oAuthConnection.findUnique({
-      where: { userId_provider: { userId: req.user.id, provider: provider.id } },
+      where: { userId_provider: { userId: req.user!.id, provider: provider.id } },
     });
     if (!connection) {
       res.status(403).json({
@@ -362,7 +362,7 @@ function mountProviderRoutes(provider: ProviderConfig) {
     }
 
     const membership = await prisma.teamMember.findUnique({
-      where: { userId_challengeId: { userId: req.user.id, challengeId } },
+      where: { userId_challengeId: { userId: req.user!.id, challengeId } },
     });
     if (!membership) {
       res.status(403).json({ error: "Not enrolled in this challenge" });
@@ -415,7 +415,7 @@ function mountProviderRoutes(provider: ProviderConfig) {
 
     const existing = await prisma.stepSubmission.findMany({
       where: {
-        userId: req.user.id,
+        userId: req.user!.id,
         challengeId,
         date: { in: prepared.map((r) => r.date) },
       },
@@ -426,10 +426,10 @@ function mountProviderRoutes(provider: ProviderConfig) {
     await prisma.$transaction(
       prepared.map((row) =>
         prisma.stepSubmission.upsert({
-          where: { userId_challengeId_date: { userId: req.user.id, challengeId, date: row.date } },
+          where: { userId_challengeId_date: { userId: req.user!.id, challengeId, date: row.date } },
           update: { steps: row.steps, isFlagged: row.steps > 100_000 },
           create: {
-            userId: req.user.id,
+            userId: req.user!.id,
             challengeId,
             date: row.date,
             steps: row.steps,
@@ -446,7 +446,7 @@ function mountProviderRoutes(provider: ProviderConfig) {
     await prisma.auditLog.create({
       data: {
         action: `${provider.id}_sync`,
-        actorId: req.user.id,
+        actorId: req.user!.id,
         challengeId,
         metadata: { imported, updated, skipped },
       },
@@ -463,7 +463,7 @@ function mountProviderRoutes(provider: ProviderConfig) {
     }
 
     const deleted = await prisma.oAuthConnection.deleteMany({
-      where: { userId: req.user.id, provider: provider.id },
+      where: { userId: req.user!.id, provider: provider.id },
     });
 
     if (deleted.count === 0) {
@@ -472,7 +472,7 @@ function mountProviderRoutes(provider: ProviderConfig) {
     }
 
     await prisma.auditLog.create({
-      data: { action: `oauth_disconnect_${provider.id}`, actorId: req.user.id },
+      data: { action: `oauth_disconnect_${provider.id}`, actorId: req.user!.id },
     });
 
     res.status(204).send();
@@ -493,7 +493,7 @@ router.get("/connections", authRequired, async (req: AuthenticatedRequest, res) 
   }
 
   const connections = await prisma.oAuthConnection.findMany({
-    where: { userId: req.user.id },
+    where: { userId: req.user!.id },
     select: { provider: true, createdAt: true, updatedAt: true },
   });
 
