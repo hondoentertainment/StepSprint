@@ -1,9 +1,16 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import crypto from "crypto";
+import bcrypt from "bcryptjs";
 import request from "supertest";
 import { DateTime } from "luxon";
 import app from "../app";
 import { prisma } from "../prisma";
+
+/** Create a verified test user with a known password directly in the DB. */
+async function createVerifiedUser(email: string, name: string) {
+  const passwordHash = await bcrypt.hash("password123", 12);
+  return prisma.user.create({ data: { email, name, passwordHash, emailVerified: true } });
+}
 
 /**
  * Integration tests for integrations routes. Each `describe` block owns its
@@ -53,17 +60,9 @@ describe("Integrations routes", () => {
 
       const memberEmail = `csv-member-${suffix}@stepsprint.local`;
       const outsiderEmail = `csv-outsider-${suffix}@stepsprint.local`;
-      await request(app)
-        .post("/api/auth/register")
-        .send({ email: memberEmail, password: "password123", name: "CSV Member" })
-        .expect(200);
-      await request(app)
-        .post("/api/auth/register")
-        .send({ email: outsiderEmail, password: "password123", name: "CSV Outsider" })
-        .expect(200);
 
-      const memberUser = await prisma.user.findUniqueOrThrow({ where: { email: memberEmail } });
-      const outsiderUser = await prisma.user.findUniqueOrThrow({ where: { email: outsiderEmail } });
+      const memberUser = await createVerifiedUser(memberEmail, "CSV Member");
+      const outsiderUser = await createVerifiedUser(outsiderEmail, "CSV Outsider");
       memberUserId = memberUser.id;
       outsiderUserId = outsiderUser.id;
 
@@ -215,12 +214,7 @@ describe("Integrations routes", () => {
 
     beforeAll(async () => {
       const email = `token-user-${suffix}@stepsprint.local`;
-      await request(app)
-        .post("/api/auth/register")
-        .send({ email, password: "password123", name: "Token User" })
-        .expect(200);
-
-      const user = await prisma.user.findUniqueOrThrow({ where: { email } });
+      const user = await createVerifiedUser(email, "Token User");
       userId = user.id;
 
       const login = await request(app)
@@ -320,11 +314,7 @@ describe("Integrations routes", () => {
     it("404 when revoking another user's token", async () => {
       // Create a second user to own a token
       const email2 = `token-other-${suffix}@stepsprint.local`;
-      await request(app)
-        .post("/api/auth/register")
-        .send({ email: email2, password: "password123", name: "Other" })
-        .expect(200);
-      const other = await prisma.user.findUniqueOrThrow({ where: { email: email2 } });
+      const other = await createVerifiedUser(email2, "Other");
 
       const raw = crypto.randomBytes(32).toString("hex");
       const plain = `ssp_${raw}`;
@@ -384,17 +374,8 @@ describe("Integrations routes", () => {
       const memberEmail = `ah-member-${suffix}@stepsprint.local`;
       const outsiderEmail = `ah-outsider-${suffix}@stepsprint.local`;
 
-      await request(app)
-        .post("/api/auth/register")
-        .send({ email: memberEmail, password: "password123", name: "AH Member" })
-        .expect(200);
-      await request(app)
-        .post("/api/auth/register")
-        .send({ email: outsiderEmail, password: "password123", name: "AH Outsider" })
-        .expect(200);
-
-      const memberUser = await prisma.user.findUniqueOrThrow({ where: { email: memberEmail } });
-      const outsiderUser = await prisma.user.findUniqueOrThrow({ where: { email: outsiderEmail } });
+      const memberUser = await createVerifiedUser(memberEmail, "AH Member");
+      const outsiderUser = await createVerifiedUser(outsiderEmail, "AH Outsider");
       userId = memberUser.id;
       outsiderUserId = outsiderUser.id;
 

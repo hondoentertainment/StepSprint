@@ -27,25 +27,48 @@ const isProduction = config.nodeEnv === "production";
 // ---------------------------------------------------------------------------
 // Security headers (helmet + pinned CSP)
 // ---------------------------------------------------------------------------
-// The API is consumed by the first-party SPA and the Swagger UI at /api/docs.
-// Swagger UI loads assets from cdn.jsdelivr.net; everything else is self-hosted.
-app.use(
-  helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "https://cdn.jsdelivr.net", "'unsafe-inline'"],
-        styleSrc: ["'self'", "https://cdn.jsdelivr.net", "'unsafe-inline'"],
-        imgSrc: ["'self'", "data:", "https://cdn.jsdelivr.net"],
-        connectSrc: ["'self'"],
-        fontSrc: ["'self'"],
-        frameAncestors: ["'none'"],
-        objectSrc: ["'none'"],
-        baseUri: ["'self'"],
-      },
+// The API is consumed by the first-party SPA (strict policy) and the Swagger
+// UI at /api/docs (relaxed policy — Swagger requires cdn.jsdelivr.net + inline).
+// We apply the strict policy globally and override only the docs route.
+
+const strictCsp = helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:"],
+      connectSrc: ["'self'"],
+      fontSrc: ["'self'"],
+      frameAncestors: ["'none'"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
     },
-  })
-);
+  },
+});
+
+const swaggerCsp = helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "https://cdn.jsdelivr.net", "'unsafe-inline'"],
+      styleSrc: ["'self'", "https://cdn.jsdelivr.net", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https://cdn.jsdelivr.net"],
+      connectSrc: ["'self'"],
+      fontSrc: ["'self'"],
+      frameAncestors: ["'none'"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+    },
+  },
+});
+
+app.use((req, res, next) => {
+  if (req.path.startsWith("/api/docs") || req.path === "/api/openapi.json") {
+    return swaggerCsp(req, res, next);
+  }
+  return strictCsp(req, res, next);
+});
 
 // ---------------------------------------------------------------------------
 // Request logging
@@ -93,8 +116,10 @@ app.use(cookieParser());
 // not auto-sent by the browser and therefore not CSRF-vulnerable. We skip
 // CSRF validation for those requests so iOS Shortcuts / OAuth flows continue
 // to work without a CSRF token.
-const { generateToken, doubleCsrfProtection } = doubleCsrf({
+const { generateCsrfToken, doubleCsrfProtection } = doubleCsrf({
   getSecret: () => config.jwtSecret,
+  getSessionIdentifier: (req) =>
+    (req.cookies?.[config.cookieName] as string | undefined) ?? req.ip ?? "anon",
   cookieName: "stepsprint.csrf",
   cookieOptions: {
     sameSite: "lax",
@@ -103,7 +128,7 @@ const { generateToken, doubleCsrfProtection } = doubleCsrf({
     path: "/",
   },
   size: 64,
-  getTokenFromRequest: (req) => {
+  getCsrfTokenFromRequest: (req) => {
     const h = req.headers["x-csrf-token"];
     return typeof h === "string" ? h : undefined;
   },
@@ -112,7 +137,7 @@ const { generateToken, doubleCsrfProtection } = doubleCsrf({
 // Expose a token endpoint that the SPA calls on startup.
 // Must be registered BEFORE the CSRF protection middleware.
 app.get("/api/csrf-token", (req, res) => {
-  res.json({ token: generateToken(req as Request, res) });
+  res.json({ token: generateCsrfToken(req as Request, res) });
 });
 
 function csrfProtection(req: Request, res: Response, next: NextFunction) {

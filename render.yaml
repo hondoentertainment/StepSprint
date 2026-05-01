@@ -1,12 +1,15 @@
 # StepSprint Render blueprint.
 # Deploy: render.com → New → Blueprint → select this repo.
 # Provisions stepsprint-api (Docker web service) + stepsprint-db (Postgres 16).
-# All required env vars are pre-filled below; only SENTRY_DSN and the four
-# OAuth vars need manual values — leave them blank to deploy without them.
+#
+# Required manual steps after first deploy:
+#   1. Set RESEND_API_KEY  (get from resend.com — required for email verification)
+#   2. Set SMTP_FROM       (e.g. "StepSprint <noreply@yourdomain.com>")
+#   3. Optionally set SENTRY_DSN, VAPID_*, OAuth vars
 
 databases:
   - name: stepsprint-db
-    plan: free
+    plan: starter
     databaseName: stepsprint
     postgresMajorVersion: "16"
 
@@ -14,7 +17,7 @@ services:
   - type: web
     name: stepsprint-api
     runtime: docker
-    plan: free
+    plan: starter
     region: oregon
     dockerfilePath: ./Dockerfile
     dockerContext: ./server
@@ -35,6 +38,20 @@ services:
       # Update this value if you use a custom domain on Vercel.
       - key: APP_ORIGIN
         value: https://step-sprint.vercel.app
+      # Email (transactional — required for password reset and email verification).
+      # Set RESEND_API_KEY to your Resend API key (resend.com).
+      - key: RESEND_API_KEY
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      # Push notifications (optional — generate with: npx web-push generate-vapid-keys)
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        sync: false
+      # Observability (optional)
       - key: SENTRY_DSN
         sync: false
       # OAuth integrations (optional — server starts and runs without these).

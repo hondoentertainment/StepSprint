@@ -17,7 +17,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://stepsprint-api.onrender.com https://*.sentry.io https://*.ingest.sentry.io https://app.posthog.com https://eu.posthog.com; img-src 'self' data:; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none';"
+          "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://stepsprint-api.onrender.com https://*.sentry.io https://*.ingest.sentry.io https://app.posthog.com https://eu.posthog.com; img-src 'self' data:; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none';"
         },
         {
           "key": "X-Frame-Options",

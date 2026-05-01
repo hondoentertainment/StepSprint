@@ -18,10 +18,11 @@ COPY tsconfig.json ./
 COPY prisma ./prisma
 COPY src ./src
 
-# Use the PostgreSQL schema for the production Prisma client.
-# The dev schema (schema.prisma) targets SQLite; schema.postgresql.prisma
-# targets Postgres and is the canonical production schema.
-RUN cp prisma/schema.postgresql.prisma prisma/schema.prisma
+# Use the PostgreSQL schema and migrations for the production Prisma client.
+# The dev schema targets SQLite; schema.postgresql.prisma and
+# migrations_postgres/ are the canonical production schema and migration history.
+RUN cp prisma/schema.postgresql.prisma prisma/schema.prisma \
+    && cp -r prisma/migrations_postgres/. prisma/migrations/
 
 RUN npx prisma generate
 RUN npm run build
@@ -56,7 +57,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD curl -fsS http://127.0.0.1:3001/api/health || exit 1
 
 ENTRYPOINT ["/sbin/tini", "--"]
-# prisma db push syncs the schema to Postgres without requiring provider-specific
-# migration files (the existing migrations were generated for SQLite).
-# TODO: once PostgreSQL migrations are generated, switch back to migrate deploy.
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss && node dist/index.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]

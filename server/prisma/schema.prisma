@@ -12,21 +12,36 @@ enum Role {
 }
 
 model User {
-  id                     String                  @id @default(cuid())
-  email                  String                  @unique
-  name                   String?
-  passwordHash           String?
-  role                   Role                    @default(PARTICIPANT)
-  createdAt              DateTime                @default(now())
-  updatedAt              DateTime                @updatedAt
-  memberships            TeamMember[]
-  submissions            StepSubmission[]
-  auditLogs              AuditLog[]              @relation("AuditActor")
-  resetTokens            PasswordResetToken[]
-  notificationPreference NotificationPreference?
-  pushSubscriptions      PushSubscription[]
-  integrationTokens      IntegrationToken[]
-  oauthConnections       OAuthConnection[]
+  id                          String                       @id @default(cuid())
+  email                       String                       @unique
+  name                        String?
+  passwordHash                String?
+  role                        Role                         @default(PARTICIPANT)
+  tokenVersion                Int                          @default(0)
+  emailVerified               Boolean                      @default(false)
+  createdAt                   DateTime                     @default(now())
+  updatedAt                   DateTime                     @updatedAt
+  memberships                 TeamMember[]
+  submissions                 StepSubmission[]
+  auditLogs                   AuditLog[]                   @relation("AuditActor")
+  resetTokens                 PasswordResetToken[]
+  emailVerificationTokens     EmailVerificationToken[]
+  notificationPreference      NotificationPreference?
+  pushSubscriptions           PushSubscription[]
+  integrationTokens           IntegrationToken[]
+  oauthConnections            OAuthConnection[]
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@index([userId])
 }
 
 model PasswordResetToken {

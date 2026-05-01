@@ -2,6 +2,7 @@ import { PrismaClient, Role } from "@prisma/client";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { DateTime } from "luxon";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import { logger } from "./logger";
 
 const databaseUrl = process.env.DATABASE_URL ?? "file:./dev.db";
@@ -9,35 +10,64 @@ const adapter = new PrismaBetterSqlite3({ url: databaseUrl });
 const prisma = new PrismaClient({ adapter });
 
 const TZ = "America/Chicago";
-const DEFAULT_PASSWORD = "password123";
+
+// In production, the admin password must be set via ADMIN_PASSWORD env var.
+// In dev, fall back to a well-known default so local setup stays simple.
+const isProduction = process.env.NODE_ENV === "production";
+let adminPassword = process.env.ADMIN_PASSWORD;
+if (!adminPassword) {
+  if (isProduction) {
+    // Generate a random password and print it once — admin must change it.
+    adminPassword = crypto.randomBytes(16).toString("base64url");
+    logger.warn(
+      { password: adminPassword },
+      "ADMIN_PASSWORD not set — generated a random admin password. Change it immediately after first login."
+    );
+  } else {
+    adminPassword = "password123";
+  }
+}
+
+// Dev participants always use this fixed password for easy local testing.
+const PARTICIPANT_PASSWORD = isProduction ? null : "password123";
 
 async function main() {
-  const passwordHash = await bcrypt.hash(DEFAULT_PASSWORD, 12);
+  const adminHash = await bcrypt.hash(adminPassword!, 12);
   const now = DateTime.now().setZone(TZ);
   const start = now.startOf("month").toISODate();
   const end = now.endOf("month").toISODate();
 
   const admin = await prisma.user.upsert({
     where: { email: "admin@stepsprint.local" },
-    update: { passwordHash },
+    update: { passwordHash: adminHash, emailVerified: true },
     create: {
       email: "admin@stepsprint.local",
       name: "Admin User",
       role: Role.ADMIN,
-      passwordHash,
+      passwordHash: adminHash,
+      emailVerified: true,
     },
   });
+
+  if (isProduction) {
+    // In production we only seed the admin account — no demo data.
+    logger.info({ adminEmail: admin.email }, "Production seed complete.");
+    return;
+  }
+
+  const participantHash = await bcrypt.hash(PARTICIPANT_PASSWORD!, 12);
 
   const participants = await Promise.all(
     Array.from({ length: 12 }).map((_, idx) =>
       prisma.user.upsert({
         where: { email: `user${idx + 1}@stepsprint.local` },
-        update: { passwordHash },
+        update: { passwordHash: participantHash, emailVerified: true },
         create: {
           email: `user${idx + 1}@stepsprint.local`,
           name: `Walker ${idx + 1}`,
           role: Role.PARTICIPANT,
-          passwordHash,
+          passwordHash: participantHash,
+          emailVerified: true,
         },
       })
     )
@@ -64,22 +94,12 @@ async function main() {
     },
   });
 
-  await prisma.teamMember.deleteMany({
-    where: { challengeId: challenge.id },
-  });
-
-  await prisma.team.deleteMany({
-    where: { challengeId: challenge.id },
-  });
+  await prisma.teamMember.deleteMany({ where: { challengeId: challenge.id } });
+  await prisma.team.deleteMany({ where: { challengeId: challenge.id } });
 
   const teams = await Promise.all(
     ["Team Alpha", "Team Bravo", "Team Charlie"].map((name) =>
-      prisma.team.create({
-        data: {
-          name,
-          challengeId: challenge.id,
-        },
-      })
+      prisma.team.create({ data: { name, challengeId: challenge.id } })
     )
   );
 
@@ -90,9 +110,7 @@ async function main() {
     isLeader: index % teams.length === 0,
   }));
 
-  await prisma.teamMember.createMany({
-    data: assignments,
-  });
+  await prisma.teamMember.createMany({ data: assignments });
 
   const dates = Array.from({ length: 10 }).map((_, offset) =>
     now.minus({ days: offset }).toISODate()
@@ -130,7 +148,7 @@ async function main() {
     },
   });
 
-  logger.info("Seed complete!");
+  logger.info("Dev seed complete!");
 }
 
 main()
