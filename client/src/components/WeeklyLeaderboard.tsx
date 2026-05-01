@@ -99,15 +99,17 @@ export function WeeklyLeaderboard({ challengeId, selectedChallenge }: Props) {
               tabIndex={0}
             >
               <div className="primary">
-                <span className="rank">{t("weeklyLeaderboard.rank", { rank: index + 1 })}</span>{" "}
-                {entry.name || entry.email}
+                <span className="rank">#{index + 1}</span>
+                <span className="list-name" title={entry.name || entry.email}>
+                  {entry.name || entry.email}
+                </span>
               </div>
               <div className="meta">
-                {entry.steps.toLocaleString()} {t("common.steps")} · {entry.trend}
+                {entry.steps.toLocaleString()} {t("common.steps")}
                 {entry.delta !== 0 && (
                   <span className="delta">
-                    ({entry.delta > 0 ? "+" : ""}
-                    {entry.delta.toLocaleString()} vs last week)
+                    {" "}({entry.delta > 0 ? "+" : ""}
+                    {entry.delta.toLocaleString()})
                   </span>
                 )}
               </div>

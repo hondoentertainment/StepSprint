@@ -120,7 +120,9 @@
     "success": "Steps submitted successfully.",
     "flaggedHint": "Submissions above 100,000 steps are flagged.",
     "connectDevice": "Connect fitness device",
-    "comingSoon": "Coming soon"
+    "comingSoon": "Coming soon",
+    "syncAppleWatch": "Sync from Apple Watch",
+    "hideAppleWatch": "Hide Apple Watch sync"
   },
   "weeklyLeaderboard": {
     "title": "Weekly Top Steppers",
@@ -134,8 +136,11 @@
   "weekPicker": {
     "weekOf": "Week of",
     "pickDate": "Pick a date to select its week",
+    "jumpToWeek": "Jump to week by date",
+    "weekNumber": "Week {{week}}",
     "thisWeek": "This week",
     "previousWeek": "Previous week",
+    "nextWeek": "Next week",
     "showThisWeek": "Show this week",
     "showPreviousWeek": "Show previous week"
   },
@@ -282,6 +287,8 @@
     "rank": "#{{rank}}",
     "total": "{{steps}} total",
     "lead": "Lead: {{name}} ({{steps}})",
-    "behind": "{{steps}} behind"
+    "leads": "leads",
+    "behind": "{{steps}} behind",
+    "behindShort": "behind"
   }
 }

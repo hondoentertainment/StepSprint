@@ -106,19 +106,17 @@ export function TeamStandings({ challengeId, user }: Props) {
               className={`list-row ${userTeamName && entry.teamName === userTeamName ? "list-row-my-team" : ""}`}
             >
               <div className="primary">
-                <span className="rank">{t("teamStandings.rank", { rank: index + 1 })}</span>{" "}
-                {entry.teamName}
+                <span className="rank">#{index + 1}</span>
+                <span className="list-name" title={entry.teamName}>{entry.teamName}</span>
                 {userTeamName && entry.teamName === userTeamName && (
                   <span className="my-team-badge" aria-hidden> {t("teamStandings.myTeam")}</span>
                 )}
               </div>
               <div className="meta">
-                {t("teamStandings.total", { steps: entry.totalSteps.toLocaleString() })} ·{" "}
-                {t("teamStandings.lead", {
-                  name: entry.leaderName || "—",
-                  steps: entry.leaderSteps.toLocaleString(),
-                })} ·{" "}
-                {t("teamStandings.behind", { steps: entry.stepsBehind.toLocaleString() })}
+                <span className="meta-steps">{entry.totalSteps.toLocaleString()} {t("common.steps")}</span>
+                <span className="meta-detail">
+                  {entry.leaderName || "—"} {t("teamStandings.leads")} &middot; {entry.stepsBehind.toLocaleString()} {t("teamStandings.behindShort")}
+                </span>
               </div>
             </div>
           ))}

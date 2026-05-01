@@ -17,6 +17,15 @@ export function WeekPicker({ value, onChange, challengeStart, challengeEnd }: Pr
   const min = challengeStart || "2020-01-01";
   const max = challengeEnd || "2030-12-31";
 
+  const thisWeek = getISOWeek(new Date());
+  const isThisWeek = value.year === thisWeek.year && value.week === thisWeek.week;
+
+  // Compute boundary weeks to disable next/prev when at challenge limits
+  const minWeek = getISOWeek(new Date(min + "T12:00:00"));
+  const maxWeek = getISOWeek(new Date(max + "T12:00:00"));
+  const isAtMin = value.year === minWeek.year && value.week <= minWeek.week;
+  const isAtMax = value.year === maxWeek.year && value.week >= maxWeek.week;
+
   function handleDateChange(dateStr: string) {
     const d = new Date(dateStr + "T12:00:00");
     const { year, week } = getISOWeek(d);
@@ -24,26 +33,34 @@ export function WeekPicker({ value, onChange, challengeStart, challengeEnd }: Pr
   }
 
   function goToThisWeek() {
-    const now = getISOWeek(new Date());
-    onChange({ year: now.year, week: now.week });
+    onChange({ year: thisWeek.year, week: thisWeek.week });
   }
 
-  function goToPreviousWeek() {
+  function shiftWeek(delta: number) {
     const mondayStr = weekToDate(value.year, value.week);
     const monday = new Date(mondayStr + "T12:00:00");
-    monday.setDate(monday.getDate() - 7);
+    monday.setDate(monday.getDate() + delta * 7);
     const { year, week } = getISOWeek(monday);
     onChange({ year, week });
   }
 
-  const isThisWeek =
-    value.year === getISOWeek(new Date()).year && value.week === getISOWeek(new Date()).week;
-
   return (
-    <div className="week-picker">
-      <div className="week-picker row">
-        <label>
-          {t("weekPicker.weekOf")}
+    <div className="week-picker-v2">
+      <div className="week-nav">
+        <button
+          type="button"
+          className="week-nav-arrow secondary"
+          onClick={() => shiftWeek(-1)}
+          disabled={isAtMin}
+          aria-label={t("weekPicker.previousWeek")}
+        >
+          &#8592;
+        </button>
+        <div className="week-nav-center">
+          <label className="week-nav-label" aria-live="polite">
+            <span className="week-range">{formatWeekRange(value.year, value.week)}</span>
+            <span className="week-number">{t("weekPicker.weekNumber", { week: value.week })}</span>
+          </label>
           <input
             type="date"
             value={mondayOfWeek}
@@ -51,31 +68,32 @@ export function WeekPicker({ value, onChange, challengeStart, challengeEnd }: Pr
             min={min}
             max={max}
             title={t("weekPicker.pickDate")}
+            className="week-date-input"
+            aria-label={t("weekPicker.jumpToWeek")}
           />
-        </label>
-        <span className="week-picker-label" aria-live="polite">
-          {formatWeekRange(value.year, value.week)}
-        </span>
-      </div>
-      <div className="week-picker-shortcuts row">
+        </div>
         <button
           type="button"
-          className="secondary"
-          onClick={goToThisWeek}
-          disabled={isThisWeek}
-          aria-label={t("weekPicker.showThisWeek")}
+          className="week-nav-arrow secondary"
+          onClick={() => shiftWeek(1)}
+          disabled={isAtMax || isThisWeek}
+          aria-label={t("weekPicker.nextWeek")}
         >
-          {t("weekPicker.thisWeek")}
-        </button>
-        <button
-          type="button"
-          className="secondary"
-          onClick={goToPreviousWeek}
-          aria-label={t("weekPicker.showPreviousWeek")}
-        >
-          {t("weekPicker.previousWeek")}
+          &#8594;
         </button>
       </div>
+      {!isThisWeek && (
+        <div className="week-this-week-row">
+          <button
+            type="button"
+            className="secondary"
+            onClick={goToThisWeek}
+            aria-label={t("weekPicker.showThisWeek")}
+          >
+            {t("weekPicker.thisWeek")}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { api, getErrorMessage } from "../api";
+import { StepSprintLogo } from "./StepSprintLogo";
 
 export function ResetPassword() {
   const { t } = useTranslation();
@@ -53,7 +54,10 @@ export function ResetPassword() {
     return (
       <div className="app">
         <header className="hero">
-          <h1>{t("app.name")}</h1>
+          <div className="hero-logo">
+            <StepSprintLogo size={40} />
+            <h1>{t("app.name")}</h1>
+          </div>
           <p>{t("app.tagline")}</p>
         </header>
         <section className="panel panel-login">

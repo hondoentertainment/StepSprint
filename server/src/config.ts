@@ -21,6 +21,10 @@ const envSchema = z.object({
   VAPID_PUBLIC_KEY: z.string().optional(),
   VAPID_PRIVATE_KEY: z.string().optional(),
   VAPID_SUBJECT: z.string().default("mailto:admin@stepsprint.local"),
+  FITBIT_CLIENT_ID: z.string().optional(),
+  FITBIT_CLIENT_SECRET: z.string().optional(),
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -52,4 +56,10 @@ export const config = {
         from: parsed.data.SMTP_FROM ?? "noreply@stepsprint.local",
       }
     : null,
+  oauth: {
+    fitbitClientId: parsed.data.FITBIT_CLIENT_ID,
+    fitbitClientSecret: parsed.data.FITBIT_CLIENT_SECRET,
+    googleClientId: parsed.data.GOOGLE_CLIENT_ID,
+    googleClientSecret: parsed.data.GOOGLE_CLIENT_SECRET,
+  },
 };

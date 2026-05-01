@@ -1,9 +1,5 @@
 const API_BASE = (import.meta.env.VITE_API_URL as string)?.replace(/\/$/, "") ?? "";
 
-const CSRF_COOKIE = "stepsprint_csrf";
-const CSRF_HEADER = "x-csrf-token";
-const MUTATION_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
-
 export class ApiError extends Error {
   status: number;
 
@@ -23,26 +19,54 @@ export function getApiUrl(path: string): string {
   return `${API_BASE}${path}`;
 }
 
-function getCsrfToken(): string {
-  const entry = document.cookie
-    .split(";")
-    .find((c) => c.trim().startsWith(`${CSRF_COOKIE}=`));
-  return entry ? entry.split("=").slice(1).join("=").trim() : "";
+// ---------------------------------------------------------------------------
+// CSRF token (double-submit cookie pattern)
+// ---------------------------------------------------------------------------
+// The server sets an httpOnly CSRF cookie and returns the matching token value
+// in JSON. We cache it per page load and attach it as x-csrf-token on all
+// mutating requests. Bearer-token requests (iOS Shortcuts, OAuth sync) bypass
+// CSRF on the server side and don't need the header.
+
+let _csrfToken: string | null = null;
+
+async function getCsrfToken(): Promise<string> {
+  if (_csrfToken) return _csrfToken;
+  const res = await fetch(getApiUrl("/api/csrf-token"), { credentials: "include" });
+  if (!res.ok) throw new ApiError("Failed to fetch CSRF token", res.status);
+  const data = (await res.json()) as { token: string };
+  _csrfToken = data.token;
+  return _csrfToken;
 }
 
+const MUTATING = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
 export async function api<T>(path: string, options: RequestInit = {}) {
-  const method = ((options.method as string | undefined) ?? "GET").toUpperCase();
-  const isMutation = MUTATION_METHODS.has(method);
+  const method = (options.method ?? "GET").toUpperCase();
+
+  const baseHeaders: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(options.headers as Record<string, string> | undefined),
+  };
+
+  if (MUTATING.has(method)) {
+    try {
+      baseHeaders["x-csrf-token"] = await getCsrfToken();
+    } catch {
+      // If the CSRF endpoint is unreachable (dev without server), proceed
+      // without the header so dev workflow is unaffected.
+    }
+  }
 
   const response = await fetch(getApiUrl(path), {
     credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...(isMutation ? { [CSRF_HEADER]: getCsrfToken() } : {}),
-    },
     ...options,
+    headers: baseHeaders,
   });
+
   if (!response.ok) {
+    // Clear cached CSRF token if the server rejects it so the next request
+    // will fetch a fresh one.
+    if (response.status === 403) _csrfToken = null;
     const payload = await response.json().catch(() => ({}));
     throw new ApiError(payload.error ?? "Request failed", response.status);
   }

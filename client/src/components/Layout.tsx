@@ -1,8 +1,9 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Link, Outlet, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import type { User } from "../types";
 import type { Challenge } from "../types";
 import { TABS } from "../types";
+import { StepSprintLogo } from "./StepSprintLogo";
 
 type Props = {
   user: User;
@@ -23,12 +24,14 @@ export function Layout({
 }: Props) {
   const { t } = useTranslation();
   const visibleTabs = TABS.filter((t) => t !== "Admin" || user.role === "ADMIN");
+  const location = useLocation();
+  const isOnSubmit = location.pathname === "/submit";
 
   const tabToPath: Record<string, string> = {
     Home: "/home",
     Submit: "/submit",
-    "Weekly Top Steppers": "/weekly",
-    "Team Standings": "/teams",
+    "Leaderboard": "/weekly",
+    "Teams": "/teams",
     Admin: "/admin",
   };
 
@@ -38,11 +41,19 @@ export function Layout({
         {t("common.skipToContent")}
       </a>
       <header className="topbar" role="banner" aria-label="Site header">
-        <div>
-          <h1>{t("app.name")}</h1>
-          <p>{t("layout.welcome", { name: user.name ?? user.email })}</p>
+        <div className="topbar-brand">
+          <StepSprintLogo size={26} />
+          <div>
+            <h1>{t("app.name")}</h1>
+            <p>{t("layout.welcome", { name: user.name ?? user.email })}</p>
+          </div>
         </div>
         <div className="topbar-actions">
+          {!isOnSubmit && selectedChallengeId && (
+            <Link to="/submit" className="topbar-log-btn" aria-label="Log today's steps">
+              + Log steps
+            </Link>
+          )}
           <select
             value={selectedChallengeId}
             onChange={(e) => onChallengeChange(e.target.value)}

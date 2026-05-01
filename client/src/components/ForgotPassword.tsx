@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { api, getErrorMessage } from "../api";
 import { isValidEmail } from "../utils";
+import { StepSprintLogo } from "./StepSprintLogo";
 
 export function ForgotPassword() {
   const { t } = useTranslation();
@@ -35,7 +36,10 @@ export function ForgotPassword() {
   return (
     <div className="app">
       <header className="hero">
-        <h1>{t("app.name")}</h1>
+        <div className="hero-logo">
+          <StepSprintLogo size={40} />
+          <h1>{t("app.name")}</h1>
+        </div>
         <p>{t("app.tagline")}</p>
       </header>
       <section className="panel panel-login">
