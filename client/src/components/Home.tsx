@@ -59,9 +59,9 @@ function HomeSkeleton() {
 }
 
 function ChallengeProgress({ challenge }: { challenge: Challenge }) {
+  const [now] = useState(() => Date.now());
   const start = new Date(challenge.startDate).getTime();
   const end = new Date(challenge.endDate).getTime();
-  const now = Date.now();
   const totalMs = end - start;
   const elapsedMs = Math.max(0, Math.min(now - start, totalMs));
   const pct = totalMs > 0 ? Math.round((elapsedMs / totalMs) * 100) : 0;

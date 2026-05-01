@@ -97,8 +97,9 @@ app.use(cookieParser());
 // not auto-sent by the browser and therefore not CSRF-vulnerable. We skip
 // CSRF validation for those requests so iOS Shortcuts / OAuth flows continue
 // to work without a CSRF token.
-const { generateToken, doubleCsrfProtection } = doubleCsrf({
+const { generateCsrfToken, doubleCsrfProtection } = doubleCsrf({
   getSecret: () => config.jwtSecret,
+  getSessionIdentifier: (req) => req.cookies["stepsprint.csrf"] ?? "",
   cookieName: "stepsprint.csrf",
   cookieOptions: {
     sameSite: "lax",
@@ -107,7 +108,7 @@ const { generateToken, doubleCsrfProtection } = doubleCsrf({
     path: "/",
   },
   size: 64,
-  getTokenFromRequest: (req) => {
+  getCsrfTokenFromRequest: (req) => {
     const h = req.headers["x-csrf-token"];
     return typeof h === "string" ? h : undefined;
   },
@@ -116,7 +117,7 @@ const { generateToken, doubleCsrfProtection } = doubleCsrf({
 // Expose a token endpoint that the SPA calls on startup.
 // Must be registered BEFORE the CSRF protection middleware.
 app.get("/api/csrf-token", (req, res) => {
-  res.json({ token: generateToken(req as Request, res) });
+  res.json({ token: generateCsrfToken(req, res) });
 });
 
 function csrfProtection(req: Request, res: Response, next: NextFunction) {

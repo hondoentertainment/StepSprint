@@ -32,12 +32,11 @@ describe("isCsrfValid", () => {
 });
 
 describe("CSRF cookie endpoint", () => {
-  it("GET /api/csrf-token sets the CSRF cookie and returns ok", async () => {
+  it("GET /api/csrf-token returns a token string", async () => {
     const request = (await import("supertest")).default;
     const app = (await import("../app")).default;
     const res = await request(app).get("/api/csrf-token").expect(200);
-    expect(res.body).toEqual({ ok: true });
-    // In test mode the cookie middleware is skipped, so we just verify the
-    // endpoint is reachable and returns the expected shape.
+    expect(typeof res.body.token).toBe("string");
+    expect(res.body.token.length).toBeGreaterThan(0);
   });
 });
