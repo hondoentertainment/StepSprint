@@ -11,6 +11,7 @@
  *   Garmin:       /api/integrations/garmin/callback
  */
 import crypto from "crypto";
+import jwt from "jsonwebtoken";
 import { Router } from "express";
 import { z } from "zod";
 import { DateTime } from "luxon";
@@ -77,6 +78,28 @@ const GARMIN = {
 
 const GARMIN_PKCE_TTL_MS = 15 * 60 * 1000;
 
+/** Garmin PKCE verifier cookie (callback path only, HttpOnly, bound to Garmin `state` nonce). */
+const GARMIN_PKCE_COOKIE = "stepsprint.garmin_pkce";
+const GARMIN_PKCE_ISSUER = "stepsprint-garmin-pkce";
+const GARMIN_PKCE_COOKIE_PATH = "/api/integrations/garmin/callback";
+
+type GarminPkceCookiePayload = { sub: string; ch?: string; v: string; n: string };
+
+function garminPkceCookieBase(): {
+  httpOnly: boolean;
+  secure: boolean;
+  sameSite: "lax" | "none";
+  path: string;
+} {
+  const prod = config.nodeEnv === "production";
+  return {
+    httpOnly: true,
+    secure: prod,
+    sameSite: prod ? "none" : "lax",
+    path: GARMIN_PKCE_COOKIE_PATH,
+  };
+}
+
 function garminScopesList(): string[] {
   const raw = config.oauth.garminOAuthScope;
   if (!raw) return [];
@@ -99,10 +122,6 @@ function generatePkcePair(): { verifier: string; challenge: string } {
   const verifier = base64Url(crypto.randomBytes(32));
   const challenge = base64Url(crypto.createHash("sha256").update(verifier).digest());
   return { verifier, challenge };
-}
-
-async function deleteExpiredOAuthPkce(): Promise<void> {
-  await prisma.oAuthPkcePending.deleteMany({ where: { expiresAt: { lt: new Date() } } });
 }
 
 async function garminExchangeCode(code: string, codeVerifier: string): Promise<TokenResponse> {
@@ -650,11 +669,11 @@ function mountProviderRoutes(provider: ProviderConfig) {
   });
 }
 
-/** Garmin Connect OAuth 2 PKCE flows (distinct from Fitbit/Google — verifier stored pending callback). */
+/** Garmin Connect OAuth 2 PKCE (verifier stored in a short-lived HttpOnly cookie bound to Garmin `state`). */
 function mountGarminRoutes(): void {
   const base = "/garmin";
 
-  router.get(`${base}/connect`, authRequired, async (req: AuthenticatedRequest, res) => {
+  router.get(`${base}/connect`, authRequired, (req: AuthenticatedRequest, res) => {
     if (!isGarminAvailable()) {
       res.status(503).json({
         error: "Garmin Connect integration is not configured on this server.",
@@ -667,18 +686,23 @@ function mountGarminRoutes(): void {
     }
 
     const challengeId = (req.query as { challengeId?: string }).challengeId ?? "";
-    await deleteExpiredOAuthPkce();
     const { verifier, challenge } = generatePkcePair();
-    const stateNonce = base64Url(crypto.randomBytes(24));
+    const nonce = crypto.randomUUID();
 
-    await prisma.oAuthPkcePending.create({
-      data: {
-        stateNonce,
-        codeVerifier: verifier,
-        userId: req.user.id,
-        challengeId: challengeId || null,
-        expiresAt: new Date(Date.now() + GARMIN_PKCE_TTL_MS),
+    const cookieJwt = jwt.sign(
+      {
+        sub: req.user.id,
+        ...(challengeId ? { ch: challengeId } : {}),
+        v: verifier,
+        n: nonce,
       },
+      config.jwtSecret,
+      { expiresIn: `${Math.floor(GARMIN_PKCE_TTL_MS / 1000)}s`, issuer: GARMIN_PKCE_ISSUER }
+    );
+
+    res.cookie(GARMIN_PKCE_COOKIE, cookieJwt, {
+      ...garminPkceCookieBase(),
+      maxAge: GARMIN_PKCE_TTL_MS,
     });
 
     const params = new URLSearchParams({
@@ -687,7 +711,7 @@ function mountGarminRoutes(): void {
       redirect_uri: garminRedirectUri(),
       code_challenge: challenge,
       code_challenge_method: "S256",
-      state: stateNonce,
+      state: nonce,
     });
 
     const scoped = garminScopesList();
@@ -702,40 +726,47 @@ function mountGarminRoutes(): void {
       return;
     }
 
+    const ckBase = garminPkceCookieBase();
     const { code, state, error: oauthError } = req.query as Record<string, string | undefined>;
-
-    if (oauthError) {
-      res.redirect(`${config.appOrigin}/integrations?oauth_error=${encodeURIComponent(oauthError)}`);
-      return;
-    }
-    if (!code || !state) {
-      res.status(400).json({ error: "Missing code or state" });
-      return;
-    }
-
-    const pending = await prisma.oAuthPkcePending.findUnique({
-      where: { stateNonce: state },
-    });
-
-    if (!pending || pending.expiresAt < new Date()) {
-      if (pending) {
-        await prisma.oAuthPkcePending.delete({ where: { id: pending.id } }).catch(() => {});
-      }
-      res.redirect(`${config.appOrigin}/integrations?oauth_error=oauth_state_invalid`);
-      return;
-    }
-
-    await prisma.oAuthPkcePending.delete({ where: { id: pending.id } });
+    const rawCook = typeof req.cookies?.[GARMIN_PKCE_COOKIE] === "string" ? req.cookies[GARMIN_PKCE_COOKIE] : "";
 
     try {
-      const tokens = await garminExchangeCode(code, pending.codeVerifier);
+      if (oauthError) {
+        res.clearCookie(GARMIN_PKCE_COOKIE, ckBase);
+        res.redirect(`${config.appOrigin}/integrations?oauth_error=${encodeURIComponent(oauthError)}`);
+        return;
+      }
+      if (!code || !state || !rawCook) {
+        res.clearCookie(GARMIN_PKCE_COOKIE, ckBase);
+        res.redirect(`${config.appOrigin}/integrations?oauth_error=missing_oauth_cookie_or_state`);
+        return;
+      }
+
+      let decoded: GarminPkceCookiePayload;
+      try {
+        decoded = jwt.verify(rawCook, config.jwtSecret, {
+          issuer: GARMIN_PKCE_ISSUER,
+        }) as GarminPkceCookiePayload;
+      } catch {
+        res.clearCookie(GARMIN_PKCE_COOKIE, ckBase);
+        res.redirect(`${config.appOrigin}/integrations?oauth_error=oauth_state_invalid`);
+        return;
+      }
+
+      if (decoded.n !== state || !decoded.sub || !decoded.v) {
+        res.clearCookie(GARMIN_PKCE_COOKIE, ckBase);
+        res.redirect(`${config.appOrigin}/integrations?oauth_error=oauth_state_invalid`);
+        return;
+      }
+
+      const tokens = await garminExchangeCode(code, decoded.v);
       const expiresAt = tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000) : null;
       const scopeStr = garminScopesList().join(" ");
 
       await prisma.oAuthConnection.upsert({
         where: {
           userId_provider: {
-            userId: pending.userId,
+            userId: decoded.sub,
             provider: GARMIN.id,
           },
         },
@@ -747,7 +778,7 @@ function mountGarminRoutes(): void {
           scopes: scopeStr.length > 0 ? scopeStr : null,
         },
         create: {
-          userId: pending.userId,
+          userId: decoded.sub,
           provider: GARMIN.id,
           accessToken: tokens.access_token,
           refreshToken: tokens.refresh_token ?? null,
@@ -760,14 +791,16 @@ function mountGarminRoutes(): void {
       await prisma.auditLog.create({
         data: {
           action: "oauth_connect_garmin",
-          actorId: pending.userId,
-          challengeId: pending.challengeId || null,
+          actorId: decoded.sub,
+          challengeId: decoded.ch || null,
         },
       });
 
+      res.clearCookie(GARMIN_PKCE_COOKIE, ckBase);
       res.redirect(`${config.appOrigin}/integrations?oauth_success=garmin`);
     } catch (err) {
       logger.error({ err }, "Garmin OAuth callback error");
+      res.clearCookie(GARMIN_PKCE_COOKIE, ckBase);
       res.redirect(`${config.appOrigin}/integrations?oauth_error=token_exchange_failed`);
     }
   });
