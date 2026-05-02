@@ -58,26 +58,37 @@ function HomeSkeleton() {
   );
 }
 
-function ChallengeProgress({ challenge }: { challenge: Challenge }) {
-  const [now] = useState(() => Date.now());
-  const start = new Date(challenge.startDate).getTime();
-  const end = new Date(challenge.endDate).getTime();
+type ProgressData = {
+  pct: number;
+  elapsedDays: number;
+  totalDays: number;
+  remainingDays: number;
+};
+
+function computeProgress(startDate: string, endDate: string, now: number): ProgressData {
+  const start = new Date(startDate).getTime();
+  const end = new Date(endDate).getTime();
   const totalMs = end - start;
   const elapsedMs = Math.max(0, Math.min(now - start, totalMs));
   const pct = totalMs > 0 ? Math.round((elapsedMs / totalMs) * 100) : 0;
   const totalDays = Math.round(totalMs / 86400000);
   const elapsedDays = Math.round(elapsedMs / 86400000);
   const remainingDays = Math.max(0, totalDays - elapsedDays);
+  return { pct, elapsedDays, totalDays, remainingDays };
+}
 
-  if (challenge.locked || pct >= 100) return null;
+function ChallengeProgress({ challenge, now }: { challenge: Challenge; now: number }) {
+  const progress = computeProgress(challenge.startDate, challenge.endDate, now);
+
+  if (challenge.locked || progress.pct >= 100) return null;
 
   return (
     <div className="challenge-progress">
       <div className="challenge-progress-bar">
-        <div className="challenge-progress-fill" style={{ width: `${pct}%` }} />
+        <div className="challenge-progress-fill" style={{ width: `${progress.pct}%` }} />
       </div>
       <p className="challenge-progress-label">
-        Day {elapsedDays} of {totalDays} &mdash; {remainingDays} day{remainingDays === 1 ? "" : "s"} left
+        Day {progress.elapsedDays} of {progress.totalDays} &mdash; {progress.remainingDays} day{progress.remainingDays === 1 ? "" : "s"} left
       </p>
     </div>
   );
@@ -124,6 +135,7 @@ export function Home({
     if (typeof sessionStorage === "undefined") return false;
     return sessionStorage.getItem("stepSprintJustLoggedIn") !== null;
   });
+  const [now] = useState<number>(() => Date.now());
   const [dailyReminder, setDailyReminder] = useState(false);
   const [pushKey, setPushKey] = useState<string | null>(null);
   const [pushKeyLoaded, setPushKeyLoaded] = useState(false);
@@ -312,7 +324,7 @@ export function Home({
           )}
         </div>
       )}
-      {selectedChallenge && <ChallengeProgress challenge={selectedChallenge} />}
+      {selectedChallenge && <ChallengeProgress challenge={selectedChallenge} now={now} />}
       {challengesLoading ? (
         <HomeSkeleton />
       ) : !challengeId ? (

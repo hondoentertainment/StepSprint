@@ -41,7 +41,7 @@ describe("Auth routes", () => {
       expect(res.body.error).toBe("Invalid email or password");
     });
 
-    it("returns user and token for correct credentials", async () => {
+    it("returns user and session cookie for correct credentials", async () => {
       const res = await request(app)
         .post("/api/auth/login")
         .send({ email: "user1@stepsprint.local", password: "password123" })
@@ -50,8 +50,26 @@ describe("Auth routes", () => {
       expect(res.body.user.email).toBe("user1@stepsprint.local");
       expect(res.body.user).toHaveProperty("id");
       expect(res.body.user).toHaveProperty("role");
-      expect(res.body).toHaveProperty("token");
+      // JWT is in the session cookie only, not in the response body.
       expect(res.headers["set-cookie"]).toBeDefined();
+    });
+
+    it("returns 403 for unverified email", async () => {
+      // Create an unverified user.
+      const email = `unverified-${Date.now()}@example.com`;
+      const bcrypt = await import("bcryptjs");
+      await prisma.user.create({
+        data: {
+          email,
+          passwordHash: await bcrypt.hash("password123", 12),
+          emailVerified: false,
+        },
+      });
+      const res = await request(app)
+        .post("/api/auth/login")
+        .send({ email, password: "password123" })
+        .expect(403);
+      expect(res.body.error).toBe("EMAIL_VERIFICATION_REQUIRED");
     });
   });
 
@@ -64,14 +82,27 @@ describe("Auth routes", () => {
       expect(res.body).toHaveProperty("error");
     });
 
-    it("creates new user with valid data", async () => {
+    it("creates new user and queues verification email (201)", async () => {
       const email = `register-${Date.now()}@example.com`;
       const res = await request(app)
         .post("/api/auth/register")
         .send({ email, password: "testpass123", name: "New User" })
+        .expect(201);
+      expect(res.body.ok).toBe(true);
+      expect(res.body.message).toMatch(/verif/i);
+      // No session cookie until email is verified.
+      expect(res.headers["set-cookie"]).toBeUndefined();
+    });
+
+    it("logs admin-provisioned user in immediately after setting password", async () => {
+      // Simulate admin-provisioned user (no passwordHash, emailVerified: true).
+      const email = `admin-provisioned-${Date.now()}@example.com`;
+      await prisma.user.create({ data: { email, emailVerified: true } });
+      const res = await request(app)
+        .post("/api/auth/register")
+        .send({ email, password: "testpass123", name: "Provisioned User" })
         .expect(200);
       expect(res.body.user.email).toBe(email);
-      expect(res.body.user.name).toBe("New User");
       expect(res.headers["set-cookie"]).toBeDefined();
     });
 
@@ -119,8 +150,6 @@ describe("Auth routes", () => {
     });
 
     it("reset token is single-use: second attempt fails", async () => {
-      // Seed a dedicated user so we don't clobber user1's password for
-      // other tests in the suite.
       const email = `reset-single-use-${Date.now()}@example.com`;
       const user = await prisma.user.create({
         data: { email, passwordHash: "placeholder" },
@@ -136,25 +165,56 @@ describe("Auth routes", () => {
         },
       });
 
-      // First reset succeeds.
       const first = await request(app)
         .post("/api/auth/reset-password")
         .send({ token: plainToken, email, password: "brandnewpass1" })
         .expect(200);
       expect(first.body.ok).toBe(true);
 
-      // Second reset with the same token must be rejected (single-use).
       const second = await request(app)
         .post("/api/auth/reset-password")
         .send({ token: plainToken, email, password: "anotherpass1" })
         .expect(400);
       expect(second.body.error).toBe("Invalid or expired reset link");
 
-      // Confirm DB state: token row is marked used.
       const row = await prisma.passwordResetToken.findFirst({
         where: { userId: user.id },
       });
       expect(row?.usedAt).not.toBeNull();
+    });
+  });
+
+  describe("POST /api/auth/verify-email", () => {
+    it("returns 400 for invalid token", async () => {
+      const res = await request(app)
+        .post("/api/auth/verify-email")
+        .send({ token: "badtoken", email: "nonexistent-verify@example.com" })
+        .expect(400);
+      expect(res.body).toHaveProperty("error");
+    });
+
+    it("verifies email with valid token", async () => {
+      const crypto = await import("crypto");
+      const email = `verify-${Date.now()}@example.com`;
+      const user = await prisma.user.create({ data: { email, emailVerified: false } });
+      const plain = crypto.randomBytes(32).toString("hex");
+      const hash = crypto.createHash("sha256").update(plain).digest("hex");
+      await prisma.emailVerificationToken.create({
+        data: {
+          userId: user.id,
+          tokenHash: hash,
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        },
+      });
+
+      const res = await request(app)
+        .post("/api/auth/verify-email")
+        .send({ token: plain, email })
+        .expect(200);
+      expect(res.body.ok).toBe(true);
+
+      const updated = await prisma.user.findUnique({ where: { id: user.id } });
+      expect(updated?.emailVerified).toBe(true);
     });
   });
 
@@ -178,9 +238,39 @@ describe("Auth routes", () => {
   });
 
   describe("POST /api/auth/logout", () => {
-    it("clears cookie and returns ok", async () => {
-      const res = await request(app).post("/api/auth/logout").expect(200);
+    it("returns 401 without auth", async () => {
+      await request(app).post("/api/auth/logout").expect(401);
+    });
+
+    it("clears cookie and invalidates session on subsequent requests", async () => {
+      // Use a dedicated user so we don't affect tokenVersion of shared seed users.
+      const bcrypt = await import("bcryptjs");
+      const email = `logout-test-${Date.now()}@example.com`;
+      await prisma.user.create({
+        data: {
+          email,
+          passwordHash: await bcrypt.hash("password123", 12),
+          emailVerified: true,
+        },
+      });
+
+      const loginRes = await request(app)
+        .post("/api/auth/login")
+        .send({ email, password: "password123" })
+        .expect(200);
+      const cookie = loginRes.headers["set-cookie"];
+
+      const res = await request(app)
+        .post("/api/auth/logout")
+        .set("Cookie", cookie)
+        .expect(200);
       expect(res.body).toEqual({ ok: true });
+
+      // Old cookie must now be rejected.
+      await request(app)
+        .get("/api/auth/me")
+        .set("Cookie", cookie)
+        .expect(401);
     });
   });
 });

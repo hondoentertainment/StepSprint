@@ -1,10 +1,19 @@
 import rateLimit from "express-rate-limit";
 
-/** Rate limit for auth endpoints (login, etc.) */
+/** Rate limit for auth endpoints (register, logout, me). */
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 30,
   message: { error: "Too many requests, please try again later." },
+});
+
+/** Stricter limiter for login — mitigates credential brute-force. */
+export const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10,
+  message: { error: "Too many login attempts, please try again later." },
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 
 /** General API rate limit (applied in production) */
