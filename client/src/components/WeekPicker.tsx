@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { getISOWeek, weekToDate, formatWeekRange } from "../utils";
 
 type WeekInfo = { year: number; week: number };
@@ -11,6 +12,7 @@ type Props = {
 
 /** Date-based week picker: pick a week by selecting a date within it */
 export function WeekPicker({ value, onChange, challengeStart, challengeEnd }: Props) {
+  const { t } = useTranslation();
   const mondayOfWeek = weekToDate(value.year, value.week);
   const min = challengeStart || "2020-01-01";
   const max = challengeEnd || "2030-12-31";
@@ -50,14 +52,14 @@ export function WeekPicker({ value, onChange, challengeStart, challengeEnd }: Pr
           className="week-nav-arrow secondary"
           onClick={() => shiftWeek(-1)}
           disabled={isAtMin}
-          aria-label="Previous week"
+          aria-label={t("weekPicker.previousWeek")}
         >
           &#8592;
         </button>
         <div className="week-nav-center">
           <label className="week-nav-label" aria-live="polite">
             <span className="week-range">{formatWeekRange(value.year, value.week)}</span>
-            <span className="week-number">Week {value.week}</span>
+            <span className="week-number">{t("weekPicker.weekNumber", { week: value.week })}</span>
           </label>
           <input
             type="date"
@@ -65,9 +67,9 @@ export function WeekPicker({ value, onChange, challengeStart, challengeEnd }: Pr
             onChange={(e) => handleDateChange(e.target.value)}
             min={min}
             max={max}
-            title="Pick a date to jump to its week"
+            title={t("weekPicker.pickDate")}
             className="week-date-input"
-            aria-label="Jump to week by date"
+            aria-label={t("weekPicker.jumpToWeek")}
           />
         </div>
         <button
@@ -75,7 +77,7 @@ export function WeekPicker({ value, onChange, challengeStart, challengeEnd }: Pr
           className="week-nav-arrow secondary"
           onClick={() => shiftWeek(1)}
           disabled={isAtMax || isThisWeek}
-          aria-label="Next week"
+          aria-label={t("weekPicker.nextWeek")}
         >
           &#8594;
         </button>
@@ -86,9 +88,9 @@ export function WeekPicker({ value, onChange, challengeStart, challengeEnd }: Pr
             type="button"
             className="secondary"
             onClick={goToThisWeek}
-            aria-label="Show this week"
+            aria-label={t("weekPicker.showThisWeek")}
           >
-            Jump to this week
+            {t("weekPicker.thisWeek")}
           </button>
         </div>
       )}

@@ -36,11 +36,13 @@ const strictCsp = helmet({
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'"],
+      scriptSrcAttr: ["'none'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", "data:"],
       connectSrc: ["'self'"],
       fontSrc: ["'self'"],
       frameAncestors: ["'none'"],
+      formAction: ["'self'"],
       objectSrc: ["'none'"],
       baseUri: ["'self'"],
     },
@@ -119,7 +121,7 @@ app.use(cookieParser());
 const { generateCsrfToken, doubleCsrfProtection } = doubleCsrf({
   getSecret: () => config.jwtSecret,
   getSessionIdentifier: (req) =>
-    (req.cookies?.[config.cookieName] as string | undefined) ?? req.ip ?? "anon",
+    (req.cookies?.["stepsprint.csrf"] as string | undefined) ?? req.ip ?? "anon",
   cookieName: "stepsprint.csrf",
   cookieOptions: {
     sameSite: "lax",

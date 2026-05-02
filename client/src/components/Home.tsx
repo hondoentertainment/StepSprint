@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { api } from "../api";
 import { ApiError, getErrorMessage } from "../api";
 import { track } from "../analytics";
@@ -126,6 +127,7 @@ export function Home({
   challengesLoading,
   challengesError,
 }: Props) {
+  const { t } = useTranslation();
   const [summary, setSummary] = useState<Summary | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -219,7 +221,7 @@ export function Home({
       if (permission !== "granted") {
         setPushStatus({
           kind: "error",
-          message: "Push permission was not granted.",
+          message: t("home.notifications.permissionDenied"),
         });
         return;
       }
@@ -238,7 +240,7 @@ export function Home({
       });
       setPushStatus({
         kind: "success",
-        message: "Push reminders enabled on this device.",
+        message: t("home.notifications.enabled"),
       });
     } catch (err) {
       setPushStatus({
@@ -279,7 +281,7 @@ export function Home({
         if (cancelled) return;
         setSummary(null);
         if (err instanceof ApiError && err.status === 403) {
-          setError("You are not enrolled in this challenge yet.");
+          setError(t("home.notEnrolled"));
         } else {
           setError(getErrorMessage(err));
         }
@@ -293,17 +295,17 @@ export function Home({
     return () => {
       cancelled = true;
     };
-  }, [challengeId]);
+  }, [challengeId, t]);
 
   return (
     <section className="panel">
       {streakMilestone !== null && (
         <StreakToast days={streakMilestone} onDismiss={() => setStreakMilestone(null)} />
       )}
-      <h2>Your Dashboard</h2>
+      <h2>{t("home.title")}</h2>
       {welcomeMessage && (
         <p className="status status-success" role="status" aria-live="polite">
-          Welcome back! You&apos;ve signed in successfully.
+          {t("home.welcome")}
         </p>
       )}
       {challengesError && <p className="status status-error">{challengesError}</p>}
@@ -313,11 +315,11 @@ export function Home({
             className={`challenge-badge ${selectedChallenge.locked ? "locked" : "open"}`}
           >
             {selectedChallenge.name} &middot; {selectedChallenge.timezone} &middot;{" "}
-            {selectedChallenge.locked ? "Locked" : "Open"}
+            {selectedChallenge.locked ? t("common.locked") : t("common.open")}
           </span>
           {!selectedChallenge.locked && (
             <Link to="/submit" className="btn-primary-sm">
-              Log today&apos;s steps
+              {t("home.logSteps")}
             </Link>
           )}
         </div>
@@ -326,7 +328,7 @@ export function Home({
       {challengesLoading ? (
         <HomeSkeleton />
       ) : !challengeId ? (
-        <p className="status">No active challenges yet.</p>
+        <p className="status">{t("home.noChallenges")}</p>
       ) : isLoading ? (
         <HomeSkeleton />
       ) : error ? (
@@ -335,14 +337,13 @@ export function Home({
         <div className="stats-grid">
           <div className="stats-hero">
             <div className="card card-hero">
-              <h3><IconFootstep size={13} className="card-icon" /> Today</h3>
-              <p>{summary.personalTotals.today.toLocaleString()} steps</p>
+              <h3><IconFootstep size={13} className="card-icon" /> {t("home.stats.today")}</h3>
+              <p>{summary.personalTotals.today.toLocaleString()} {t("common.steps")}</p>
             </div>
             <div className="card card-streak">
-              <h3><IconFlame size={13} className="card-icon" /> Current streak</h3>
+              <h3><IconFlame size={13} className="card-icon" /> {t("home.stats.streak")}</h3>
               <p>
-                {summary.streak.currentDays} day
-                {summary.streak.currentDays === 1 ? "" : "s"}
+                {t("home.stats.days", { count: summary.streak.currentDays })}
               </p>
             </div>
           </div>
@@ -350,58 +351,61 @@ export function Home({
             <div
               className="progress-ring"
               style={{ ["--value" as string]: summary.consistency.score }}
-              aria-label={`Consistency: ${summary.consistency.score}%, ${summary.consistency.activeDays} of ${summary.consistency.elapsedDays} days active`}
+              aria-label={`${t("home.stats.consistency")}: ${summary.consistency.score}%, ${t("home.stats.daysActive", { active: summary.consistency.activeDays, elapsed: summary.consistency.elapsedDays })}`}
             >
               <div className="progress-ring-inner">
                 {summary.consistency.score}%
               </div>
             </div>
             <div className="progress-ring-content">
-              <strong><IconTarget size={13} className="card-icon card-icon-inline" /> Consistency</strong>
+              <strong><IconTarget size={13} className="card-icon card-icon-inline" /> {t("home.stats.consistency")}</strong>
               <span>
-                {summary.consistency.activeDays} of {summary.consistency.elapsedDays} days active
+                {t("home.stats.daysActive", {
+                  active: summary.consistency.activeDays,
+                  elapsed: summary.consistency.elapsedDays,
+                })}
               </span>
             </div>
           </div>
           <div className="card">
-            <h3><IconCalendarWeek size={13} className="card-icon" /> This week</h3>
-            <p>{summary.personalTotals.week.toLocaleString()} steps</p>
+            <h3><IconCalendarWeek size={13} className="card-icon" /> {t("home.stats.thisWeek")}</h3>
+            <p>{summary.personalTotals.week.toLocaleString()} {t("common.steps")}</p>
           </div>
           <div className="card">
-            <h3><IconCalendarMonth size={13} className="card-icon" /> This month</h3>
-            <p>{summary.personalTotals.month.toLocaleString()} steps</p>
+            <h3><IconCalendarMonth size={13} className="card-icon" /> {t("home.stats.thisMonth")}</h3>
+            <p>{summary.personalTotals.month.toLocaleString()} {t("common.steps")}</p>
           </div>
           <div className="card">
-            <h3><IconTeam size={13} className="card-icon" /> Team total</h3>
+            <h3><IconTeam size={13} className="card-icon" /> {t("home.stats.teamTotal")}</h3>
             <p>
-              {summary.teamTotals.teamName || "Unassigned"} &middot;{" "}
-              {summary.teamTotals.total.toLocaleString()} steps
+              {summary.teamTotals.teamName || t("common.unassigned")} &middot;{" "}
+              {summary.teamTotals.total.toLocaleString()} {t("common.steps")}
             </p>
           </div>
           <div className="card">
-            <h3><IconTrophy size={13} className="card-icon" /> Rank</h3>
+            <h3><IconTrophy size={13} className="card-icon" /> {t("home.stats.rank")}</h3>
             <p>{summary.rank ?? "—"}</p>
           </div>
           <div className="card">
-            <h3><IconArrowUp size={13} className="card-icon" /> Gap to #1</h3>
-            <p>{summary.gapToFirst.toLocaleString()} steps</p>
+            <h3><IconArrowUp size={13} className="card-icon" /> {t("home.stats.gapToFirst")}</h3>
+            <p>{summary.gapToFirst.toLocaleString()} {t("common.steps")}</p>
           </div>
         </div>
       ) : (
         <div className="empty-state" role="status">
-          <p className="status">No summary yet. Submit your first steps to get started!</p>
+          <p className="status">{t("home.emptyState")}</p>
           <Link to="/submit" className="btn-primary">
-            Log your steps
+            {t("home.logSteps")}
           </Link>
         </div>
       )}
       <div className="notification-prefs">
         <label>
           <input type="checkbox" checked={dailyReminder} onChange={toggleDailyReminder} />
-          Daily reminder to log steps
+          {t("home.notifications.dailyReminder")}
         </label>
         {pushKeyLoaded && (!pushSupported || pushKey === null) ? (
-          <p className="status">Push notifications not available.</p>
+          <p className="status">{t("home.notifications.notAvailable")}</p>
         ) : pushKeyLoaded ? (
           <div>
             <button
@@ -410,7 +414,7 @@ export function Home({
               disabled={pushBusy}
               className="secondary"
             >
-              {pushBusy ? "Enabling..." : "Enable push reminders"}
+              {pushBusy ? t("home.notifications.enabling") : t("home.notifications.enable")}
             </button>
             {pushStatus && (
               <p
