@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { ApiError, api, getErrorMessage } from "../api";
 import { isValidEmail } from "../utils";
 import { identify } from "../analytics";
-import type { RegisterOutcome } from "../types";
+import type { RegisterOutcome, User } from "../types";
 import { StepSprintLogo } from "./StepSprintLogo";
 
 type Props = {
