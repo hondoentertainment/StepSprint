@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import request from "supertest";
 import app from "../app";
 
@@ -43,4 +43,4 @@ describe("Admin analytics", () => {
     expect(res.body).toHaveProperty("submissionTrend");
     expect(Array.isArray(res.body.submissionTrend)).toBe(true);
   });
-
+});
