@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import "./App.css";
 import { useAuth } from "./hooks/useAuth";
 import { useChallenges } from "./hooks/useChallenges";
-import { WeekProvider } from "./contexts/WeekContext";
+import { WeekProvider } from "./contexts/WeekContext.tsx";
 import { useWeek } from "./contexts/useWeek";
 import { Login } from "./components/Login";
 import { Layout } from "./components/Layout";

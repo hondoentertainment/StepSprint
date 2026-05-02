@@ -128,6 +128,10 @@ In the Vercel dashboard → set `VITE_POSTHOG_KEY` (and optionally `VITE_POSTHOG
 | `GOOGLE_CLIENT_ID` | Manual | No | Google OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | Manual | No | Google OAuth client secret |
 | `REMINDER_NOTIFICATION_HOUR_LOCAL` | Manual | No | Local hour per challenge TZ when opt-in reminders are evaluated (`0`-`23`; default `17`). Server runs checks hourly; see `scheduler` service |
+| `REMINDER_USE_EXTERNAL_CRON` | Manual | No | Set to `true` to **disable** the in-process hourly reminder loop (use when running multiple API instances so only one sweep runs). |
+| `REMINDER_CRON_SECRET` | Manual | With external cron | Min 16 characters. Required for `POST /api/cron/reminder-sweep` with header `Authorization: Bearer <secret>`. |
+
+Schedule the HTTP call from your host (for example Render **Cron Jobs**, GitHub Actions `schedule`, or Uptime Robot) at least once per hour. The sweep still only notifies users when their challenge timezone matches `REMINDER_NOTIFICATION_HOUR_LOCAL` and they are due for a reminder, so hourly pings are correct.
 
 ### Client (Vercel)
 

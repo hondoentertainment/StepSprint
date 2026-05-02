@@ -724,6 +724,34 @@ a.secondary:hover {
   border-bottom: 1px solid var(--border);
 }
 
+.cohort-table-wrap {
+  overflow-x: auto;
+  margin-top: 0.5rem;
+}
+
+.cohort-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.cohort-table th,
+.cohort-table td {
+  text-align: left;
+  padding: 0.4rem 0.55rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.cohort-table th {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.cohort-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
 .admin-grid .list a {
   display: block;
   padding: 0.5rem 0;

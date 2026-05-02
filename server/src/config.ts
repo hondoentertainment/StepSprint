@@ -23,6 +23,10 @@ const envSchema = z.object({
   /** Public origin of this API (e.g. Render URL). Used for OAuth redirect_uri when the SPA runs on another origin. Defaults to APP_ORIGIN (same-origin / Vite proxy). */
   API_PUBLIC_ORIGIN: z.string().optional(),
   REMINDER_NOTIFICATION_HOUR_LOCAL: z.coerce.number().int().min(0).max(23).optional(),
+  /** When `true`, disables the in-process hourly reminder loop (use POST /api/cron/reminder-sweep from a platform cron instead). */
+  REMINDER_USE_EXTERNAL_CRON: z.string().optional(),
+  /** Minimum 16 chars. Bearer token for POST /api/cron/reminder-sweep (Authorization: Bearer …). */
+  REMINDER_CRON_SECRET: z.string().min(16).optional(),
   VAPID_PUBLIC_KEY: z.string().optional(),
   VAPID_PRIVATE_KEY: z.string().optional(),
   VAPID_SUBJECT: z.string().optional(),
@@ -76,5 +80,7 @@ export const config = {
   },
   reminderNotificationHourLocal:
     parsed.data.REMINDER_NOTIFICATION_HOUR_LOCAL ?? 17,
+  reminderUseExternalCron: parsed.data.REMINDER_USE_EXTERNAL_CRON === "true",
+  reminderCronSecret: parsed.data.REMINDER_CRON_SECRET,
   emailTransportConfigured: Boolean(parsed.data.RESEND_API_KEY || parsed.data.SMTP_HOST),
 };

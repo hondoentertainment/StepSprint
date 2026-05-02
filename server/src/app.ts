@@ -20,6 +20,7 @@ import integrationsRoutes from "./routes/integrations";
 import oauthRoutes from "./routes/oauth";
 import notificationsRoutes from "./routes/notifications";
 import openapiRoutes from "./routes/openapi";
+import cronRoutes from "./routes/cron";
 
 const app = express();
 const isProduction = config.nodeEnv === "production";
@@ -166,6 +167,7 @@ app.get("/api/health", (_req, res) => {
 // ---------------------------------------------------------------------------
 // Routes
 // ---------------------------------------------------------------------------
+app.use("/api/cron", cronRoutes);
 app.use("/api/auth", authLimiter, authRoutes);
 app.use("/api/admin/analytics", analyticsRoutes);
 app.use("/api/admin", adminRoutes);

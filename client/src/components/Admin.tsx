@@ -1,10 +1,26 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api, getApiUrl, getErrorMessage } from "../api";
 import { ConfirmDialog } from "./ConfirmDialog";
 import type { User } from "../types";
 import type { Challenge } from "../types";
 import type { Submission } from "../types";
+
+type CohortRow = {
+  challengeId: string;
+  challengeName: string;
+  startDate: string;
+  endDate: string;
+  timezone: string;
+  lifecycle: "upcoming" | "active" | "ended";
+  participantCount: number;
+  participationRate: number;
+  neverLoggedCount: number;
+  dormantParticipantCount: number;
+  avgActiveDays: number;
+  totalSubmissions: number;
+  totalSteps: number;
+};
 
 type Props = {
   user: User;
@@ -55,6 +71,15 @@ export function Admin({
     submissionTrend: Array<{ date: string; submissionsCount: number }>;
   } | null>(null);
 
+  const [cohortRows, setCohortRows] = useState<CohortRow[] | null>(null);
+
+  const loadCohort = useCallback(() => {
+    if (user.role !== "ADMIN") return;
+    api<{ challenges: CohortRow[] }>("/api/admin/analytics/cohort")
+      .then((data) => setCohortRows(data.challenges))
+      .catch(() => setCohortRows([]));
+  }, [user.role]);
+
   useEffect(() => {
     if (user.role !== "ADMIN") return;
     const url = `/api/admin/submissions?query=${encodeURIComponent(search)}${selectedChallengeId ? `&challengeId=${selectedChallengeId}` : ""}`;
@@ -80,6 +105,10 @@ export function Admin({
       .then(setAnalytics)
       .catch(() => setAnalytics(null));
   }, [user.role, selectedChallengeId]);
+
+  useEffect(() => {
+    loadCohort();
+  }, [loadCohort]);
 
   async function handleCreateInvite() {
     if (!selectedChallengeId || !inviteEmail) {
@@ -128,6 +157,7 @@ export function Admin({
       });
       await onChallengesRefresh();
       setCreateForm({ name: "", startDate: "", endDate: "", timezone: "America/Chicago", teamSize: 4 });
+      loadCohort();
       showFeedback("success", t("admin.feedback.challengeCreated"));
     } catch (err) {
       showFeedback("error", getErrorMessage(err));
@@ -146,6 +176,7 @@ export function Admin({
         body: JSON.stringify({ emails }),
       });
       setParticipantEmails("");
+      loadCohort();
       showFeedback("success", t("admin.feedback.participantsAdded", { count: emails.length }));
     } catch (err) {
       showFeedback("error", getErrorMessage(err));
@@ -162,6 +193,7 @@ export function Admin({
         method: "POST",
         body: JSON.stringify({ strategy: assignStrategy }),
       });
+      loadCohort();
       showFeedback("success", t("admin.feedback.teamsAssigned"));
     } catch (err) {
       showFeedback("error", getErrorMessage(err));
@@ -179,6 +211,7 @@ export function Admin({
         body: JSON.stringify({ locked }),
       });
       await onChallengesRefresh();
+      loadCohort();
       showFeedback("success", locked ? t("admin.feedback.challengeLocked") : t("admin.feedback.challengeUnlocked"));
     } catch (err) {
       showFeedback("error", getErrorMessage(err));
@@ -343,6 +376,39 @@ export function Admin({
               <p className="hint invite-hint">{t("admin.invite.hintExpiry")}</p>
             </div>
           )}
+
+          <h3>{t("admin.sections.cohort")}</h3>
+          <p className="hint">{t("admin.cohort.intro")}</p>
+          {cohortRows && cohortRows.length === 0 ? (
+            <p className="hint">{t("admin.cohort.empty")}</p>
+          ) : cohortRows && cohortRows.length > 0 ? (
+            <div className="cohort-table-wrap">
+              <table className="cohort-table">
+                <thead>
+                  <tr>
+                    <th scope="col">{t("admin.cohort.headers.challenge")}</th>
+                    <th scope="col">{t("admin.cohort.headers.status")}</th>
+                    <th scope="col">{t("admin.cohort.headers.participants")}</th>
+                    <th scope="col">{t("admin.cohort.headers.participation")}</th>
+                    <th scope="col">{t("admin.cohort.headers.dormant")}</th>
+                    <th scope="col">{t("admin.cohort.headers.neverLogged")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cohortRows.map((row) => (
+                    <tr key={row.challengeId}>
+                      <td>{row.challengeName}</td>
+                      <td>{t(`admin.cohort.lifecycle.${row.lifecycle}`)}</td>
+                      <td>{row.participantCount}</td>
+                      <td>{row.participationRate}%</td>
+                      <td>{row.dormantParticipantCount}</td>
+                      <td>{row.neverLoggedCount}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
 
           <h3>{t("admin.sections.analytics")}</h3>
           {analytics && selectedChallengeId ? (

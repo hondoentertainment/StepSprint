@@ -184,6 +184,11 @@ let sweeping = false;
  * challenge timezone reaches `REMINDER_NOTIFICATION_HOUR_LOCAL` (default 17).
  */
 export function startDailyReminderScheduler(): void {
+  if (config.reminderUseExternalCron) {
+    logger.info("In-process reminder scheduler disabled (REMINDER_USE_EXTERNAL_CRON=true)");
+    return;
+  }
+
   setTimeout(() => {
     void hourlyReminderSweep();
   }, 60_000);

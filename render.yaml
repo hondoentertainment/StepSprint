@@ -69,3 +69,5 @@ services:
         sync: false
       - key: GOOGLE_CLIENT_SECRET
         sync: false
+      # Optional (multi-instance): REMINDER_USE_EXTERNAL_CRON=true + REMINDER_CRON_SECRET (min 16 chars).
+      # Schedule hourly POST to /api/cron/reminder-sweep with Authorization: Bearer <secret>.
