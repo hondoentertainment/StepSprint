@@ -43,6 +43,7 @@ describe("Admin analytics", () => {
     expect(res.body).toHaveProperty("submissionTrend");
     expect(Array.isArray(res.body.submissionTrend)).toBe(true);
   });
+});
 
   it("returns cohort summary for admin", async () => {
     const cookie = await adminCookie();

@@ -221,6 +221,36 @@ function callbackUrl(provider: ProviderConfig): string {
   return `${config.apiPublicOrigin}/api/integrations/${provider.id.replace("_", "-")}/callback`;
 }
 
+/** Create an HMAC-signed, base64url-encoded OAuth state parameter. */
+function createOAuthState(userId: string, challengeId: string): string {
+  const nonce = crypto.randomBytes(16).toString("hex");
+  const payload = JSON.stringify({ userId, challengeId, nonce });
+  const sig = crypto.createHmac("sha256", config.jwtSecret).update(payload).digest("hex");
+  return Buffer.from(JSON.stringify({ payload, sig })).toString("base64url");
+}
+
+/** Verify and decode an OAuth state parameter. Returns null if invalid. */
+function parseOAuthState(state: string): { userId: string; challengeId: string } | null {
+  try {
+    const decoded = JSON.parse(Buffer.from(state, "base64url").toString("utf8")) as {
+      payload: string;
+      sig: string;
+    };
+    const expected = crypto
+      .createHmac("sha256", config.jwtSecret)
+      .update(decoded.payload)
+      .digest("hex");
+    const sigBuf = Buffer.from(decoded.sig, "hex");
+    const expBuf = Buffer.from(expected, "hex");
+    if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
+      return null;
+    }
+    return JSON.parse(decoded.payload) as { userId: string; challengeId: string };
+  } catch {
+    return null;
+  }
+}
+
 function isAvailable(p: ProviderConfig) {
   return Boolean(p.clientId && p.clientSecret);
 }
@@ -375,9 +405,7 @@ function mountProviderRoutes(provider: ProviderConfig) {
     }
 
     const challengeId = (req.query as { challengeId?: string }).challengeId ?? "";
-    const state = Buffer.from(JSON.stringify({ userId: req.user!.id, challengeId })).toString(
-      "base64url"
-    );
+    const state = createOAuthState(req.user!.id, challengeId);
 
     const params = new URLSearchParams({
       response_type: "code",
@@ -409,14 +437,9 @@ function mountProviderRoutes(provider: ProviderConfig) {
       return;
     }
 
-    let parsedState: { userId: string; challengeId: string };
-    try {
-      parsedState = JSON.parse(Buffer.from(state, "base64url").toString("utf8")) as {
-        userId: string;
-        challengeId: string;
-      };
-    } catch {
-      res.status(400).json({ error: "Invalid state parameter" });
+    const parsedState = parseOAuthState(state);
+    if (!parsedState) {
+      res.status(400).json({ error: "Invalid or tampered state parameter" });
       return;
     }
 
