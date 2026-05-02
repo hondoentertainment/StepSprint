@@ -28,9 +28,9 @@ jobs:
         working-directory: server
         run: npx prisma generate
 
-      - name: Create SQLite schema
+      - name: Run migrations
         working-directory: server
-        run: npx prisma db push
+        run: npx prisma migrate deploy
 
       - name: Seed database
         working-directory: server
@@ -66,3 +66,52 @@ jobs:
       - name: Build client
         working-directory: client
         run: npm run build
+
+  smoke-test:
+    needs: server-test
+    runs-on: ubuntu-latest
+    env:
+      JWT_SECRET: test-jwt-secret-min-16-chars
+      DATABASE_URL: "file:./smoke.db"
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install server deps
+        working-directory: server
+        run: npm ci
+
+      - name: Generate Prisma client
+        working-directory: server
+        run: npx prisma generate
+
+      - name: Run migrations
+        working-directory: server
+        run: npx prisma migrate deploy
+
+      - name: Build server
+        working-directory: server
+        run: npm run build
+
+      - name: Start server and verify health
+        working-directory: server
+        run: |
+          node dist/index.js &
+          SERVER_PID=$!
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:3001/api/health > /dev/null 2>&1; then
+              echo "Health check passed"
+              kill $SERVER_PID
+              exit 0
+            fi
+            sleep 1
+          done
+          kill $SERVER_PID
+          echo "Server failed to become healthy within 30 seconds"
+          exit 1
