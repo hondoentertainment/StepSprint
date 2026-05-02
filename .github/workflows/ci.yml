@@ -5,6 +5,10 @@ on:
   push:
     branches: [master]
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   server-test:
     runs-on: ubuntu-latest
@@ -95,6 +99,8 @@ jobs:
 
   client-test:
     runs-on: ubuntu-latest
+    env:
+      VITE_API_URL: ${{ vars.VITE_API_URL || 'https://stepsprint-api.onrender.com' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -116,6 +122,11 @@ jobs:
         working-directory: client
         run: npm run test:run
 
-      - name: Build client
+      - name: Build client (matches Vercel build env)
         working-directory: client
         run: npm run build
+
+      - name: Verify Vercel output path
+        run: |
+          test -f client/dist/index.html
+          test -d client/dist/assets
