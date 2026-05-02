@@ -34,6 +34,11 @@ const envSchema = z.object({
   FITBIT_CLIENT_SECRET: z.string().optional(),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
+  /** Garmin Connect Developer Program (OAuth 2.0 + PKCE + confidential client exchange). Wellness API scopes are assigned in the Garmin app registration. */
+  GARMIN_CLIENT_ID: z.string().optional(),
+  GARMIN_CLIENT_SECRET: z.string().optional(),
+  /** Optional Garmin authorize `scope` (space-separated per Garmin app registration). Omit if your app preset handles scopes without this parameter. */
+  GARMIN_OAUTH_SCOPE: z.string().optional(),
   /** When `true`, expose Swagger UI at /api/docs and /api/openapi.json. Defaults off in production. */
   OPENAPI_DOCS_ENABLED: z.enum(["true", "false"]).optional(),
 });
@@ -88,6 +93,9 @@ export const config = {
     fitbitClientSecret: parsed.data.FITBIT_CLIENT_SECRET,
     googleClientId: parsed.data.GOOGLE_CLIENT_ID,
     googleClientSecret: parsed.data.GOOGLE_CLIENT_SECRET,
+    garminClientId: parsed.data.GARMIN_CLIENT_ID,
+    garminClientSecret: parsed.data.GARMIN_CLIENT_SECRET,
+    garminOAuthScope: parsed.data.GARMIN_OAUTH_SCOPE?.trim(),
   },
   reminderNotificationHourLocal:
     parsed.data.REMINDER_NOTIFICATION_HOUR_LOCAL ?? 17,

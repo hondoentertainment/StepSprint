@@ -111,19 +111,20 @@ Team assignment supports random and snake-draft at challenge creation.
 - **Prisma transactions** for multi-row writes (team allocation, submission edits).
 - **Error handling**: throw `ApiError` on the server; catch `ApiError` in the client `api.ts` layer and surface typed messages; the client `ErrorBoundary` forwards render-time errors to Sentry.
 - **Logging**: use the exported `logger` (pino) — no `console.log` in production code paths.
-- **Analytics**: use `track()` / `identify()` from `client/src/analytics.ts`; keep event names stable (they're a public-ish contract for PostHog dashboards).
+- **Analytics**: use `track()` / `identify()` from `client/src/analytics.ts`; keep event names stable (they're a public-ish contract for PostHog dashboards). In production builds, PostHog initializes only after the user accepts optional analytics in the cookie banner (see `CookieConsentBanner.tsx`).
 - **No emojis** in code or UI unless the user asks.
 
 ## Known gaps / gotchas
 
-- **Sentry and PostHog are no-ops in dev**: SDKs wired on client + server but silent until `SENTRY_DSN` / `VITE_SENTRY_DSN` / `VITE_POSTHOG_KEY` are set.
+- **Sentry and PostHog**: Server Sentry is silent until `SENTRY_DSN` is set. Client Sentry needs `VITE_SENTRY_DSN`. PostHog loads only when `VITE_POSTHOG_KEY` is set **and** (in production) the user accepts analytics in the banner; in development, analytics runs unless the user chose “Essential only”.
 - **No real SMTP provider**: Nodemailer wired, password reset emails no-op without SMTP env.
-- **i18n coverage is thin**: only `Login` is translated via `useTranslation`; all other components still hardcode English.
+- **i18n coverage is thin**: `Login` and legal/cookie strings use `useTranslation` via `en.json`; most other screens still hardcode English.
 - **Health-sync integrations**: Apple Watch sync via API token and Shortcuts is implemented; Fitbit and Google Fit use OAuth when server env credentials are set (`routes/oauth.ts`, `routes/integrations.ts`).
 - **Push notifications**: daily reminders are email-only; no Web Push / VAPID yet.
-- **CSP not pinned**: helmet defaults are on but CSP is disabled — lock down once asset origins stabilize.
-- **CSRF deferred**: auth is cookie-based; server-side CSRF was intentionally not added this round because it requires a paired change to `client/src/api.ts`. Tracked inline in `server/src/app.ts`.
-- **Server not deployed**: `render.yaml` + `server/Dockerfile` exist; provisioning is manual and not yet done. See `docs/DEPLOYMENT.md` → "Server deploy".
+- **CSP**: API responses use helmet with pinned CSP (strict for API routes; relaxed only for `/api/docs` and `/api/openapi.json` when OpenAPI docs are enabled).
+- **CSRF**: Production uses double-submit cookie validation on `/api/*` (except Bearer-auth and specific auth endpoints); the SPA fetches `/api/csrf-token` and sends `x-csrf-token` (`server/src/app.ts`, `client/src/api.ts`).
+- **OpenAPI / Swagger**: Disabled by default when `NODE_ENV=production`. Set `OPENAPI_DOCS_ENABLED=true` on the server to expose `/api/docs` and `/api/openapi.json`.
+- **Deploy**: Client (Vercel) and API (Docker on Render) are described in `docs/DEPLOYMENT.md`; `render.yaml` and `server/Dockerfile` run `prisma migrate deploy` before the process starts.
 - **Postgres cutover pending**: dev uses SQLite; `server/prisma/schema.postgresql.prisma` is kept in sync but not yet the live schema.
 - **Dependency vulnerabilities**: 4 high advisories in `vite-plugin-pwa > workbox-build > @rollup/plugin-terser > serialize-javascript` (client) and 3 moderate in `@prisma/dev > @hono/node-server` (server) remain after `npm audit fix`. Resolving either chain requires `--force` with breaking downgrades, so they're deferred.
 - **Bundle size**: `Admin`, `WeeklyLeaderboard`, `TeamStandings` are code-split; `Home`, `Login`, `Submit` stay eager (critical path). Initial bundle is ~97 KB gzipped — room for more splitting, image optimization, and response caching.

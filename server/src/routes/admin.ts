@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { DateTime } from "luxon";
 import { z } from "zod";
 import { prisma } from "../prisma";
 import { config } from "../config";
@@ -279,6 +280,115 @@ const submissionsQuerySchema = z.object({
   challengeId: z.string().optional(),
   cursor: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+
+const activityGridQuerySchema = z.object({
+  weekYear: z.coerce.number().int(),
+  weekNumber: z.coerce.number().int().min(1).max(53),
+});
+
+router.get("/challenges/:challengeId/activity-grid", async (req, res) => {
+  const parsed = activityGridQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ error: "weekYear and weekNumber (1-53) are required" });
+    return;
+  }
+
+  const challenge = await prisma.challenge.findUnique({
+    where: { id: req.params.challengeId },
+  });
+  if (!challenge) {
+    res.status(404).json({ error: "Challenge not found" });
+    return;
+  }
+
+  const tz = challenge.timezone;
+  const { weekYear, weekNumber } = parsed.data;
+  const challengeStart = DateTime.fromJSDate(challenge.startDate, { zone: tz }).startOf("day");
+  const challengeEnd = DateTime.fromJSDate(challenge.endDate, { zone: tz }).startOf("day");
+  const { start: weekMonday } = getIsoWeekRange(weekYear, weekNumber, tz);
+  const weekSunday = weekMonday.plus({ days: 6 }).startOf("day");
+
+  let gridStart = weekMonday > challengeStart ? weekMonday : challengeStart;
+  let gridEnd = weekSunday < challengeEnd ? weekSunday : challengeEnd;
+  if (gridStart > gridEnd) {
+    const membersEmpty = await prisma.teamMember.findMany({
+      where: { challengeId: challenge.id },
+      include: { user: true },
+      orderBy: { user: { email: "asc" } },
+    });
+    res.json({
+      challengeId: challenge.id,
+      weekYear,
+      weekNumber,
+      timezone: tz,
+      days: [],
+      rows: membersEmpty.map((m) => ({
+        userId: m.user.id,
+        email: m.user.email,
+        name: m.user.name,
+        cells: [],
+      })),
+    });
+    return;
+  }
+
+  const days: string[] = [];
+  for (let d = gridStart; d <= gridEnd; d = d.plus({ days: 1 })) {
+    const iso = d.toISODate();
+    if (iso) days.push(iso);
+  }
+
+  const members = await prisma.teamMember.findMany({
+    where: { challengeId: challenge.id },
+    include: { user: true },
+    orderBy: { user: { email: "asc" } },
+  });
+
+  const submissions = await prisma.stepSubmission.findMany({
+    where: {
+      challengeId: challenge.id,
+      date: {
+        gte: gridStart.toJSDate(),
+        lte: gridEnd.endOf("day").toJSDate(),
+      },
+    },
+    select: { userId: true, date: true, steps: true, isFlagged: true },
+  });
+
+  const stepsMap = new Map<string, { steps: number; flagged: boolean }>();
+  const daySet = new Set(days);
+  for (const s of submissions) {
+    const iso = DateTime.fromJSDate(s.date, { zone: tz }).toISODate();
+    if (!iso || !daySet.has(iso)) continue;
+    const key = `${s.userId}\t${iso}`;
+    const prev = stepsMap.get(key);
+    if (prev) {
+      prev.steps += s.steps;
+      prev.flagged = prev.flagged || s.isFlagged;
+    } else {
+      stepsMap.set(key, { steps: s.steps, flagged: s.isFlagged });
+    }
+  }
+
+  const rows = members.map((m) => ({
+    userId: m.user.id,
+    email: m.user.email,
+    name: m.user.name,
+    cells: days.map((day) => {
+      const entry = stepsMap.get(`${m.user.id}\t${day}`);
+      return entry ? { steps: entry.steps, flagged: entry.flagged } : { steps: null, flagged: false };
+    }),
+  }));
+
+  res.json({
+    challengeId: challenge.id,
+    weekYear,
+    weekNumber,
+    timezone: tz,
+    days,
+    rows,
+  });
 });
 
 router.get("/submissions", async (req, res) => {

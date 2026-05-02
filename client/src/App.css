@@ -752,6 +752,85 @@ a.secondary:hover {
   border-bottom: none;
 }
 
+.activity-grid-wrap {
+  overflow-x: auto;
+  margin-top: 0.75rem;
+  max-width: 100%;
+}
+
+.activity-grid-table {
+  border-collapse: collapse;
+  font-size: 0.75rem;
+  min-width: max-content;
+}
+
+.activity-grid-table th,
+.activity-grid-table td {
+  padding: 0.35rem 0.45rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.activity-grid-sticky-col {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--bg-elevated);
+  box-shadow: 1px 0 0 var(--border);
+  text-align: left;
+  max-width: 11rem;
+}
+
+.activity-grid-table thead .activity-grid-sticky-col {
+  z-index: 2;
+}
+
+.activity-grid-user {
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.activity-grid-user-email {
+  display: block;
+  font-weight: 400;
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 10rem;
+}
+
+.activity-grid-day {
+  text-align: center;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.activity-grid-cell.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.activity-grid-empty {
+  color: var(--text-muted);
+}
+
+.activity-grid-flag {
+  margin-left: 0.15rem;
+  color: var(--accent-hover);
+  font-weight: 700;
+}
+
+.activity-grid-tz {
+  margin-top: 0.35rem;
+  font-size: 0.75rem;
+}
+
+.admin-activity-week-hint {
+  margin-bottom: 0.35rem;
+}
+
 .admin-grid .list a {
   display: block;
   padding: 0.5rem 0;

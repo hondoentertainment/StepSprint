@@ -31,6 +31,7 @@ export function Layout({
   const tabToPath: Record<string, string> = {
     Home: "/home",
     Submit: "/submit",
+    Devices: "/integrations",
     "Leaderboard": "/weekly",
     "Teams": "/teams",
     Admin: "/admin",

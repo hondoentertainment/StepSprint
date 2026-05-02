@@ -57,5 +57,5 @@ export type Submission = {
   challenge: { name: string };
 };
 
-export const TABS = ["Home", "Submit", "Leaderboard", "Teams", "Admin"] as const;
+export const TABS = ["Home", "Submit", "Devices", "Leaderboard", "Teams", "Admin"] as const;
 export type Tab = (typeof TABS)[number];

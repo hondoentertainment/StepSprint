@@ -93,10 +93,17 @@
     "tabs": {
       "Home": "Home",
       "Submit": "Submit",
+      "Devices": "Devices",
       "Weekly Top Steppers": "Weekly Top Steppers",
       "Team Standings": "Team Standings",
       "Admin": "Admin"
     }
+  },
+  "integrations": {
+    "title": "Fitness sync",
+    "subtitle": "Apple Watch shortcut tokens, Garmin Connect OAuth, Fitbit, and Google Fit all land here.",
+    "noChallenge": "Select an active challenge in the header to configure sync.",
+    "backToSubmit": "Back to Submit steps"
   },
   "home": {
     "title": "Participant Home",
@@ -118,6 +125,7 @@
     },
     "emptyState": "No summary yet. Submit your first steps to get started!",
     "logSteps": "Log your steps",
+    "devicesLink": "Wearables & sync",
     "notifications": {
       "dailyReminder": "Remind me to log steps (Web Push when enabled, plus email when the server has email configured)",
       "notAvailable": "Push notifications not available.",
@@ -129,6 +137,8 @@
   },
   "submit": {
     "title": "Submit steps",
+    "manualIntro": "Enter your step count below for any day in this challenge. Typing your total here works whether or not you connect a fitness sync.",
+    "manualHintNoIntegration": "No fitness sync is linked to your account yet — that is fine. Manual entries count the same as synced steps.",
     "noChallengeSelected": "Choose an active challenge before submitting steps.",
     "dateLabel": "Date",
     "stepsLabel": "Steps",
@@ -136,10 +146,8 @@
     "submitting": "Submitting…",
     "success": "Steps submitted successfully.",
     "flaggedHint": "Submissions above 100,000 steps are flagged.",
-    "connectDevice": "Connect fitness device",
-    "comingSoon": "Coming soon",
-    "syncAppleWatch": "Sync from Apple Watch",
-    "hideAppleWatch": "Hide Apple Watch sync"
+    "connectDevice": "Fitness sync & wearables",
+    "connectDeviceNeedChallenge": "(select a challenge first)"
   },
   "weeklyLeaderboard": {
     "title": "Weekly Top Steppers",
@@ -218,6 +226,7 @@
       "inviteParticipant": "Invite participant",
       "cohort": "Compare challenges",
       "analytics": "Analytics",
+      "dailyActivity": "Daily activity grid",
       "exports": "Exports"
     },
     "scope": {
@@ -290,6 +299,18 @@
         "active": "Active",
         "ended": "Ended"
       }
+    },
+    "activityGrid": {
+      "intro": "Participant rows and calendar-day columns for the selected week (within this challenge). Uses the challenge timezone.",
+      "participant": "Participant",
+      "weekHint": "Choose the ISO week to inspect (same week state as Weekly Top Steppers).",
+      "loading": "Loading activity grid…",
+      "emptyWeek": "No challenge days fall in this ISO week.",
+      "selectChallenge": "Select a challenge to load the grid.",
+      "loadError": "Could not load the activity grid.",
+      "noSubmission": "No submission",
+      "flaggedSuffix": "flagged",
+      "ariaGrid": "Daily step counts per participant"
     },
     "exports": {
       "hint": "CSV exports open against the StepSprint API host. Stay logged in; your browser sends your session cookie to the API origin.",

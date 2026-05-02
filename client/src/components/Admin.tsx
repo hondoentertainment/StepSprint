@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api, getApiUrl, getErrorMessage } from "../api";
+import { useWeek } from "../contexts/useWeek";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { WeekPicker } from "./WeekPicker";
 import type { User } from "../types";
 import type { Challenge } from "../types";
 import type { Submission } from "../types";
@@ -22,13 +24,18 @@ type CohortRow = {
   totalSteps: number;
 };
 
+type ActivityGridRow = {
+  userId: string;
+  email: string;
+  name: string | null;
+  cells: Array<{ steps: number | null; flagged: boolean }>;
+};
+
 type Props = {
   user: User;
   selectedChallengeId: string;
   selectedChallenge: Challenge | null;
   onChallengesRefresh: () => Promise<Challenge[]>;
-  weekYear: number;
-  weekNumber: number;
 };
 
 export function Admin({
@@ -36,10 +43,9 @@ export function Admin({
   selectedChallengeId,
   selectedChallenge,
   onChallengesRefresh,
-  weekYear,
-  weekNumber,
 }: Props) {
   const { t } = useTranslation();
+  const { week, setWeek } = useWeek();
   const [createForm, setCreateForm] = useState({
     name: "",
     startDate: "",
@@ -72,6 +78,13 @@ export function Admin({
   } | null>(null);
 
   const [cohortRows, setCohortRows] = useState<CohortRow[] | null>(null);
+  const [activityGrid, setActivityGrid] = useState<{
+    days: string[];
+    rows: ActivityGridRow[];
+    timezone: string;
+  } | null>(null);
+  const [activityGridLoading, setActivityGridLoading] = useState(false);
+  const [activityGridFailed, setActivityGridFailed] = useState(false);
 
   const loadCohort = useCallback(() => {
     if (user.role !== "ADMIN") return;
@@ -109,6 +122,48 @@ export function Admin({
   useEffect(() => {
     loadCohort();
   }, [loadCohort]);
+
+  useEffect(() => {
+    if (user.role !== "ADMIN" || !selectedChallengeId) {
+      setActivityGrid(null);
+      setActivityGridFailed(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadGrid() {
+      setActivityGridLoading(true);
+      setActivityGridFailed(false);
+      setActivityGrid(null);
+      try {
+        const data = await api<{
+          days: string[];
+          rows: ActivityGridRow[];
+          timezone: string;
+        }>(
+          `/api/admin/challenges/${encodeURIComponent(selectedChallengeId)}/activity-grid?weekYear=${week.year}&weekNumber=${week.week}`
+        );
+        if (!cancelled) {
+          setActivityGrid({ days: data.days, rows: data.rows, timezone: data.timezone });
+          setActivityGridFailed(false);
+        }
+      } catch {
+        if (!cancelled) {
+          setActivityGrid(null);
+          setActivityGridFailed(true);
+        }
+      } finally {
+        if (!cancelled) setActivityGridLoading(false);
+      }
+    }
+
+    void loadGrid();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user.role, selectedChallengeId, week.year, week.week]);
 
   async function handleCreateInvite() {
     if (!selectedChallengeId || !inviteEmail) {
@@ -452,6 +507,82 @@ export function Admin({
             <p className="hint">{t("admin.analytics.selectChallenge")}</p>
           )}
 
+          <h3>{t("admin.sections.dailyActivity")}</h3>
+          <p className="hint">{t("admin.activityGrid.intro")}</p>
+          {!selectedChallengeId ? (
+            <p className="hint">{t("admin.activityGrid.selectChallenge")}</p>
+          ) : (
+            <>
+              <p className="hint admin-activity-week-hint">{t("admin.activityGrid.weekHint")}</p>
+              <WeekPicker
+                value={{ year: week.year, week: week.week }}
+                onChange={setWeek}
+                challengeStart={selectedChallenge?.startDate}
+                challengeEnd={selectedChallenge?.endDate}
+              />
+              {activityGridLoading ? (
+                <p className="status" role="status">
+                  {t("admin.activityGrid.loading")}
+                </p>
+              ) : activityGridFailed ? (
+                <p className="status status-error" role="alert">
+                  {t("admin.activityGrid.loadError")}
+                </p>
+              ) : activityGrid && activityGrid.days.length === 0 ? (
+                <p className="hint" role="status">
+                  {t("admin.activityGrid.emptyWeek")}
+                </p>
+              ) : activityGrid && activityGrid.days.length > 0 ? (
+                <div className="activity-grid-wrap">
+                  <table className="activity-grid-table" role="grid" aria-label={t("admin.activityGrid.ariaGrid")}>
+                    <thead>
+                      <tr>
+                        <th scope="col" className="activity-grid-sticky-col">
+                          {t("admin.activityGrid.participant")}
+                        </th>
+                        {activityGrid.days.map((day) => (
+                          <th key={day} scope="col" className="activity-grid-day" title={day}>
+                            {day.slice(5)}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {activityGrid.rows.map((row) => (
+                        <tr key={row.userId}>
+                          <th scope="row" className="activity-grid-sticky-col activity-grid-user">
+                            <span className="activity-grid-user-name">{row.name ?? row.email}</span>
+                            {row.name ? <span className="activity-grid-user-email">{row.email}</span> : null}
+                          </th>
+                          {row.cells.map((cell, idx) => {
+                            const day = activityGrid.days[idx] ?? "";
+                            const label =
+                              cell.steps === null
+                                ? `${row.name ?? row.email}, ${day}: ${t("admin.activityGrid.noSubmission")}`
+                                : `${row.name ?? row.email}, ${day}: ${cell.steps.toLocaleString()} ${t("common.steps")}${cell.flagged ? ` (${t("admin.activityGrid.flaggedSuffix")})` : ""}`;
+                            return (
+                              <td key={day} className="activity-grid-cell num" title={label}>
+                                {cell.steps === null ? (
+                                  <span className="activity-grid-empty">—</span>
+                                ) : (
+                                  <>
+                                    <span className="activity-grid-steps">{cell.steps.toLocaleString()}</span>
+                                    {cell.flagged ? <span className="activity-grid-flag" title={t("admin.submission.flagged")}>*</span> : null}
+                                  </>
+                                )}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <p className="hint activity-grid-tz">{activityGrid.timezone}</p>
+                </div>
+              ) : null}
+            </>
+          )}
+
           <h3>{t("admin.sections.exports")}</h3>
           <p className="hint">{t("admin.exports.hint")}</p>
           <div className="list export-links">
@@ -473,7 +604,7 @@ export function Admin({
                 </a>
                 <a
                   href={getApiUrl(
-                    `/api/admin/export/weekly?challengeId=${encodeURIComponent(selectedChallengeId)}&weekYear=${weekYear}&weekNumber=${weekNumber}`
+                    `/api/admin/export/weekly?challengeId=${encodeURIComponent(selectedChallengeId)}&weekYear=${week.year}&weekNumber=${week.week}`
                   )}
                   target="_blank"
                   rel="noreferrer"

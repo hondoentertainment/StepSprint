@@ -36,6 +36,7 @@ model User {
   pushSubscriptions           PushSubscription[]
   integrationTokens           IntegrationToken[]
   oauthConnections            OAuthConnection[]
+  oauthPkceStates             OAuthPkcePending[]
 }
 
 model EmailVerificationToken {
@@ -175,6 +176,20 @@ model OAuthConnection {
 
   @@unique([userId, provider])
   @@index([userId])
+}
+
+model OAuthPkcePending {
+  id           String   @id @default(cuid())
+  stateNonce   String   @unique
+  codeVerifier String
+  userId       String
+  challengeId  String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model AuditLog {

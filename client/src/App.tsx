@@ -5,11 +5,11 @@ import "./App.css";
 import { useAuth } from "./hooks/useAuth";
 import { useChallenges } from "./hooks/useChallenges";
 import { WeekProvider } from "./contexts/WeekContext.tsx";
-import { useWeek } from "./contexts/useWeek";
 import { Login } from "./components/Login";
 import { Layout } from "./components/Layout";
 import { Home } from "./components/Home";
 import { Submit } from "./components/Submit";
+import { IntegrationsPage } from "./components/IntegrationsPage";
 import { Privacy } from "./components/Privacy";
 import { Terms } from "./components/Terms";
 import { CookieConsentBanner } from "./components/CookieConsentBanner";
@@ -60,8 +60,6 @@ function AuthenticatedApp() {
     error: challengesError,
     refreshChallenges,
   } = useChallenges();
-  const { week } = useWeek();
-
   if (!user) return null;
 
   return (
@@ -104,6 +102,15 @@ function AuthenticatedApp() {
           }
         />
         <Route
+          path="integrations"
+          element={
+            <IntegrationsPage
+              challengeId={selectedChallengeId}
+              challengesLoading={challengesLoading}
+            />
+          }
+        />
+        <Route
           path="weekly"
           element={
             <Suspense fallback={<RouteFallback />}>
@@ -131,8 +138,6 @@ function AuthenticatedApp() {
                   selectedChallengeId={selectedChallengeId}
                   selectedChallenge={selectedChallenge}
                   onChallengesRefresh={refreshChallenges}
-                  weekYear={week.year}
-                  weekNumber={week.week}
                 />
               </Suspense>
             )

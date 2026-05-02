@@ -63,6 +63,7 @@ router.get("/fitness", authRequired, async (req: AuthenticatedRequest, res) => {
 
   const fitbitAvail = Boolean(config.oauth.fitbitClientId && config.oauth.fitbitClientSecret);
   const googleAvail = Boolean(config.oauth.googleClientId && config.oauth.googleClientSecret);
+  const garminAvail = Boolean(config.oauth.garminClientId && config.oauth.garminClientSecret);
 
   const [tokenCount, oauthConnections] = await Promise.all([
     prisma.integrationToken.count({ where: { userId: req.user.id } }),
@@ -95,11 +96,17 @@ router.get("/fitness", authRequired, async (req: AuthenticatedRequest, res) => {
         available: fitbitAvail,
         connected: oauthSet.has("fitbit"),
       },
+      {
+        id: "garmin",
+        name: "Garmin Connect",
+        available: garminAvail,
+        connected: oauthSet.has("garmin"),
+      },
     ],
     message:
-      googleAvail || fitbitAvail
-        ? "Use OAuth below for Fitbit or Google Fit, or an API token for Apple Watch via iOS Shortcuts."
-        : "Use an API token to sync Apple Watch steps via iOS Shortcuts. Fitbit and Google Fit OAuth appear in the app after those credentials are configured on the server.",
+      googleAvail || fitbitAvail || garminAvail
+        ? "Use OAuth for Fitbit, Google Fit, or Garmin Connect (when configured), or generate an integration token for Apple Watch via iOS Shortcuts."
+        : "Use an API token for Apple Watch / Health via iOS Shortcuts. Fitbit, Google Fit, and Garmin Connect appear after OAuth credentials are configured on the server.",
   });
 });
 

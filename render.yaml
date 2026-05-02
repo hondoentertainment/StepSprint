@@ -5,7 +5,7 @@
 # Required manual steps after first deploy:
 #   1. Set RESEND_API_KEY  (get from resend.com — required for email verification)
 #   2. Set SMTP_FROM       (e.g. "StepSprint <noreply@yourdomain.com>")
-#   3. Optionally set SENTRY_DSN, VAPID_*, OAuth vars
+#   3. Optionally set SENTRY_DSN, VAPID_*, OAuth vars, OPENAPI_DOCS_ENABLED (Swagger in prod; default off)
 
 databases:
   - name: stepsprint-db
