@@ -765,6 +765,7 @@ function mountGarminRoutes(): void {
       res.status(401).json({ error: "Authentication required" });
       return;
     }
+    const user = req.user;
 
     const parsed = garminSyncBodySchema.safeParse(req.body);
     if (!parsed.success) {
@@ -774,7 +775,7 @@ function mountGarminRoutes(): void {
 
     const { challengeId } = parsed.data;
     const connection = await prisma.oAuthConnection.findUnique({
-      where: { userId_provider: { userId: req.user.id, provider: GARMIN.id } },
+      where: { userId_provider: { userId: user.id, provider: GARMIN.id } },
     });
 
     if (!connection) {
@@ -795,7 +796,7 @@ function mountGarminRoutes(): void {
     }
 
     const membership = await prisma.teamMember.findUnique({
-      where: { userId_challengeId: { userId: req.user.id, challengeId } },
+      where: { userId_challengeId: { userId: user.id, challengeId } },
     });
     if (!membership) {
       res.status(403).json({ error: "Not enrolled in this challenge" });
@@ -848,7 +849,7 @@ function mountGarminRoutes(): void {
 
     const existing = await prisma.stepSubmission.findMany({
       where: {
-        userId: req.user.id,
+        userId: user.id,
         challengeId,
         date: { in: prepared.map((r) => r.date) },
       },
@@ -861,7 +862,7 @@ function mountGarminRoutes(): void {
         prisma.stepSubmission.upsert({
           where: {
             userId_challengeId_date: {
-              userId: req.user.id,
+              userId: user.id,
               challengeId,
               date: row.date,
             },
@@ -871,7 +872,7 @@ function mountGarminRoutes(): void {
             isFlagged: row.steps > 100_000,
           },
           create: {
-            userId: req.user.id,
+            userId: user.id,
             challengeId,
             date: row.date,
             steps: row.steps,
@@ -888,7 +889,7 @@ function mountGarminRoutes(): void {
     await prisma.auditLog.create({
       data: {
         action: "garmin_sync",
-        actorId: req.user.id,
+        actorId: user.id,
         challengeId,
         metadata: { imported, updated, skipped },
       },
