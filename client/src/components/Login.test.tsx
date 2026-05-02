@@ -9,12 +9,15 @@ function renderLogin() {
   const onLogin = vi.fn().mockResolvedValue({
     id: "1",
     email: "a@b.com",
-    role: "MEMBER",
+    role: "PARTICIPANT",
   });
   const onRegister = vi.fn().mockResolvedValue({
-    id: "1",
-    email: "a@b.com",
-    role: "MEMBER",
+    kind: "session",
+    user: {
+      id: "1",
+      email: "a@b.com",
+      role: "PARTICIPANT",
+    },
   });
   const utils = render(
     <I18nextProvider i18n={i18n}>

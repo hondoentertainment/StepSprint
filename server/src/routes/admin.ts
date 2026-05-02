@@ -5,6 +5,7 @@ import { config } from "../config";
 import { sameMonthRange, toDateOnly, toJsDate, getIsoWeekRange } from "../utils/dates";
 import { AuthenticatedRequest, authRequired, roleRequired } from "../middleware/auth";
 import { Role } from "@prisma/client";
+import { normalizeEmail } from "../utils/email";
 
 const router = Router();
 
@@ -101,13 +102,14 @@ router.post("/challenges/:id/participants", async (req, res) => {
   // Admin-added participants are pre-verified — they'll set a password via /register.
   const usersFromEmails = parsed.data.emails
     ? await Promise.all(
-        parsed.data.emails.map((email) =>
-          prisma.user.upsert({
+        parsed.data.emails.map((raw) => {
+          const email = normalizeEmail(raw);
+          return prisma.user.upsert({
             where: { email },
             update: { emailVerified: true },
             create: { email, emailVerified: true },
-          })
-        )
+          });
+        })
       )
     : [];
 

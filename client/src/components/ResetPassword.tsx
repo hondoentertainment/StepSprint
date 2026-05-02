@@ -7,8 +7,8 @@ import { StepSprintLogo } from "./StepSprintLogo";
 export function ResetPassword() {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
-  const token = searchParams.get("token") ?? "";
-  const email = searchParams.get("email") ?? "";
+  const token = (searchParams.get("token") ?? "").trim();
+  const email = (searchParams.get("email") ?? "").trim();
 
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");

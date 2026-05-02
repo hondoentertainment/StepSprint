@@ -65,8 +65,25 @@
       "passwordTooShort": "Password must be at least 8 characters.",
       "passwordNeedsLetter": "Password must contain at least one letter.",
       "passwordNeedsNumber": "Password must contain at least one number.",
-      "passwordsDoNotMatch": "Passwords do not match."
+      "passwordsDoNotMatch": "Passwords do not match.",
+      "emailNotVerified": "Verify your email before signing in. Check your inbox for a link from StepSprint (and spam)."
+    },
+    "afterRegister": {
+      "title": "Check your email",
+      "resendPrompt": "No message yet? Try resending the verification email."
+    },
+    "verifyEmailActions": {
+      "resend": "Resend verification email",
+      "resending": "Sending…",
+      "resendDone": "If this address has an account that still needs verifying, another email has been sent."
     }
+  },
+  "verifyEmail": {
+    "title": "Confirm your email",
+    "working": "Confirming…",
+    "success": "Your email is verified. You can sign in.",
+    "failed": "This link is invalid or has expired.",
+    "invalidLink": "This verification link is missing details. Ask for a new link from sign in."
   },
   "layout": {
     "welcome": "Welcome, {{name}}",

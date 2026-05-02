@@ -150,6 +150,16 @@ function csrfProtection(req: Request, res: Response, next: NextFunction) {
   if (req.headers.authorization?.startsWith("Bearer ")) {
     return next();
   }
+  // These POSTs carry a secret token in the body (from email links). Users often
+  // open them without a prior API visit, so a CSRF cookie may not exist yet on
+  // split-hosting — same threat model as Bearer: attacker needs the token.
+  const pathOnly = req.originalUrl.split("?")[0];
+  if (
+    req.method === "POST" &&
+    (pathOnly === "/api/auth/reset-password" || pathOnly === "/api/auth/verify-email")
+  ) {
+    return next();
+  }
   return doubleCsrfProtection(req, res, next);
 }
 

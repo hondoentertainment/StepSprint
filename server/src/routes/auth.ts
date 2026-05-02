@@ -18,6 +18,7 @@ import {
 } from "../utils/resetToken";
 import { sendEmail } from "../services/email";
 import { sessionCookieClearOptions, sessionCookieOptions } from "../cookies";
+import { normalizeEmail } from "../utils/email";
 
 const router = Router();
 
@@ -37,9 +38,10 @@ function generateVerificationToken(): { plain: string; hash: string } {
 }
 
 async function sendVerificationEmail(
-  email: string,
+  emailRaw: string,
   userId: string
 ): Promise<void> {
+  const email = normalizeEmail(emailRaw);
   // Invalidate any existing unused tokens.
   await prisma.emailVerificationToken.updateMany({
     where: { userId, usedAt: null },
@@ -82,7 +84,9 @@ router.post("/login", ...(isProduction ? [loginLimiter] : []), async (req, res) 
   }
 
   const { email, password } = parsed.data;
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await prisma.user.findUnique({
+    where: { email: normalizeEmail(email) },
+  });
 
   if (!user) {
     await hashPassword(password); // constant-time to prevent timing attacks
@@ -139,7 +143,8 @@ router.post("/register", async (req, res) => {
   }
 
   const { email, name, password } = parsed.data;
-  const existing = await prisma.user.findUnique({ where: { email } });
+  const emailNorm = normalizeEmail(email);
+  const existing = await prisma.user.findUnique({ where: { email: emailNorm } });
 
   if (existing) {
     if (existing.passwordHash) {
@@ -152,7 +157,7 @@ router.post("/register", async (req, res) => {
     // These users are pre-verified since an admin explicitly added them.
     const hash = await hashPassword(password);
     const user = await prisma.user.update({
-      where: { email },
+      where: { email: emailNorm },
       data: {
         passwordHash: hash,
         name: name ?? existing.name,
@@ -174,10 +179,10 @@ router.post("/register", async (req, res) => {
 
   const hash = await hashPassword(password);
   const user = await prisma.user.create({
-    data: { email, name, passwordHash: hash },
+    data: { email: emailNorm, name, passwordHash: hash },
   });
 
-  await sendVerificationEmail(email, user.id).catch(() => {
+  await sendVerificationEmail(emailNorm, user.id).catch(() => {
     // Non-fatal — user can request a new verification email.
   });
 
@@ -198,8 +203,9 @@ router.post("/resend-verification", ...(isProduction ? [loginLimiter] : []), asy
     return;
   }
 
+  const email = normalizeEmail(parsed.data.email);
   const user = await prisma.user.findUnique({
-    where: { email: parsed.data.email },
+    where: { email },
   });
 
   // Always return success to prevent email enumeration.
@@ -208,7 +214,7 @@ router.post("/resend-verification", ...(isProduction ? [loginLimiter] : []), asy
     return;
   }
 
-  await sendVerificationEmail(parsed.data.email, user.id).catch(() => {});
+  await sendVerificationEmail(email, user.id).catch(() => {});
   res.json({ ok: true, message: "If applicable, a new verification email has been sent." });
 });
 
@@ -228,7 +234,10 @@ router.post("/verify-email", async (req, res) => {
   }
 
   const { token, email } = parsed.data;
-  const user = await prisma.user.findUnique({ where: { email } });
+  const emailNorm = normalizeEmail(email);
+  const user = await prisma.user.findUnique({
+    where: { email: emailNorm },
+  });
   if (!user) {
     res.status(400).json({ error: "Invalid or expired verification link" });
     return;
@@ -279,7 +288,10 @@ router.post("/forgot-password", passwordResetLimiter, async (req, res) => {
   }
 
   const { email } = parsed.data;
-  const user = await prisma.user.findUnique({ where: { email } });
+  const emailNorm = normalizeEmail(email);
+  const user = await prisma.user.findUnique({
+    where: { email: emailNorm },
+  });
 
   // Always return success to prevent email enumeration.
   if (!user) {
@@ -303,9 +315,9 @@ router.post("/forgot-password", passwordResetLimiter, async (req, res) => {
     },
   });
 
-  const resetUrl = `${config.appOrigin}/reset-password?token=${plainToken}&email=${encodeURIComponent(email)}`;
+  const resetUrl = `${config.appOrigin}/reset-password?token=${encodeURIComponent(plainToken)}&email=${encodeURIComponent(user.email)}`;
   await sendEmail({
-    to: email,
+    to: user.email,
     subject: "StepSprint Password Reset",
     text: `Reset your password: ${resetUrl}\n\nThis link expires in 1 hour. If you didn't request this, ignore this email.`,
   });
@@ -331,7 +343,10 @@ router.post("/reset-password", async (req, res) => {
   }
 
   const { token, email, password } = parsed.data;
-  const user = await prisma.user.findUnique({ where: { email } });
+  const emailNorm = normalizeEmail(email);
+  const user = await prisma.user.findUnique({
+    where: { email: emailNorm },
+  });
   if (!user) {
     res.status(400).json({ error: "Invalid or expired reset link" });
     return;

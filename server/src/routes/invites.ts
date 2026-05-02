@@ -7,6 +7,7 @@ import { config } from "../config";
 import { sessionCookieOptions } from "../cookies";
 import { authRequired, roleRequired, AuthenticatedRequest } from "../middleware/auth";
 import { Role } from "@prisma/client";
+import { normalizeEmail } from "../utils/email";
 
 const router = Router();
 
@@ -40,11 +41,12 @@ router.post("/", authRequired, roleRequired(Role.ADMIN), async (req: Authenticat
     return;
   }
 
+  const email = normalizeEmail(parsed.data.email);
   const token = jwt.sign(
     {
       type: "invite",
       challengeId: parsed.data.challengeId,
-      email: parsed.data.email,
+      email,
     },
     config.jwtSecret,
     { expiresIn: INVITE_EXPIRY }
@@ -118,11 +120,13 @@ router.get("/accept", async (req, res) => {
     return;
   }
 
+  const email = normalizeEmail(payload.email);
+
   // Invite acceptance is a trust signal equivalent to email verification.
   const user = await prisma.user.upsert({
-    where: { email: payload.email },
+    where: { email },
     update: { emailVerified: true },
-    create: { email: payload.email, emailVerified: true },
+    create: { email, emailVerified: true },
   });
 
   await prisma.teamMember.upsert({

@@ -1,15 +1,19 @@
 import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { getErrorMessage } from "../api";
+import { ApiError, api, getErrorMessage } from "../api";
 import { isValidEmail } from "../utils";
 import { identify } from "../analytics";
-import type { User } from "../types";
+import type { RegisterOutcome } from "../types";
 import { StepSprintLogo } from "./StepSprintLogo";
 
 type Props = {
   onLogin: (email: string, password: string) => Promise<User>;
-  onRegister: (email: string, password: string, name?: string) => Promise<User>;
+  onRegister: (
+    email: string,
+    password: string,
+    name?: string
+  ) => Promise<RegisterOutcome>;
 };
 
 type StrengthKey = "tooShort" | "weak" | "fair" | "strong";
@@ -33,6 +37,10 @@ export function Login({ onLogin, onRegister }: Props) {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [postRegisterBanner, setPostRegisterBanner] = useState("");
+  const [verifyResendInfo, setVerifyResendInfo] = useState("");
+  const [verificationBlocked, setVerificationBlocked] = useState(false);
+  const [resendBusy, setResendBusy] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const emailInputRef = useRef<HTMLInputElement>(null);
@@ -80,17 +88,29 @@ export function Login({ onLogin, onRegister }: Props) {
     try {
       setBusy(true);
       setError("");
-      let user: User;
+      setVerifyResendInfo("");
+      setVerificationBlocked(false);
       if (mode === "login") {
-        user = await onLogin(email.trim(), password);
+        const user = await onLogin(email.trim(), password);
+        setPostRegisterBanner("");
+        identify(user.id);
       } else {
-        user = await onRegister(
+        const outcome = await onRegister(
           email.trim(),
           password,
           name?.trim() || undefined
         );
+        if (outcome.kind === "session") {
+          identify(outcome.user.id);
+          setPostRegisterBanner("");
+        } else {
+          setPostRegisterBanner(outcome.message);
+          setVerificationBlocked(false);
+          setPassword("");
+          setConfirmPassword("");
+          setMode("login");
+        }
       }
-      identify(user.id);
     } catch (err) {
       const msg = getErrorMessage(err);
       if (msg === "PASSWORD_SETUP_REQUIRED") {
@@ -98,12 +118,47 @@ export function Login({ onLogin, onRegister }: Props) {
         setPassword("");
         setConfirmPassword("");
         setError("");
+        setVerificationBlocked(false);
+      } else if (
+        err instanceof ApiError &&
+        msg === "EMAIL_VERIFICATION_REQUIRED"
+      ) {
+        setVerificationBlocked(true);
+        setError(t("login.errors.emailNotVerified"));
       } else {
+        setVerificationBlocked(false);
         setError(msg);
       }
     } finally {
       setBusy(false);
     }
+  }
+
+  async function handleResendVerification() {
+    if (!email.trim() || !isValidEmail(email)) {
+      setError(t("login.errors.emailInvalid"));
+      return;
+    }
+    try {
+      setResendBusy(true);
+      setVerifyResendInfo("");
+      await api("/api/auth/resend-verification", {
+        method: "POST",
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      setVerifyResendInfo(t("login.verifyEmailActions.resendDone"));
+    } catch (e) {
+      setVerifyResendInfo(getErrorMessage(e));
+    } finally {
+      setResendBusy(false);
+    }
+  }
+
+  function clearVerificationExtras() {
+    setVerificationBlocked(false);
+    setVerifyResendInfo("");
+    setPostRegisterBanner("");
+    setError("");
   }
 
   const strength = (mode === "register" || mode === "setup") && password
@@ -140,6 +195,32 @@ export function Login({ onLogin, onRegister }: Props) {
           <p className="hint">{t("login.hint.register")}</p>
         )}
 
+        {mode === "login" && postRegisterBanner ? (
+          <div role="status" aria-live="polite">
+            <p className="hint">{t("login.afterRegister.title")}</p>
+            <p className="status status-success">{postRegisterBanner}</p>
+          </div>
+        ) : null}
+
+        {mode === "login" && (postRegisterBanner || verificationBlocked) ? (
+          <div className="verification-resend-block">
+            <p className="hint">{t("login.afterRegister.resendPrompt")}</p>
+            <button
+              type="button"
+              className="secondary"
+              disabled={resendBusy || !email.trim() || busy}
+              onClick={handleResendVerification}
+            >
+              {resendBusy
+                ? t("login.verifyEmailActions.resending")
+                : t("login.verifyEmailActions.resend")}
+            </button>
+            {verifyResendInfo ? (
+              <p className="status status-success">{verifyResendInfo}</p>
+            ) : null}
+          </div>
+        ) : null}
+
         <form onSubmit={handleSubmit}>
           <label>
             {t("login.email")}
@@ -147,7 +228,10 @@ export function Login({ onLogin, onRegister }: Props) {
               ref={emailInputRef}
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setVerificationBlocked(false);
+              }}
               autoComplete="email"
               readOnly={mode === "setup"}
               aria-invalid={!!error && error.toLowerCase().includes("email")}
@@ -256,7 +340,7 @@ export function Login({ onLogin, onRegister }: Props) {
                 className="form-link link-button"
                 onClick={() => {
                   setMode("register");
-                  setError("");
+                  clearVerificationExtras();
                   setPassword("");
                   setConfirmPassword("");
                 }}
@@ -271,7 +355,7 @@ export function Login({ onLogin, onRegister }: Props) {
               className="form-link link-button"
               onClick={() => {
                 setMode("login");
-                setError("");
+                clearVerificationExtras();
                 setPassword("");
                 setConfirmPassword("");
               }}
@@ -285,7 +369,7 @@ export function Login({ onLogin, onRegister }: Props) {
               className="form-link link-button"
               onClick={() => {
                 setMode("login");
-                setError("");
+                clearVerificationExtras();
                 setPassword("");
                 setConfirmPassword("");
               }}

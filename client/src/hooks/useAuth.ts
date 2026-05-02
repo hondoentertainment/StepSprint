@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
-import type { User } from "../types";
+import type { RegisterOutcome, User } from "../types";
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -25,16 +25,30 @@ export function useAuth() {
     return data.user;
   }
 
-  async function register(email: string, password: string, name?: string) {
-    const data = await api<{ user: User }>("/api/auth/register", {
+  async function register(
+    email: string,
+    password: string,
+    name?: string
+  ): Promise<RegisterOutcome> {
+    const data = await api<{
+      user?: User;
+      ok?: boolean;
+      message?: string;
+    }>("/api/auth/register", {
       method: "POST",
       body: JSON.stringify({ email, password, name: name || undefined }),
     });
-    setUser(data.user);
-    if (typeof sessionStorage !== "undefined") {
-      sessionStorage.setItem("stepSprintJustLoggedIn", "1");
+    if (data.user) {
+      setUser(data.user);
+      if (typeof sessionStorage !== "undefined") {
+        sessionStorage.setItem("stepSprintJustLoggedIn", "1");
+      }
+      return { kind: "session", user: data.user };
     }
-    return data.user;
+    if (data.ok && typeof data.message === "string") {
+      return { kind: "verify_email", message: data.message };
+    }
+    throw new Error("Unexpected registration response");
   }
 
   async function logout() {

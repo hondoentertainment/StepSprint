@@ -5,6 +5,11 @@ export type User = {
   role: "ADMIN" | "PARTICIPANT";
 };
 
+/** POST /api/auth/register: session for provisioned accounts, or email verification for new sign-ups */
+export type RegisterOutcome =
+  | { kind: "session"; user: User }
+  | { kind: "verify_email"; message: string };
+
 export type Challenge = {
   id: string;
   name: string;

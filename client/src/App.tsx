@@ -24,6 +24,9 @@ const ResetPassword = lazy(() =>
 const InvitePage = lazy(() =>
   import("./components/InvitePage").then((m) => ({ default: m.InvitePage })),
 );
+const VerifyEmail = lazy(() =>
+  import("./components/VerifyEmail").then((m) => ({ default: m.VerifyEmail })),
+);
 const WeeklyLeaderboard = lazy(() =>
   import("./components/WeeklyLeaderboard").then((m) => ({ default: m.WeeklyLeaderboard })),
 );
@@ -156,6 +159,14 @@ function App() {
         <Suspense fallback={<div className="panel" role="status">{t("common.loading")}</div>}>
           <Routes>
             <Route path="/invite" element={<InvitePage onAccepted={(u) => setUser(u)} />} />
+            <Route
+              path="/verify-email"
+              element={
+                <Suspense fallback={<RouteFallback />}>
+                  <VerifyEmail />
+                </Suspense>
+              }
+            />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="*" element={<Login onLogin={login} onRegister={register} />} />
