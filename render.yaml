@@ -38,6 +38,10 @@ services:
       # Update this value if you use a custom domain on Vercel.
       - key: APP_ORIGIN
         value: https://step-sprint.vercel.app
+      # Public URL of this API — used for OAuth callback URIs registered in
+      # Fitbit / Google developer consoles.
+      - key: SERVER_URL
+        value: https://stepsprint-api.onrender.com
       # Email (transactional — required for password reset and email verification).
       # Set RESEND_API_KEY to your Resend API key (resend.com).
       - key: RESEND_API_KEY

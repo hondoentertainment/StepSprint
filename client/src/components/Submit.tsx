@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { api } from "../api";
 import { getErrorMessage } from "../api";
 import { todayInTimezone, isFutureDate } from "../utils";
@@ -23,6 +24,7 @@ export function Submit({
   challengesLoading,
   onSummaryUpdated,
 }: Props) {
+  const { t } = useTranslation();
   const [date, setDate] = useState(() => todayInTimezone());
   const [steps, setSteps] = useState(8000);
   const [error, setError] = useState("");
@@ -35,13 +37,13 @@ export function Submit({
   }
 
   function getValidationError(): string | null {
-    if (!date) return "Please select a date.";
+    if (!date) return t("submit.validation.noDate");
     if (isFutureDate(date, selectedChallenge?.timezone)) {
-      return "Cannot submit steps for a future date.";
+      return t("submit.validation.futureDate");
     }
     const n = Number(steps);
-    if (Number.isNaN(n) || n < MIN_STEPS) return `Steps must be at least ${MIN_STEPS}.`;
-    if (n > MAX_STEPS) return `Steps cannot exceed ${MAX_STEPS.toLocaleString()}.`;
+    if (Number.isNaN(n) || n < MIN_STEPS) return t("submit.validation.minSteps", { min: MIN_STEPS });
+    if (n > MAX_STEPS) return t("submit.validation.maxSteps", { max: MAX_STEPS.toLocaleString() });
     return null;
   }
 
@@ -69,7 +71,7 @@ export function Submit({
       track("submission_created", { challengeId, steps: Number(steps) });
       setSteps(8000);
       resetDate();
-      setSuccess("Steps submitted successfully.");
+      setSuccess(t("submit.success"));
       const summary = await api<Summary>(`/api/me/summary?challengeId=${challengeId}`);
       onSummaryUpdated?.(summary);
     } catch (err) {
@@ -84,19 +86,19 @@ export function Submit({
 
   return (
     <section className="panel">
-      <h2>Submit steps</h2>
+      <h2>{t("submit.title")}</h2>
       {!challengeId && !challengesLoading && (
-        <p className="status status-error">Choose an active challenge before submitting steps.</p>
+        <p className="status status-error">{t("submit.noChallenge")}</p>
       )}
       {error && <p className="status status-error" role="alert">{error}</p>}
       {success && <p className="status status-success" role="status" aria-live="polite">{success}</p>}
       <form onSubmit={handleSubmit}>
         <label>
-          Date
+          {t("submit.date")}
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </label>
         <label>
-          Steps
+          {t("submit.steps")}
           <input
             type="number"
             min={MIN_STEPS}
@@ -106,10 +108,10 @@ export function Submit({
           />
         </label>
         <button type="submit" disabled={!canSubmit} className="cta-primary">
-          {isSubmitting ? "Submitting…" : "Log steps"}
+          {isSubmitting ? t("submit.submitting") : t("submit.submit")}
         </button>
       </form>
-      <p className="hint">Submissions above 100,000 steps are flagged.</p>
+      <p className="hint">{t("submit.flagged")}</p>
       <p className="hint">
         <button
           type="button"
@@ -117,7 +119,7 @@ export function Submit({
           onClick={() => setShowAppleHealth((v) => !v)}
           disabled={!challengeId}
         >
-          {showAppleHealth ? "Hide Apple Watch sync" : "Sync from Apple Watch"}
+          {showAppleHealth ? t("submit.appleWatch.hide") : t("submit.appleWatch.show")}
         </button>
       </p>
       {showAppleHealth && challengeId && <AppleHealthSync challengeId={challengeId} />}

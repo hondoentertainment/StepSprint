@@ -54,5 +54,71 @@
       "passwordNeedsNumber": "Password must contain at least one number.",
       "passwordsDoNotMatch": "Passwords do not match."
     }
+  },
+  "home": {
+    "title": "Your Dashboard",
+    "loading": "Loading summary",
+    "welcome": "Welcome back! You've signed in successfully.",
+    "noChallenge": "No active challenges yet.",
+    "notEnrolled": "You are not enrolled in this challenge yet.",
+    "empty": "No summary yet. Submit your first steps to get started!",
+    "logSteps": "Log your steps",
+    "logToday": "Log today's steps",
+    "challenge": {
+      "locked": "Locked",
+      "open": "Open",
+      "unassigned": "Unassigned"
+    },
+    "progress": {
+      "label_one": "Day {{elapsed}} of {{total}} — {{count}} day left",
+      "label_other": "Day {{elapsed}} of {{total}} — {{count}} days left"
+    },
+    "streak": {
+      "title": "{{count}}-day streak!",
+      "body": "You're on fire. Keep it up!",
+      "dismiss": "Dismiss"
+    },
+    "cards": {
+      "today": "Today",
+      "streak": "Current streak",
+      "streakCount_one": "{{count}} day",
+      "streakCount_other": "{{count}} days",
+      "consistency": "Consistency",
+      "consistencyAriaLabel": "Consistency: {{score}}%, {{activeDays}} of {{elapsedDays}} days active",
+      "daysActive": "{{activeDays}} of {{elapsedDays}} days active",
+      "week": "This week",
+      "month": "This month",
+      "teamTotal": "Team total",
+      "rank": "Rank",
+      "gapToFirst": "Gap to #1"
+    },
+    "notifications": {
+      "dailyReminder": "Daily reminder to log steps",
+      "unavailable": "Push notifications not available.",
+      "enable": "Enable push reminders",
+      "enabling": "Enabling...",
+      "permissionDenied": "Push permission was not granted.",
+      "enabled": "Push reminders enabled on this device."
+    }
+  },
+  "submit": {
+    "title": "Submit steps",
+    "noChallenge": "Choose an active challenge before submitting steps.",
+    "date": "Date",
+    "steps": "Steps",
+    "submit": "Log steps",
+    "submitting": "Submitting…",
+    "success": "Steps submitted successfully.",
+    "flagged": "Submissions above 100,000 steps are flagged.",
+    "appleWatch": {
+      "show": "Sync from Apple Watch",
+      "hide": "Hide Apple Watch sync"
+    },
+    "validation": {
+      "noDate": "Please select a date.",
+      "futureDate": "Cannot submit steps for a future date.",
+      "minSteps": "Steps must be at least {{min}}.",
+      "maxSteps": "Steps cannot exceed {{max}}."
+    }
   }
 }

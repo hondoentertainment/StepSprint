@@ -27,6 +27,9 @@ const envSchema = z.object({
   FITBIT_CLIENT_SECRET: z.string().optional(),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
+  // Public URL of this API server — used for OAuth callback URIs.
+  // In production set to e.g. https://stepsprint-api.onrender.com
+  SERVER_URL: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -68,4 +71,6 @@ export const config = {
     googleClientId: parsed.data.GOOGLE_CLIENT_ID,
     googleClientSecret: parsed.data.GOOGLE_CLIENT_SECRET,
   },
+  serverUrl:
+    parsed.data.SERVER_URL ?? `http://localhost:${Number(parsed.data.PORT ?? "3001")}`,
 };
