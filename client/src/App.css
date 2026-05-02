@@ -1414,3 +1414,75 @@ textarea:focus-visible {
   text-overflow: ellipsis;
   max-width: 200px;
 }
+
+/* ========== Legal footer & cookie banner ========== */
+.legal-footer {
+  margin-top: auto;
+  padding-top: 1rem;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.legal-footer a {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.legal-footer a:hover {
+  color: var(--accent);
+}
+
+.legal-page {
+  max-width: 40rem;
+  margin: 0 auto;
+}
+
+.legal-page ul {
+  padding-left: 1.25rem;
+  margin: 0.5rem 0 1rem;
+  color: var(--text-secondary);
+}
+
+.cookie-consent-banner {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 200;
+  padding: 1rem;
+  background: var(--bg-elevated);
+  border-top: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+}
+
+.cookie-consent-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.cookie-consent-text {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+}
+
+.cookie-consent-links {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.cookie-consent-links a {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.cookie-consent-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}

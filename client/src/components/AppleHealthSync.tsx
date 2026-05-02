@@ -36,6 +36,9 @@ export function AppleHealthSync({ challengeId }: Props) {
 
   const syncUrl = getApiUrl("/api/integrations/apple-health");
 
+  const oauthProviders = providers.filter((p) => p.id === "fitbit" || p.id === "google_fit");
+  const showOAuthSection = oauthProviders.some((p) => p.available || p.connected);
+
   const loadData = useCallback(async () => {
     try {
       const [tokenData, connData] = await Promise.all([
@@ -292,15 +295,15 @@ export function AppleHealthSync({ challengeId }: Props) {
         </details>
       )}
 
-      {/* OAuth providers */}
-      {providers.length > 0 && (
+      {/* OAuth providers (only when Fitbit/Google are configured or already linked) */}
+      {showOAuthSection && (
         <div className="oauth-providers">
           <h4>Connected fitness services</h4>
           <p className="hint">
             Connect Fitbit or Google Fit to sync steps directly — no Shortcut required.
           </p>
           <ul>
-            {providers.map((p) => (
+            {oauthProviders.map((p) => (
               <li key={p.id} className="oauth-provider-row">
                 <span className="provider-name">{p.name}</span>
                 {!p.available ? (

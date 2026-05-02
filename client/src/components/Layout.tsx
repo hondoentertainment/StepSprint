@@ -4,6 +4,7 @@ import type { User } from "../types";
 import type { Challenge } from "../types";
 import { TABS } from "../types";
 import { StepSprintLogo } from "./StepSprintLogo";
+import { LegalFooter } from "./LegalFooter";
 
 type Props = {
   user: User;
@@ -91,6 +92,7 @@ export function Layout({
       <main id="main-content" tabIndex={-1}>
         <Outlet />
       </main>
+      <LegalFooter />
     </div>
   );
 }

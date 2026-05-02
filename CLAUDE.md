@@ -119,7 +119,7 @@ Team assignment supports random and snake-draft at challenge creation.
 - **Sentry and PostHog are no-ops in dev**: SDKs wired on client + server but silent until `SENTRY_DSN` / `VITE_SENTRY_DSN` / `VITE_POSTHOG_KEY` are set.
 - **No real SMTP provider**: Nodemailer wired, password reset emails no-op without SMTP env.
 - **i18n coverage is thin**: only `Login` is translated via `useTranslation`; all other components still hardcode English.
-- **Health-sync integrations** (Apple Health / Google Fit / Fitbit): `routes/integrations.ts` is scaffolding; no OAuth flows yet.
+- **Health-sync integrations**: Apple Watch sync via API token and Shortcuts is implemented; Fitbit and Google Fit use OAuth when server env credentials are set (`routes/oauth.ts`, `routes/integrations.ts`).
 - **Push notifications**: daily reminders are email-only; no Web Push / VAPID yet.
 - **CSP not pinned**: helmet defaults are on but CSP is disabled — lock down once asset origins stabilize.
 - **CSRF deferred**: auth is cookie-based; server-side CSRF was intentionally not added this round because it requires a paired change to `client/src/api.ts`. Tracked inline in `server/src/app.ts`.

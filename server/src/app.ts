@@ -7,6 +7,7 @@ import { doubleCsrf } from "csrf-csrf";
 import * as Sentry from "@sentry/node";
 import { config } from "./config";
 import { logger } from "./logger";
+import { prisma } from "./prisma";
 import { authLimiter, apiLimiter, generalLimiter } from "./middleware/rateLimit";
 import authRoutes from "./routes/auth";
 import adminRoutes from "./routes/admin";
@@ -67,7 +68,10 @@ const swaggerCsp = helmet({
 });
 
 app.use((req, res, next) => {
-  if (req.path.startsWith("/api/docs") || req.path === "/api/openapi.json") {
+  const openApiPath =
+    config.openApiDocsEnabled &&
+    (req.path.startsWith("/api/docs") || req.path === "/api/openapi.json");
+  if (openApiPath) {
     return swaggerCsp(req, res, next);
   }
   return strictCsp(req, res, next);
@@ -170,8 +174,13 @@ if (isProduction) {
 // ---------------------------------------------------------------------------
 // Health check
 // ---------------------------------------------------------------------------
-app.get("/api/health", (_req, res) => {
-  res.json({ ok: true });
+app.get("/api/health", async (_req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({ ok: true, db: "up" as const });
+  } catch {
+    res.status(503).json({ ok: false, db: "down" as const });
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -189,7 +198,9 @@ app.use("/api/invites", inviteRoutes);
 app.use("/api/integrations", integrationsRoutes);
 app.use("/api/integrations", oauthRoutes);
 app.use("/api/me/notifications", notificationsRoutes);
-app.use("/api", openapiRoutes);
+if (config.openApiDocsEnabled) {
+  app.use("/api", openapiRoutes);
+}
 
 // Sentry must be attached AFTER all routes and BEFORE any custom error handler.
 Sentry.setupExpressErrorHandler(app);

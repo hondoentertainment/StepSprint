@@ -10,6 +10,9 @@ import { Login } from "./components/Login";
 import { Layout } from "./components/Layout";
 import { Home } from "./components/Home";
 import { Submit } from "./components/Submit";
+import { Privacy } from "./components/Privacy";
+import { Terms } from "./components/Terms";
+import { CookieConsentBanner } from "./components/CookieConsentBanner";
 
 // Route-based code splitting: lazy-load heavier, less critical-path routes.
 // Home, Login, and Submit stay eager as they're on the primary user journey.
@@ -63,6 +66,8 @@ function AuthenticatedApp() {
 
   return (
     <Routes>
+      <Route path="/privacy" element={<Privacy />} />
+      <Route path="/terms" element={<Terms />} />
       <Route
         path="/"
         element={
@@ -156,8 +161,11 @@ function App() {
   if (!user) {
     return (
       <BrowserRouter>
+        <CookieConsentBanner />
         <Suspense fallback={<div className="panel" role="status">{t("common.loading")}</div>}>
           <Routes>
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
             <Route path="/invite" element={<InvitePage onAccepted={(u) => setUser(u)} />} />
             <Route
               path="/verify-email"
@@ -178,6 +186,7 @@ function App() {
 
   return (
     <BrowserRouter>
+      <CookieConsentBanner />
       <WeekProvider>
         <AuthenticatedApp />
       </WeekProvider>

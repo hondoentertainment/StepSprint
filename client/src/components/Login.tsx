@@ -6,6 +6,7 @@ import { isValidEmail } from "../utils";
 import { identify } from "../analytics";
 import type { RegisterOutcome, User } from "../types";
 import { StepSprintLogo } from "./StepSprintLogo";
+import { LegalFooter } from "./LegalFooter";
 
 type Props = {
   onLogin: (email: string, password: string) => Promise<User>;
@@ -379,6 +380,7 @@ export function Login({ onLogin, onRegister }: Props) {
           )}
         </div>
       </section>
+      <LegalFooter />
     </div>
   );
 }

@@ -98,8 +98,8 @@ router.get("/fitness", authRequired, async (req: AuthenticatedRequest, res) => {
     ],
     message:
       googleAvail || fitbitAvail
-        ? "Use OAuth for Fitbit or Google Fit when enabled on the server; use an API token for Apple Watch via iOS Shortcuts."
-        : "Use an API token to sync Apple Watch steps via iOS Shortcuts. OAuth providers appear when Fitbit/Google env vars are set.",
+        ? "Use OAuth below for Fitbit or Google Fit, or an API token for Apple Watch via iOS Shortcuts."
+        : "Use an API token to sync Apple Watch steps via iOS Shortcuts. Fitbit and Google Fit OAuth appear in the app after those credentials are configured on the server.",
   });
 });
 

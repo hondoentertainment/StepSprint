@@ -132,15 +132,13 @@ test.describe("Apple Watch sync UI", () => {
     await expect(tokenRows).toHaveCount(countBefore - 1, { timeout: 10_000 });
   });
 
-  test("OAuth section shows Fitbit and Google Fit connection status", async ({ page }) => {
+  test("OAuth section is hidden when Fitbit and Google Fit are not configured", async ({ page }) => {
     await loginAsParticipant(page);
     await navigateToSubmit(page);
 
     await page.getByRole("button", { name: /Sync from Apple Watch/i }).click();
     await expect(page.getByRole("heading", { name: /Apple Watch \/ Apple Health sync/i })).toBeVisible();
 
-    // OAuth provider cards should be visible
-    await expect(page.getByText(/Fitbit/i).first()).toBeVisible();
-    await expect(page.getByText(/Google Fit/i).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Connected fitness services/i })).not.toBeVisible();
   });
 });

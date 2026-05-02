@@ -34,6 +34,8 @@ const envSchema = z.object({
   FITBIT_CLIENT_SECRET: z.string().optional(),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
+  /** When `true`, expose Swagger UI at /api/docs and /api/openapi.json. Defaults off in production. */
+  OPENAPI_DOCS_ENABLED: z.enum(["true", "false"]).optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -43,6 +45,14 @@ if (!parsed.success) {
 }
 
 const smtpFrom = parsed.data.SMTP_FROM ?? "noreply@stepsprint.app";
+
+const nodeEnv = parsed.data.NODE_ENV ?? "development";
+const openApiDocsEnabled =
+  parsed.data.OPENAPI_DOCS_ENABLED === "true"
+    ? true
+    : parsed.data.OPENAPI_DOCS_ENABLED === "false"
+      ? false
+      : nodeEnv !== "production";
 
 export const config = {
   port: Number(parsed.data.PORT ?? "3001"),
@@ -55,7 +65,8 @@ export const config = {
   defaultChallengeTz: parsed.data.DEFAULT_CHALLENGE_TZ,
   cookieName: "stepsprint_session",
   sentryDsn: parsed.data.SENTRY_DSN,
-  nodeEnv: parsed.data.NODE_ENV ?? "development",
+  nodeEnv,
+  openApiDocsEnabled,
   resendApiKey: parsed.data.RESEND_API_KEY,
   emailFrom: smtpFrom,
   vapid: {
