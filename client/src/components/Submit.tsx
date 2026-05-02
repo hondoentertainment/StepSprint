@@ -37,13 +37,13 @@ export function Submit({
   }
 
   function getValidationError(): string | null {
-    if (!date) return t("submit.validation.noDate");
+    if (!date) return "Please select a date.";
     if (isFutureDate(date, selectedChallenge?.timezone)) {
-      return t("submit.validation.futureDate");
+      return "Cannot submit steps for a future date.";
     }
     const n = Number(steps);
-    if (Number.isNaN(n) || n < MIN_STEPS) return t("submit.validation.minSteps", { min: MIN_STEPS });
-    if (n > MAX_STEPS) return t("submit.validation.maxSteps", { max: MAX_STEPS.toLocaleString() });
+    if (Number.isNaN(n) || n < MIN_STEPS) return `Steps must be at least ${MIN_STEPS}.`;
+    if (n > MAX_STEPS) return `Steps cannot exceed ${MAX_STEPS.toLocaleString()}.`;
     return null;
   }
 
@@ -88,17 +88,17 @@ export function Submit({
     <section className="panel">
       <h2>{t("submit.title")}</h2>
       {!challengeId && !challengesLoading && (
-        <p className="status status-error">{t("submit.noChallenge")}</p>
+        <p className="status status-error">{t("submit.noChallengeSelected")}</p>
       )}
       {error && <p className="status status-error" role="alert">{error}</p>}
       {success && <p className="status status-success" role="status" aria-live="polite">{success}</p>}
       <form onSubmit={handleSubmit}>
         <label>
-          {t("submit.date")}
+          {t("submit.dateLabel")}
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </label>
         <label>
-          {t("submit.steps")}
+          {t("submit.stepsLabel")}
           <input
             type="number"
             min={MIN_STEPS}
@@ -111,7 +111,7 @@ export function Submit({
           {isSubmitting ? t("submit.submitting") : t("submit.submit")}
         </button>
       </form>
-      <p className="hint">{t("submit.flagged")}</p>
+      <p className="hint">{t("submit.flaggedHint")}</p>
       <p className="hint">
         <button
           type="button"
@@ -119,7 +119,7 @@ export function Submit({
           onClick={() => setShowAppleHealth((v) => !v)}
           disabled={!challengeId}
         >
-          {showAppleHealth ? t("submit.appleWatch.hide") : t("submit.appleWatch.show")}
+          {showAppleHealth ? t("submit.hideAppleWatch") : t("submit.syncAppleWatch")}
         </button>
       </p>
       {showAppleHealth && challengeId && <AppleHealthSync challengeId={challengeId} />}

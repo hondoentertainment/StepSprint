@@ -1,7 +1,20 @@
 {
   "app": {
     "name": "StepSprint",
-    "tagline": "Track steps. Compete with your team. Build habits that stick."
+    "tagline": "Track steps. Compete with your team. Build habits that stick.",
+    "loading": "Loading"
+  },
+  "common": {
+    "skipToContent": "Skip to main content",
+    "loading": "Loading…",
+    "locked": "Locked",
+    "open": "Open",
+    "steps": "steps",
+    "unassigned": "Unassigned",
+    "tryAgain": "Try again",
+    "backToSignIn": "Back to sign in",
+    "confirm": "Confirm",
+    "cancel": "Cancel"
   },
   "login": {
     "title": {
@@ -55,70 +68,239 @@
       "passwordsDoNotMatch": "Passwords do not match."
     }
   },
+  "layout": {
+    "welcome": "Welcome, {{name}}",
+    "noChallenges": "No challenges available",
+    "logout": "Log out",
+    "selectChallenge": "Select challenge",
+    "tabs": {
+      "Home": "Home",
+      "Submit": "Submit",
+      "Weekly Top Steppers": "Weekly Top Steppers",
+      "Team Standings": "Team Standings",
+      "Admin": "Admin"
+    }
+  },
   "home": {
-    "title": "Your Dashboard",
-    "loading": "Loading summary",
+    "title": "Participant Home",
     "welcome": "Welcome back! You've signed in successfully.",
-    "noChallenge": "No active challenges yet.",
+    "noChallenges": "No active challenges yet.",
     "notEnrolled": "You are not enrolled in this challenge yet.",
-    "empty": "No summary yet. Submit your first steps to get started!",
-    "logSteps": "Log your steps",
-    "logToday": "Log today's steps",
-    "challenge": {
-      "locked": "Locked",
-      "open": "Open",
-      "unassigned": "Unassigned"
-    },
-    "progress": {
-      "label_one": "Day {{elapsed}} of {{total}} — {{count}} day left",
-      "label_other": "Day {{elapsed}} of {{total}} — {{count}} days left"
-    },
-    "streak": {
-      "title": "{{count}}-day streak!",
-      "body": "You're on fire. Keep it up!",
-      "dismiss": "Dismiss"
-    },
-    "cards": {
+    "stats": {
       "today": "Today",
       "streak": "Current streak",
-      "streakCount_one": "{{count}} day",
-      "streakCount_other": "{{count}} days",
+      "days_one": "{{count}} day",
+      "days_other": "{{count}} days",
       "consistency": "Consistency",
-      "consistencyAriaLabel": "Consistency: {{score}}%, {{activeDays}} of {{elapsedDays}} days active",
-      "daysActive": "{{activeDays}} of {{elapsedDays}} days active",
-      "week": "This week",
-      "month": "This month",
+      "daysActive": "{{active}} of {{elapsed}} days active",
+      "thisWeek": "This week",
+      "thisMonth": "This month",
       "teamTotal": "Team total",
       "rank": "Rank",
       "gapToFirst": "Gap to #1"
     },
+    "emptyState": "No summary yet. Submit your first steps to get started!",
+    "logSteps": "Log your steps",
     "notifications": {
-      "dailyReminder": "Daily reminder to log steps",
-      "unavailable": "Push notifications not available.",
+      "dailyReminder": "Remind me to log steps (Web Push when enabled, plus email when the server has email configured)",
+      "notAvailable": "Push notifications not available.",
       "enable": "Enable push reminders",
-      "enabling": "Enabling...",
+      "enabling": "Enabling…",
       "permissionDenied": "Push permission was not granted.",
       "enabled": "Push reminders enabled on this device."
     }
   },
   "submit": {
     "title": "Submit steps",
-    "noChallenge": "Choose an active challenge before submitting steps.",
-    "date": "Date",
-    "steps": "Steps",
+    "noChallengeSelected": "Choose an active challenge before submitting steps.",
+    "dateLabel": "Date",
+    "stepsLabel": "Steps",
     "submit": "Log steps",
     "submitting": "Submitting…",
     "success": "Steps submitted successfully.",
-    "flagged": "Submissions above 100,000 steps are flagged.",
-    "appleWatch": {
-      "show": "Sync from Apple Watch",
-      "hide": "Hide Apple Watch sync"
-    },
-    "validation": {
-      "noDate": "Please select a date.",
-      "futureDate": "Cannot submit steps for a future date.",
-      "minSteps": "Steps must be at least {{min}}.",
-      "maxSteps": "Steps cannot exceed {{max}}."
+    "flaggedHint": "Submissions above 100,000 steps are flagged.",
+    "connectDevice": "Connect fitness device",
+    "comingSoon": "Coming soon",
+    "syncAppleWatch": "Sync from Apple Watch",
+    "hideAppleWatch": "Hide Apple Watch sync"
+  },
+  "weeklyLeaderboard": {
+    "title": "Weekly Top Steppers",
+    "biggestImprovement": "Biggest improvement",
+    "vsLastWeek": "+{{delta}} steps vs last week",
+    "noChallengeSelected": "Select a challenge to view the leaderboard.",
+    "noEntries": "No entries yet for this week.",
+    "rank": "#{{rank}}",
+    "you": "You"
+  },
+  "weekPicker": {
+    "weekOf": "Week of",
+    "pickDate": "Pick a date to select its week",
+    "jumpToWeek": "Jump to week by date",
+    "weekNumber": "Week {{week}}",
+    "thisWeek": "This week",
+    "previousWeek": "Previous week",
+    "nextWeek": "Next week",
+    "showThisWeek": "Show this week",
+    "showPreviousWeek": "Show previous week"
+  },
+  "forgotPassword": {
+    "title": "Reset password",
+    "hint": "Enter your email address and we'll send you a link to reset your password.",
+    "emailLabel": "Email",
+    "submit": "Send reset link",
+    "sending": "Sending...",
+    "successMessage": "If an account with that email exists, a password reset link has been sent. Check your email (or server console in dev mode).",
+    "errors": {
+      "invalidEmail": "Please enter a valid email address."
     }
+  },
+  "resetPassword": {
+    "invalidTitle": "Invalid link",
+    "invalidMessage": "This password reset link is invalid or incomplete.",
+    "requestNewLink": "Request a new reset link",
+    "title": "Set new password",
+    "hint": "Choose a new password for {{email}}.",
+    "newPasswordLabel": "New password",
+    "confirmPasswordLabel": "Confirm new password",
+    "submit": "Reset password",
+    "resetting": "Resetting...",
+    "successMessage": "Your password has been reset. You can now sign in with your new password.",
+    "signIn": "Sign in",
+    "errors": {
+      "tooShort": "Password must be at least 8 characters.",
+      "needsLetter": "Password must contain at least one letter.",
+      "needsNumber": "Password must contain at least one number.",
+      "doNotMatch": "Passwords do not match."
+    }
+  },
+  "invite": {
+    "title": "Accepting invite",
+    "loading": "Loading…",
+    "successWithChallenge": "You've joined {{challengeName}}. Redirecting…",
+    "successGeneric": "Welcome! Redirecting…",
+    "missingToken": "Missing invite token",
+    "alreadyHaveAccountHint": "If you already had an account, your session stays active. Others can finish signing up from the Login page.",
+    "goHomeEarly": "Go to home now"
+  },
+  "errorBoundary": {
+    "title": "Something went wrong",
+    "message": "The app hit an unexpected error. You can try again, or reload the page if the problem persists.",
+    "tryAgain": "Try again"
+  },
+  "admin": {
+    "title": "Admin console",
+    "noAccess": "You do not have admin access.",
+    "scopedTo": "Scoped to this challenge",
+    "selectChallengeFirst": "Select a challenge first.",
+    "sections": {
+      "challengeSetup": "Challenge setup",
+      "participants": "Participants",
+      "teamAssignment": "Team assignment",
+      "moderation": "Moderation",
+      "inviteParticipant": "Invite participant",
+      "analytics": "Analytics",
+      "exports": "Exports"
+    },
+    "scope": {
+      "challenge": "{{name}}",
+      "selectPrompt": "Select a challenge",
+      "thisChallenge": "this challenge",
+      "all": "all"
+    },
+    "fields": {
+      "name": "Name",
+      "startDate": "Start date",
+      "endDate": "End date",
+      "timezone": "Timezone",
+      "teamSize": "Team size",
+      "emails": "Emails (comma separated)",
+      "strategy": "Strategy",
+      "search": "Search",
+      "searchPlaceholder": "email or name",
+      "reason": "Reason (required)",
+      "editSteps": "Edit steps (optional)",
+      "email": "Email",
+      "emailPlaceholder": "participant@example.com"
+    },
+    "strategies": {
+      "random": "Random",
+      "snake": "Snake draft"
+    },
+    "actions": {
+      "createChallenge": "Create challenge",
+      "addParticipants": "Add participants",
+      "assignTeams": "Assign teams",
+      "lockChallenge": "Lock challenge",
+      "unlockChallenge": "Unlock challenge",
+      "createInviteLink": "Create invite link",
+      "edit": "Edit",
+      "delete": "Delete"
+    },
+    "invite": {
+      "shareLink": "Share this link:",
+      "copy": "Copy link",
+      "copied": "Copied!",
+      "hintExpiry": "The link expires in 7 days. The participant opens it to join and sign in.",
+      "clipboardUnavailable": "Copy failed. Select the URL and copy it manually."
+    },
+    "analytics": {
+      "participation": "Participation: {{rate}}%",
+      "avgActiveDays": "Avg active days per participant: {{days}}",
+      "totalSubmissions": "Total submissions: {{count}}",
+      "totalSteps": "Total steps: {{steps}}",
+      "neverLogged": "Never logged steps: {{never}} / {{total}} participants",
+      "dormant": "Quiet {{days}}+ days (no submissions): {{dormant}} participants",
+      "submissionsTrend": "Submission activity by day",
+      "trendAria": "Bar chart of submission counts per day",
+      "emptyTrend": "No submissions yet on this timeline.",
+      "selectChallenge": "Select a challenge to view analytics."
+    },
+    "exports": {
+      "hint": "CSV exports open against the StepSprint API host. Stay logged in; your browser sends your session cookie to the API origin.",
+      "selectChallengeFirstLink": "Select a challenge above to enable export links.",
+      "submissions": "Export submissions CSV",
+      "teams": "Export team leaderboard CSV",
+      "weekly": "Export weekly leaderboard CSV"
+    },
+    "confirm": {
+      "deleteTitle": "Delete submission?",
+      "editTitle": "Edit submission?",
+      "deleteMessage": "Are you sure you want to delete this submission? ({{user}} · {{date}} · {{steps}} steps) This cannot be undone.",
+      "editMessage": "Edit steps for {{user}} on {{date}}?",
+      "delete": "Delete",
+      "save": "Save"
+    },
+    "submission": {
+      "flagged": "(flagged)"
+    },
+    "feedback": {
+      "challengeCreated": "Challenge created.",
+      "participantsAdded_one": "Added {{count}} participant.",
+      "participantsAdded_other": "Added {{count}} participants.",
+      "teamsAssigned": "Teams assigned.",
+      "challengeLocked": "Challenge locked.",
+      "challengeUnlocked": "Challenge unlocked.",
+      "submissionUpdated": "Submission updated.",
+      "submissionDeleted": "Submission deleted.",
+      "inviteCreated": "Invite link created. Share it with the participant.",
+      "selectChallengeAndEmail": "Select a challenge and enter email.",
+      "selectChallenge": "Select a challenge first."
+    }
+  },
+  "teamStandings": {
+    "title": "Team Leaderboard",
+    "loading": "Loading team standings…",
+    "emptyAdmin": "No team standings yet. Add participants and assign teams to get started.",
+    "emptyParticipant": "No team standings yet. Log steps to contribute, or ask your admin to assign teams.",
+    "goToAdmin": "Go to Admin",
+    "logSteps": "Log steps",
+    "myTeam": "(your team)",
+    "rank": "#{{rank}}",
+    "total": "{{steps}} total",
+    "lead": "Lead: {{name}} ({{steps}})",
+    "leads": "leads",
+    "behind": "{{steps}} behind",
+    "behindShort": "behind"
   }
 }

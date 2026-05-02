@@ -4,6 +4,7 @@ generator client {
 
 datasource db {
   provider = "sqlite"
+  url      = env("DATABASE_URL")
 }
 
 enum Role {
@@ -58,10 +59,11 @@ model PasswordResetToken {
 }
 
 model NotificationPreference {
-  id            String  @id @default(cuid())
-  userId        String  @unique
-  dailyReminder Boolean @default(false)
-  user          User    @relation(fields: [userId], references: [id])
+  id                      String    @id @default(cuid())
+  userId                  String    @unique
+  dailyReminder           Boolean   @default(false)
+  lastDailyReminderSentAt DateTime?
+  user                    User      @relation(fields: [userId], references: [id])
 }
 
 model PushSubscription {

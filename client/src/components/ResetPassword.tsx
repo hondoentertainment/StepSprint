@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { api, getErrorMessage } from "../api";
 import { StepSprintLogo } from "./StepSprintLogo";
 
 export function ResetPassword() {
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token") ?? "";
   const email = searchParams.get("email") ?? "";
@@ -18,19 +20,19 @@ export function ResetPassword() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (password.length < 8) {
-      setError("Password must be at least 8 characters.");
+      setError(t("resetPassword.errors.tooShort"));
       return;
     }
     if (!/[a-zA-Z]/.test(password)) {
-      setError("Password must contain at least one letter.");
+      setError(t("resetPassword.errors.needsLetter"));
       return;
     }
     if (!/[0-9]/.test(password)) {
-      setError("Password must contain at least one number.");
+      setError(t("resetPassword.errors.needsNumber"));
       return;
     }
     if (password !== confirmPassword) {
-      setError("Passwords do not match.");
+      setError(t("resetPassword.errors.doNotMatch"));
       return;
     }
     try {
@@ -54,18 +56,18 @@ export function ResetPassword() {
         <header className="hero">
           <div className="hero-logo">
             <StepSprintLogo size={40} />
-            <h1>StepSprint</h1>
+            <h1>{t("app.name")}</h1>
           </div>
-          <p>Track steps. Compete with your team. Build habits that stick.</p>
+          <p>{t("app.tagline")}</p>
         </header>
         <section className="panel panel-login">
-          <h2>Invalid link</h2>
+          <h2>{t("resetPassword.invalidTitle")}</h2>
           <p className="status status-error">
-            This password reset link is invalid or incomplete.
+            {t("resetPassword.invalidMessage")}
           </p>
           <div className="form-links">
             <Link to="/forgot-password" className="form-link">
-              Request a new reset link
+              {t("resetPassword.requestNewLink")}
             </Link>
           </div>
         </section>
@@ -76,32 +78,31 @@ export function ResetPassword() {
   return (
     <div className="app">
       <header className="hero">
-        <h1>StepSprint</h1>
-        <p>Track steps. Compete with your team. Build habits that stick.</p>
+        <h1>{t("app.name")}</h1>
+        <p>{t("app.tagline")}</p>
       </header>
       <section className="panel panel-login">
-        <h2>Set new password</h2>
+        <h2>{t("resetPassword.title")}</h2>
 
         {success ? (
           <>
             <p className="status status-success">
-              Your password has been reset. You can now sign in with your new
-              password.
+              {t("resetPassword.successMessage")}
             </p>
             <div className="form-links">
               <Link to="/" className="form-link">
-                Sign in
+                {t("resetPassword.signIn")}
               </Link>
             </div>
           </>
         ) : (
           <>
             <p className="hint">
-              Choose a new password for <strong>{email}</strong>.
+              {t("resetPassword.hint", { email })}
             </p>
             <form onSubmit={handleSubmit}>
               <label>
-                New password
+                {t("resetPassword.newPasswordLabel")}
                 <div className="password-field">
                   <input
                     type={showPassword ? "text" : "password"}
@@ -114,15 +115,15 @@ export function ResetPassword() {
                     type="button"
                     className="password-toggle"
                     onClick={() => setShowPassword(!showPassword)}
-                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    aria-label={showPassword ? t("login.hidePassword") : t("login.showPassword")}
                   >
-                    {showPassword ? "Hide" : "Show"}
+                    {showPassword ? t("login.hide") : t("login.show")}
                   </button>
                 </div>
               </label>
 
               <label>
-                Confirm new password
+                {t("resetPassword.confirmPasswordLabel")}
                 <input
                   type={showPassword ? "text" : "password"}
                   value={confirmPassword}
@@ -133,13 +134,13 @@ export function ResetPassword() {
 
               <ul className="password-requirements">
                 <li className={password.length >= 8 ? "met" : ""}>
-                  At least 8 characters
+                  {t("login.requirements.length")}
                 </li>
                 <li className={/[a-zA-Z]/.test(password) ? "met" : ""}>
-                  At least one letter
+                  {t("login.requirements.letter")}
                 </li>
                 <li className={/[0-9]/.test(password) ? "met" : ""}>
-                  At least one number
+                  {t("login.requirements.number")}
                 </li>
               </ul>
 
@@ -154,12 +155,12 @@ export function ResetPassword() {
                 disabled={!password || !confirmPassword || busy}
                 className="cta-primary"
               >
-                {busy ? "Resetting..." : "Reset password"}
+                {busy ? t("resetPassword.resetting") : t("resetPassword.submit")}
               </button>
             </form>
             <div className="form-links">
               <Link to="/" className="form-link">
-                Back to sign in
+                {t("common.backToSignIn")}
               </Link>
             </div>
           </>

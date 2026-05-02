@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { api, getErrorMessage } from "../api";
 import { isValidEmail } from "../utils";
 import { StepSprintLogo } from "./StepSprintLogo";
 
 export function ForgotPassword() {
+  const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [sent, setSent] = useState(false);
@@ -13,7 +15,7 @@ export function ForgotPassword() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!email.trim() || !isValidEmail(email)) {
-      setError("Please enter a valid email address.");
+      setError(t("forgotPassword.errors.invalidEmail"));
       return;
     }
     try {
@@ -36,34 +38,30 @@ export function ForgotPassword() {
       <header className="hero">
         <div className="hero-logo">
           <StepSprintLogo size={40} />
-          <h1>StepSprint</h1>
+          <h1>{t("app.name")}</h1>
         </div>
-        <p>Track steps. Compete with your team. Build habits that stick.</p>
+        <p>{t("app.tagline")}</p>
       </header>
       <section className="panel panel-login">
-        <h2>Reset password</h2>
+        <h2>{t("forgotPassword.title")}</h2>
 
         {sent ? (
           <>
             <p className="status status-success">
-              If an account with that email exists, a password reset link has
-              been sent. Check your email (or server console in dev mode).
+              {t("forgotPassword.successMessage")}
             </p>
             <div className="form-links">
               <Link to="/" className="form-link">
-                Back to sign in
+                {t("common.backToSignIn")}
               </Link>
             </div>
           </>
         ) : (
           <>
-            <p className="hint">
-              Enter your email address and we'll send you a link to reset your
-              password.
-            </p>
+            <p className="hint">{t("forgotPassword.hint")}</p>
             <form onSubmit={handleSubmit}>
               <label>
-                Email
+                {t("forgotPassword.emailLabel")}
                 <input
                   type="email"
                   value={email}
@@ -84,12 +82,12 @@ export function ForgotPassword() {
                 disabled={!email.trim() || busy}
                 className="cta-primary"
               >
-                {busy ? "Sending..." : "Send reset link"}
+                {busy ? t("forgotPassword.sending") : t("forgotPassword.submit")}
               </button>
             </form>
             <div className="form-links">
               <Link to="/" className="form-link">
-                Back to sign in
+                {t("common.backToSignIn")}
               </Link>
             </div>
           </>

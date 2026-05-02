@@ -1,17 +1,20 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { withTranslation, type WithTranslation } from "react-i18next";
 import { captureException } from "../sentry";
 
-type Props = {
+type OwnProps = {
   children: ReactNode;
   fallback?: (reset: () => void, error: Error) => ReactNode;
 };
+
+type Props = OwnProps & WithTranslation;
 
 type State = {
   hasError: boolean;
   error: Error | null;
 };
 
-export class ErrorBoundary extends Component<Props, State> {
+class ErrorBoundaryInner extends Component<Props, State> {
   state: State = { hasError: false, error: null };
 
   static getDerivedStateFromError(error: Error): State {
@@ -30,6 +33,7 @@ export class ErrorBoundary extends Component<Props, State> {
   };
 
   render(): ReactNode {
+    const { t } = this.props;
     if (this.state.hasError && this.state.error) {
       if (this.props.fallback) {
         return this.props.fallback(this.reset, this.state.error);
@@ -37,17 +41,14 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <div className="app" role="alert">
           <section className="panel">
-            <h2>Something went wrong</h2>
-            <p>
-              The app hit an unexpected error. You can try again, or reload the
-              page if the problem persists.
-            </p>
+            <h2>{t("errorBoundary.title")}</h2>
+            <p>{t("errorBoundary.message")}</p>
             <button
               type="button"
               className="cta-primary"
               onClick={this.reset}
             >
-              Try again
+              {t("errorBoundary.tryAgain")}
             </button>
           </section>
         </div>
@@ -58,4 +59,5 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 }
 
+export const ErrorBoundary = withTranslation()(ErrorBoundaryInner);
 export default ErrorBoundary;

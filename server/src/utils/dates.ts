@@ -40,3 +40,9 @@ export function getMonthRange(tz: string) {
   const end = start.endOf("month");
   return { start, end };
 }
+
+export function getYesterdayRange(tz: string) {
+  const start = DateTime.now().setZone(tz).minus({ days: 1 }).startOf("day");
+  const end = start.endOf("day");
+  return { start, end };
+}

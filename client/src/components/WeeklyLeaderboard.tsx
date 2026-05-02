@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { api } from "../api";
 import { getErrorMessage } from "../api";
 import type { WeeklyEntry } from "../types";
@@ -13,6 +14,7 @@ type Props = {
 };
 
 export function WeeklyLeaderboard({ challengeId, selectedChallenge }: Props) {
+  const { t } = useTranslation();
   const { week, setWeek } = useWeek();
   const weekYear = week.year;
   const weekNumber = week.week;
@@ -56,14 +58,14 @@ export function WeeklyLeaderboard({ challengeId, selectedChallenge }: Props) {
 
   return (
     <section className="panel">
-      <h2>Weekly Leaderboard</h2>
+      <h2>{t("weeklyLeaderboard.title")}</h2>
       {error && <p className="status status-error">{error}</p>}
       {!isLoading && biggest && (
         <div className="spotlight spotlight-improvement">
-          <span className="spotlight-label">Biggest improvement</span>
+          <span className="spotlight-label">{t("weeklyLeaderboard.biggestImprovement")}</span>
           <span className="spotlight-name">{biggest.name || biggest.email}</span>
           <span className="spotlight-steps">
-            +{biggest.delta.toLocaleString()} steps vs last week
+            {t("weeklyLeaderboard.vsLastWeek", { delta: biggest.delta.toLocaleString() })}
           </span>
         </div>
       )}
@@ -78,13 +80,13 @@ export function WeeklyLeaderboard({ challengeId, selectedChallenge }: Props) {
           <div className="skeleton skeleton-row" />
           <div className="skeleton skeleton-row" />
           <div className="skeleton skeleton-row" />
-          <p className="status">Loading weekly leaderboard...</p>
+          <p className="status">{t("common.loading")}</p>
         </div>
       ) : leaderboard.length === 0 ? (
         <div className="empty-state" role="status">
-          <p className="status">No weekly data yet for this selection.</p>
+          <p className="status">{t("weeklyLeaderboard.noEntries")}</p>
           <Link to="/submit" className="cta-primary" style={{ display: "inline-block" }}>
-            Log steps to appear here
+            {t("home.logSteps")}
           </Link>
         </div>
       ) : (
@@ -103,7 +105,7 @@ export function WeeklyLeaderboard({ challengeId, selectedChallenge }: Props) {
                 </span>
               </div>
               <div className="meta">
-                {entry.steps.toLocaleString()} steps
+                {entry.steps.toLocaleString()} {t("common.steps")}
                 {entry.delta !== 0 && (
                   <span className="delta">
                     {" "}({entry.delta > 0 ? "+" : ""}

@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import { z } from "zod";
 import { prisma } from "../prisma";
 import { config } from "../config";
+import { sessionCookieOptions } from "../cookies";
 import { authRequired, roleRequired, AuthenticatedRequest } from "../middleware/auth";
 import { Role } from "@prisma/client";
 
@@ -49,7 +50,7 @@ router.post("/", authRequired, roleRequired(Role.ADMIN), async (req: Authenticat
     { expiresIn: INVITE_EXPIRY }
   );
 
-  const baseUrl = config.appOrigin.replace(/\/$/, "");
+  const baseUrl = config.appOrigin;
   const inviteUrl = `${baseUrl}/invite?token=${token}`;
   res.json({ inviteUrl, expiresIn: INVITE_EXPIRY });
 });
@@ -138,12 +139,7 @@ router.get("/accept", async (req, res) => {
   });
 
   const sessionToken = jwt.sign({ sub: user.id, role: user.role }, config.jwtSecret, { expiresIn: "30d" });
-  res.cookie(config.cookieName, sessionToken, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    maxAge: 1000 * 60 * 60 * 24 * 30,
-  });
+  res.cookie(config.cookieName, sessionToken, sessionCookieOptions);
 
   res.json({
     user: { id: user.id, email: user.email, name: user.name, role: user.role },

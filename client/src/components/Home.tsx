@@ -45,9 +45,8 @@ function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
 const STREAK_MILESTONES = [7, 14, 21, 30, 60, 90];
 
 function HomeSkeleton() {
-  const { t } = useTranslation();
   return (
-    <div className="loading-skeleton" aria-label={t("home.loading")}>
+    <div className="loading-skeleton" aria-label="Loading summary">
       <div className="skeleton skeleton-title" />
       <div className="stats-grid stats-grid-skeleton">
         <div className="skeleton skeleton-card" />
@@ -79,7 +78,6 @@ function computeProgress(startDate: string, endDate: string, now: number): Progr
 }
 
 function ChallengeProgress({ challenge, now }: { challenge: Challenge; now: number }) {
-  const { t } = useTranslation();
   const progress = computeProgress(challenge.startDate, challenge.endDate, now);
 
   if (challenge.locked || progress.pct >= 100) return null;
@@ -90,19 +88,13 @@ function ChallengeProgress({ challenge, now }: { challenge: Challenge; now: numb
         <div className="challenge-progress-fill" style={{ width: `${progress.pct}%` }} />
       </div>
       <p className="challenge-progress-label">
-        {t("home.progress.label", {
-          elapsed: progress.elapsedDays,
-          total: progress.totalDays,
-          count: progress.remainingDays,
-        })}
+        Day {progress.elapsedDays} of {progress.totalDays} &mdash; {progress.remainingDays} day{progress.remainingDays === 1 ? "" : "s"} left
       </p>
     </div>
   );
 }
 
 function StreakToast({ days, onDismiss }: { days: number; onDismiss: () => void }) {
-  const { t } = useTranslation();
-
   useEffect(() => {
     const timer = setTimeout(onDismiss, 5000);
     return () => clearTimeout(timer);
@@ -113,14 +105,14 @@ function StreakToast({ days, onDismiss }: { days: number; onDismiss: () => void 
       <div className="streak-toast-inner">
         <IconFlame size={20} className="streak-toast-icon" />
         <div>
-          <strong className="streak-toast-title">{t("home.streak.title", { count: days })}</strong>
-          <span className="streak-toast-body">{t("home.streak.body")}</span>
+          <strong className="streak-toast-title">{days}-day streak!</strong>
+          <span className="streak-toast-body">You&apos;re on fire. Keep it up!</span>
         </div>
         <button
           type="button"
           className="streak-toast-close"
           onClick={onDismiss}
-          aria-label={t("home.streak.dismiss")}
+          aria-label="Dismiss"
         >
           &times;
         </button>
@@ -227,7 +219,10 @@ export function Home({
     try {
       const permission = await Notification.requestPermission();
       if (permission !== "granted") {
-        setPushStatus({ kind: "error", message: t("home.notifications.permissionDenied") });
+        setPushStatus({
+          kind: "error",
+          message: t("home.notifications.permissionDenied"),
+        });
         return;
       }
       const registration = await navigator.serviceWorker.ready;
@@ -243,9 +238,15 @@ export function Home({
           keys: json.keys,
         }),
       });
-      setPushStatus({ kind: "success", message: t("home.notifications.enabled") });
+      setPushStatus({
+        kind: "success",
+        message: t("home.notifications.enabled"),
+      });
     } catch (err) {
-      setPushStatus({ kind: "error", message: getErrorMessage(err) });
+      setPushStatus({
+        kind: "error",
+        message: getErrorMessage(err),
+      });
     } finally {
       setPushBusy(false);
     }
@@ -314,11 +315,11 @@ export function Home({
             className={`challenge-badge ${selectedChallenge.locked ? "locked" : "open"}`}
           >
             {selectedChallenge.name} &middot; {selectedChallenge.timezone} &middot;{" "}
-            {selectedChallenge.locked ? t("home.challenge.locked") : t("home.challenge.open")}
+            {selectedChallenge.locked ? t("common.locked") : t("common.open")}
           </span>
           {!selectedChallenge.locked && (
             <Link to="/submit" className="btn-primary-sm">
-              {t("home.logToday")}
+              {t("home.logSteps")}
             </Link>
           )}
         </div>
@@ -327,7 +328,7 @@ export function Home({
       {challengesLoading ? (
         <HomeSkeleton />
       ) : !challengeId ? (
-        <p className="status">{t("home.noChallenge")}</p>
+        <p className="status">{t("home.noChallenges")}</p>
       ) : isLoading ? (
         <HomeSkeleton />
       ) : error ? (
@@ -336,13 +337,13 @@ export function Home({
         <div className="stats-grid">
           <div className="stats-hero">
             <div className="card card-hero">
-              <h3><IconFootstep size={13} className="card-icon" /> {t("home.cards.today")}</h3>
-              <p>{summary.personalTotals.today.toLocaleString()} steps</p>
+              <h3><IconFootstep size={13} className="card-icon" /> {t("home.stats.today")}</h3>
+              <p>{summary.personalTotals.today.toLocaleString()} {t("common.steps")}</p>
             </div>
             <div className="card card-streak">
-              <h3><IconFlame size={13} className="card-icon" /> {t("home.cards.streak")}</h3>
+              <h3><IconFlame size={13} className="card-icon" /> {t("home.stats.streak")}</h3>
               <p>
-                {t("home.cards.streakCount", { count: summary.streak.currentDays })}
+                {t("home.stats.days", { count: summary.streak.currentDays })}
               </p>
             </div>
           </div>
@@ -350,53 +351,49 @@ export function Home({
             <div
               className="progress-ring"
               style={{ ["--value" as string]: summary.consistency.score }}
-              aria-label={t("home.cards.consistencyAriaLabel", {
-                score: summary.consistency.score,
-                activeDays: summary.consistency.activeDays,
-                elapsedDays: summary.consistency.elapsedDays,
-              })}
+              aria-label={`${t("home.stats.consistency")}: ${summary.consistency.score}%, ${t("home.stats.daysActive", { active: summary.consistency.activeDays, elapsed: summary.consistency.elapsedDays })}`}
             >
               <div className="progress-ring-inner">
                 {summary.consistency.score}%
               </div>
             </div>
             <div className="progress-ring-content">
-              <strong><IconTarget size={13} className="card-icon card-icon-inline" /> {t("home.cards.consistency")}</strong>
+              <strong><IconTarget size={13} className="card-icon card-icon-inline" /> {t("home.stats.consistency")}</strong>
               <span>
-                {t("home.cards.daysActive", {
-                  activeDays: summary.consistency.activeDays,
-                  elapsedDays: summary.consistency.elapsedDays,
+                {t("home.stats.daysActive", {
+                  active: summary.consistency.activeDays,
+                  elapsed: summary.consistency.elapsedDays,
                 })}
               </span>
             </div>
           </div>
           <div className="card">
-            <h3><IconCalendarWeek size={13} className="card-icon" /> {t("home.cards.week")}</h3>
-            <p>{summary.personalTotals.week.toLocaleString()} steps</p>
+            <h3><IconCalendarWeek size={13} className="card-icon" /> {t("home.stats.thisWeek")}</h3>
+            <p>{summary.personalTotals.week.toLocaleString()} {t("common.steps")}</p>
           </div>
           <div className="card">
-            <h3><IconCalendarMonth size={13} className="card-icon" /> {t("home.cards.month")}</h3>
-            <p>{summary.personalTotals.month.toLocaleString()} steps</p>
+            <h3><IconCalendarMonth size={13} className="card-icon" /> {t("home.stats.thisMonth")}</h3>
+            <p>{summary.personalTotals.month.toLocaleString()} {t("common.steps")}</p>
           </div>
           <div className="card">
-            <h3><IconTeam size={13} className="card-icon" /> {t("home.cards.teamTotal")}</h3>
+            <h3><IconTeam size={13} className="card-icon" /> {t("home.stats.teamTotal")}</h3>
             <p>
-              {summary.teamTotals.teamName || t("home.challenge.unassigned")} &middot;{" "}
-              {summary.teamTotals.total.toLocaleString()} steps
+              {summary.teamTotals.teamName || t("common.unassigned")} &middot;{" "}
+              {summary.teamTotals.total.toLocaleString()} {t("common.steps")}
             </p>
           </div>
           <div className="card">
-            <h3><IconTrophy size={13} className="card-icon" /> {t("home.cards.rank")}</h3>
+            <h3><IconTrophy size={13} className="card-icon" /> {t("home.stats.rank")}</h3>
             <p>{summary.rank ?? "—"}</p>
           </div>
           <div className="card">
-            <h3><IconArrowUp size={13} className="card-icon" /> {t("home.cards.gapToFirst")}</h3>
-            <p>{summary.gapToFirst.toLocaleString()} steps</p>
+            <h3><IconArrowUp size={13} className="card-icon" /> {t("home.stats.gapToFirst")}</h3>
+            <p>{summary.gapToFirst.toLocaleString()} {t("common.steps")}</p>
           </div>
         </div>
       ) : (
         <div className="empty-state" role="status">
-          <p className="status">{t("home.empty")}</p>
+          <p className="status">{t("home.emptyState")}</p>
           <Link to="/submit" className="btn-primary">
             {t("home.logSteps")}
           </Link>
@@ -408,7 +405,7 @@ export function Home({
           {t("home.notifications.dailyReminder")}
         </label>
         {pushKeyLoaded && (!pushSupported || pushKey === null) ? (
-          <p className="status">{t("home.notifications.unavailable")}</p>
+          <p className="status">{t("home.notifications.notAvailable")}</p>
         ) : pushKeyLoaded ? (
           <div>
             <button

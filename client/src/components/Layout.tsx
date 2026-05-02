@@ -1,4 +1,5 @@
 import { NavLink, Link, Outlet, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import type { User } from "../types";
 import type { Challenge } from "../types";
 import { TABS } from "../types";
@@ -21,6 +22,7 @@ export function Layout({
   onLogout,
   challengesLoading,
 }: Props) {
+  const { t } = useTranslation();
   const visibleTabs = TABS.filter((t) => t !== "Admin" || user.role === "ADMIN");
   const location = useLocation();
   const isOnSubmit = location.pathname === "/submit";
@@ -36,14 +38,14 @@ export function Layout({
   return (
     <div className="app">
       <a href="#main-content" className="skip-link">
-        Skip to main content
+        {t("common.skipToContent")}
       </a>
       <header className="topbar" role="banner" aria-label="Site header">
         <div className="topbar-brand">
           <StepSprintLogo size={26} />
           <div>
-            <h1>StepSprint</h1>
-            <p>Welcome, {user.name ?? user.email}</p>
+            <h1>{t("app.name")}</h1>
+            <p>{t("layout.welcome", { name: user.name ?? user.email })}</p>
           </div>
         </div>
         <div className="topbar-actions">
@@ -56,9 +58,11 @@ export function Layout({
             value={selectedChallengeId}
             onChange={(e) => onChallengeChange(e.target.value)}
             disabled={challengesLoading || challenges.length === 0}
-            aria-label="Select challenge"
+            aria-label={t("layout.selectChallenge")}
           >
-            {!challenges.length && <option value="">No challenges available</option>}
+            {!challenges.length && (
+              <option value="">{t("layout.noChallenges")}</option>
+            )}
             {challenges.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -66,7 +70,7 @@ export function Layout({
             ))}
           </select>
           <button onClick={onLogout} className="secondary">
-            Log out
+            {t("layout.logout")}
           </button>
         </div>
       </header>
@@ -79,7 +83,7 @@ export function Layout({
             className={({ isActive }) => (isActive ? "active" : "")}
             data-testid={`tab-${label.toLowerCase().replace(/\s+/g, "-")}`}
           >
-            {label}
+            {t(`layout.tabs.${label}`)}
           </NavLink>
         ))}
       </nav>

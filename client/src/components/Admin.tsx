@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { api } from "../api";
-import { getErrorMessage } from "../api";
+import { useTranslation } from "react-i18next";
+import { api, getApiUrl, getErrorMessage } from "../api";
 import { ConfirmDialog } from "./ConfirmDialog";
 import type { User } from "../types";
 import type { Challenge } from "../types";
@@ -23,6 +23,7 @@ export function Admin({
   weekYear,
   weekNumber,
 }: Props) {
+  const { t } = useTranslation();
   const [createForm, setCreateForm] = useState({
     name: "",
     startDate: "",
@@ -40,11 +41,18 @@ export function Admin({
   const [confirmTarget, setConfirmTarget] = useState<{ action: "edit" | "delete"; submission: Submission } | null>(null);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteUrl, setInviteUrl] = useState("");
+  const [inviteCopyOk, setInviteCopyOk] = useState(false);
   const [analytics, setAnalytics] = useState<{
     participationRate: number;
+    participantsWithSubmission: number;
+    participantCount: number;
     avgActiveDays: number;
     totalSubmissions: number;
     totalSteps: number;
+    neverLoggedCount: number;
+    dormantParticipantCount: number;
+    dormantLookbackDays: number;
+    submissionTrend: Array<{ date: string; submissionsCount: number }>;
   } | null>(null);
 
   useEffect(() => {
@@ -57,16 +65,25 @@ export function Admin({
 
   useEffect(() => {
     if (user.role !== "ADMIN" || !selectedChallengeId) return;
-    api<{ participationRate: number; avgActiveDays: number; totalSubmissions: number; totalSteps: number }>(
-      `/api/admin/analytics?challengeId=${selectedChallengeId}`
-    )
+    api<{
+      participationRate: number;
+      participantsWithSubmission: number;
+      participantCount: number;
+      avgActiveDays: number;
+      totalSubmissions: number;
+      totalSteps: number;
+      neverLoggedCount: number;
+      dormantParticipantCount: number;
+      dormantLookbackDays: number;
+      submissionTrend: Array<{ date: string; submissionsCount: number }>;
+    }>(`/api/admin/analytics?challengeId=${selectedChallengeId}`)
       .then(setAnalytics)
       .catch(() => setAnalytics(null));
   }, [user.role, selectedChallengeId]);
 
   async function handleCreateInvite() {
     if (!selectedChallengeId || !inviteEmail) {
-      showFeedback("error", "Select a challenge and enter email.");
+      showFeedback("error", t("admin.feedback.selectChallengeAndEmail"));
       return;
     }
     try {
@@ -75,9 +92,21 @@ export function Admin({
         body: JSON.stringify({ challengeId: selectedChallengeId, email: inviteEmail }),
       });
       setInviteUrl(data.inviteUrl);
-      showFeedback("success", "Invite link created. Share it with the participant.");
+      setInviteCopyOk(false);
+      showFeedback("success", t("admin.feedback.inviteCreated"));
     } catch (err) {
       showFeedback("error", getErrorMessage(err));
+    }
+  }
+
+  async function copyInviteLink() {
+    if (!inviteUrl) return;
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
+      setInviteCopyOk(true);
+      setTimeout(() => setInviteCopyOk(false), 2500);
+    } catch {
+      showFeedback("error", t("admin.invite.clipboardUnavailable"));
     }
   }
 
@@ -85,6 +114,11 @@ export function Admin({
     setFeedback({ type, message });
     setTimeout(() => setFeedback(null), 4000);
   }
+
+  const trendMax =
+    analytics && analytics.submissionTrend.length > 0
+      ? Math.max(...analytics.submissionTrend.map((r) => r.submissionsCount), 1)
+      : 1;
 
   async function handleCreateChallenge() {
     try {
@@ -94,7 +128,7 @@ export function Admin({
       });
       await onChallengesRefresh();
       setCreateForm({ name: "", startDate: "", endDate: "", timezone: "America/Chicago", teamSize: 4 });
-      showFeedback("success", "Challenge created.");
+      showFeedback("success", t("admin.feedback.challengeCreated"));
     } catch (err) {
       showFeedback("error", getErrorMessage(err));
     }
@@ -102,7 +136,7 @@ export function Admin({
 
   async function handleAddParticipants() {
     if (!selectedChallengeId) {
-      showFeedback("error", "Select a challenge first.");
+      showFeedback("error", t("admin.feedback.selectChallenge"));
       return;
     }
     try {
@@ -112,7 +146,7 @@ export function Admin({
         body: JSON.stringify({ emails }),
       });
       setParticipantEmails("");
-      showFeedback("success", `Added ${emails.length} participant(s).`);
+      showFeedback("success", t("admin.feedback.participantsAdded", { count: emails.length }));
     } catch (err) {
       showFeedback("error", getErrorMessage(err));
     }
@@ -120,7 +154,7 @@ export function Admin({
 
   async function handleAssignTeams() {
     if (!selectedChallengeId) {
-      showFeedback("error", "Select a challenge first.");
+      showFeedback("error", t("admin.feedback.selectChallenge"));
       return;
     }
     try {
@@ -128,7 +162,7 @@ export function Admin({
         method: "POST",
         body: JSON.stringify({ strategy: assignStrategy }),
       });
-      showFeedback("success", "Teams assigned.");
+      showFeedback("success", t("admin.feedback.teamsAssigned"));
     } catch (err) {
       showFeedback("error", getErrorMessage(err));
     }
@@ -136,7 +170,7 @@ export function Admin({
 
   async function handleLockChallenge(locked: boolean) {
     if (!selectedChallengeId) {
-      showFeedback("error", "Select a challenge first.");
+      showFeedback("error", t("admin.feedback.selectChallenge"));
       return;
     }
     try {
@@ -145,7 +179,7 @@ export function Admin({
         body: JSON.stringify({ locked }),
       });
       await onChallengesRefresh();
-      showFeedback("success", locked ? "Challenge locked." : "Challenge unlocked.");
+      showFeedback("success", locked ? t("admin.feedback.challengeLocked") : t("admin.feedback.challengeUnlocked"));
     } catch (err) {
       showFeedback("error", getErrorMessage(err));
     }
@@ -166,7 +200,7 @@ export function Admin({
       const url = `/api/admin/submissions?query=${encodeURIComponent(search)}${selectedChallengeId ? `&challengeId=${selectedChallengeId}` : ""}`;
       const data = await api<{ submissions: Submission[] }>(url);
       setSubmissions(data.submissions);
-      showFeedback("success", "Submission updated.");
+      showFeedback("success", t("admin.feedback.submissionUpdated"));
     } catch (err) {
       showFeedback("error", getErrorMessage(err));
     }
@@ -183,7 +217,7 @@ export function Admin({
       const url = `/api/admin/submissions?query=${encodeURIComponent(search)}${selectedChallengeId ? `&challengeId=${selectedChallengeId}` : ""}`;
       const data = await api<{ submissions: Submission[] }>(url);
       setSubmissions(data.submissions);
-      showFeedback("success", "Submission deleted.");
+      showFeedback("success", t("admin.feedback.submissionDeleted"));
     } catch (err) {
       showFeedback("error", getErrorMessage(err));
     }
@@ -192,18 +226,18 @@ export function Admin({
   if (user.role !== "ADMIN") {
     return (
       <section className="panel">
-        <h2>Admin console</h2>
-        <p>You do not have admin access.</p>
+        <h2>{t("admin.title")}</h2>
+        <p>{t("admin.noAccess")}</p>
       </section>
     );
   }
 
   return (
     <section className="panel">
-      <h2>Admin console</h2>
+      <h2>{t("admin.title")}</h2>
       {selectedChallenge && (
         <span className={`challenge-badge ${selectedChallenge.locked ? "locked" : "open"}`}>
-          {selectedChallenge.name} · Scoped to this challenge
+          {selectedChallenge.name} · {t("admin.scopedTo")}
         </span>
       )}
       {feedback && (
@@ -214,51 +248,68 @@ export function Admin({
 
       <div className="admin-grid">
         <div>
-          <h3>Challenge setup</h3>
-          <label>Name <input value={createForm.name} onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })} /></label>
-          <label>Start date <input type="date" value={createForm.startDate} onChange={(e) => setCreateForm({ ...createForm, startDate: e.target.value })} /></label>
-          <label>End date <input type="date" value={createForm.endDate} onChange={(e) => setCreateForm({ ...createForm, endDate: e.target.value })} /></label>
-          <label>Timezone <input value={createForm.timezone} onChange={(e) => setCreateForm({ ...createForm, timezone: e.target.value })} /></label>
-          <label>Team size <input type="number" value={createForm.teamSize} onChange={(e) => setCreateForm({ ...createForm, teamSize: Number(e.target.value) })} /></label>
-          <button onClick={handleCreateChallenge}>Create challenge</button>
+          <h3>{t("admin.sections.challengeSetup")}</h3>
+          <label>{t("admin.fields.name")} <input value={createForm.name} onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })} /></label>
+          <label>{t("admin.fields.startDate")} <input type="date" value={createForm.startDate} onChange={(e) => setCreateForm({ ...createForm, startDate: e.target.value })} /></label>
+          <label>{t("admin.fields.endDate")} <input type="date" value={createForm.endDate} onChange={(e) => setCreateForm({ ...createForm, endDate: e.target.value })} /></label>
+          <label>{t("admin.fields.timezone")} <input value={createForm.timezone} onChange={(e) => setCreateForm({ ...createForm, timezone: e.target.value })} /></label>
+          <label>{t("admin.fields.teamSize")} <input type="number" value={createForm.teamSize} onChange={(e) => setCreateForm({ ...createForm, teamSize: Number(e.target.value) })} /></label>
+          <button onClick={handleCreateChallenge}>{t("admin.actions.createChallenge")}</button>
         </div>
 
         <div>
-          <h3>Participants <span className="admin-scope">({selectedChallengeId ? selectedChallenge?.name ?? "Challenge" : "Select a challenge"})</span></h3>
-          <label>Emails (comma separated)<textarea value={participantEmails} onChange={(e) => setParticipantEmails(e.target.value)} /></label>
-          <button onClick={handleAddParticipants} disabled={!selectedChallengeId}>Add participants</button>
-          <h3>Team assignment</h3>
-          <label>Strategy <select value={assignStrategy} onChange={(e) => setAssignStrategy(e.target.value as "random" | "snake")}><option value="random">Random</option><option value="snake">Snake draft</option></select></label>
-          <button onClick={() => handleAssignTeams()} disabled={!selectedChallengeId}>Assign teams</button>
+          <h3>
+            {t("admin.sections.participants")}{" "}
+            <span className="admin-scope">
+              ({selectedChallengeId ? selectedChallenge?.name ?? t("admin.scope.selectPrompt") : t("admin.scope.selectPrompt")})
+            </span>
+          </h3>
+          <label>{t("admin.fields.emails")}<textarea value={participantEmails} onChange={(e) => setParticipantEmails(e.target.value)} /></label>
+          <button onClick={handleAddParticipants} disabled={!selectedChallengeId}>{t("admin.actions.addParticipants")}</button>
+          <h3>{t("admin.sections.teamAssignment")}</h3>
+          <label>
+            {t("admin.fields.strategy")}{" "}
+            <select value={assignStrategy} onChange={(e) => setAssignStrategy(e.target.value as "random" | "snake")}>
+              <option value="random">{t("admin.strategies.random")}</option>
+              <option value="snake">{t("admin.strategies.snake")}</option>
+            </select>
+          </label>
+          <button onClick={() => handleAssignTeams()} disabled={!selectedChallengeId}>{t("admin.actions.assignTeams")}</button>
           <div className="row">
-            <button onClick={() => handleLockChallenge(true)} className="secondary" disabled={!selectedChallengeId}>Lock challenge</button>
-            <button onClick={() => handleLockChallenge(false)} className="secondary" disabled={!selectedChallengeId}>Unlock challenge</button>
+            <button onClick={() => handleLockChallenge(true)} className="secondary" disabled={!selectedChallengeId}>{t("admin.actions.lockChallenge")}</button>
+            <button onClick={() => handleLockChallenge(false)} className="secondary" disabled={!selectedChallengeId}>{t("admin.actions.unlockChallenge")}</button>
           </div>
         </div>
 
         <div>
-          <h3>Moderation <span className="admin-scope">({selectedChallengeId ? "this challenge" : "all"})</span></h3>
-          <label>Search <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="email or name" /></label>
-          <label>Reason (required) <input value={reason} onChange={(e) => setReason(e.target.value)} /></label>
-          <label>Edit steps (optional) <input type="number" value={editSteps} onChange={(e) => setEditSteps(e.target.value === "" ? "" : Number(e.target.value))} /></label>
+          <h3>
+            {t("admin.sections.moderation")}{" "}
+            <span className="admin-scope">
+              ({selectedChallengeId ? t("admin.scope.thisChallenge") : t("admin.scope.all")})
+            </span>
+          </h3>
+          <label>{t("admin.fields.search")} <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("admin.fields.searchPlaceholder")} /></label>
+          <label>{t("admin.fields.reason")} <input value={reason} onChange={(e) => setReason(e.target.value)} /></label>
+          <label>{t("admin.fields.editSteps")} <input type="number" value={editSteps} onChange={(e) => setEditSteps(e.target.value === "" ? "" : Number(e.target.value))} /></label>
           <div className="list">
             {submissions.map((sub) => (
               <div key={sub.id} className="list-row">
                 <div>
-                  {sub.user.name ?? sub.user.email} · {sub.date.slice(0, 10)} · {sub.steps} steps {sub.isFlagged ? "(flagged)" : ""}
+                  {sub.user.name ?? sub.user.email} · {sub.date.slice(0, 10)} · {sub.steps} {t("common.steps")}{" "}
+                  {sub.isFlagged ? t("admin.submission.flagged") : ""}
                 </div>
                 <div className="row">
                   <button
                     onClick={() => reason && setConfirmTarget({ action: "edit", submission: sub })}
                     disabled={!reason}
                   >
-                    Edit
+                    {t("admin.actions.edit")}
                   </button>
                   <button
                     onClick={() => reason && setConfirmTarget({ action: "delete", submission: sub })}
                     disabled={!reason}
                   >
-                    Delete
+                    {t("admin.actions.delete")}
                   </button>
                 </div>
               </div>
@@ -267,47 +318,126 @@ export function Admin({
         </div>
 
         <div>
-          <h3>Invite participant</h3>
-          <label>Email <input type="email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="participant@example.com" /></label>
-          <button onClick={handleCreateInvite} disabled={!selectedChallengeId || !inviteEmail}>Create invite link</button>
+          <h3>{t("admin.sections.inviteParticipant")}</h3>
+          <label>
+            {t("admin.fields.email")}{" "}
+            <input
+              type="email"
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+              placeholder={t("admin.fields.emailPlaceholder")}
+            />
+          </label>
+          <button onClick={handleCreateInvite} disabled={!selectedChallengeId || !inviteEmail}>
+            {t("admin.actions.createInviteLink")}
+          </button>
           {inviteUrl && (
             <div className="invite-url">
-              <label>Share this link:</label>
-              <input type="text" readOnly value={inviteUrl} onClick={(e) => (e.target as HTMLInputElement).select()} />
+              <label>{t("admin.invite.shareLink")}</label>
+              <div className="invite-url-row">
+                <input type="text" readOnly value={inviteUrl} onClick={(e) => (e.target as HTMLInputElement).select()} />
+                <button type="button" className="secondary" onClick={() => void copyInviteLink()}>
+                  {inviteCopyOk ? t("admin.invite.copied") : t("admin.invite.copy")}
+                </button>
+              </div>
+              <p className="hint invite-hint">{t("admin.invite.hintExpiry")}</p>
             </div>
           )}
 
-          <h3>Analytics</h3>
+          <h3>{t("admin.sections.analytics")}</h3>
           {analytics && selectedChallengeId ? (
-            <div className="analytics-stats">
-              <span>Participation: {analytics.participationRate}%</span>
-              <span>Avg active days: {analytics.avgActiveDays}</span>
-              <span>Total submissions: {analytics.totalSubmissions}</span>
-              <span>Total steps: {analytics.totalSteps.toLocaleString()}</span>
+            <div className="analytics-dashboard">
+              <div className="analytics-stats">
+                <span>{t("admin.analytics.participation", { rate: analytics.participationRate })}</span>
+                <span>{t("admin.analytics.avgActiveDays", { days: analytics.avgActiveDays })}</span>
+                <span>{t("admin.analytics.totalSubmissions", { count: analytics.totalSubmissions })}</span>
+                <span>{t("admin.analytics.totalSteps", { steps: analytics.totalSteps.toLocaleString() })}</span>
+                <span>
+                  {t("admin.analytics.neverLogged", {
+                    never: analytics.neverLoggedCount,
+                    total: analytics.participantCount,
+                  })}
+                </span>
+                <span>
+                  {t("admin.analytics.dormant", {
+                    dormant: analytics.dormantParticipantCount,
+                    days: analytics.dormantLookbackDays,
+                  })}
+                </span>
+              </div>
+              <p className="analytics-chart-title">{t("admin.analytics.submissionsTrend")}</p>
+              <div className="analytics-chart" aria-label={t("admin.analytics.trendAria")}>
+                {analytics.submissionTrend.length === 0 ? (
+                  <p className="hint analytics-empty">{t("admin.analytics.emptyTrend")}</p>
+                ) : (
+                  analytics.submissionTrend.map((row) => (
+                    <div key={row.date} className="analytics-bar-wrap" title={`${row.date}: ${row.submissionsCount}`}>
+                      <div
+                        className="analytics-bar"
+                        style={{ height: `${Math.max(4, Math.round((row.submissionsCount / trendMax) * 48))}px` }}
+                      />
+                      <span className="analytics-bar-label">{row.date.slice(5)}</span>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           ) : (
-            <p className="hint">Select a challenge to view analytics.</p>
+            <p className="hint">{t("admin.analytics.selectChallenge")}</p>
           )}
 
-          <h3>Exports</h3>
-          <p className="hint">CSV exports open in a new tab. You must be logged in; your session cookie is sent automatically.</p>
-          <div className="list">
-            <a href={`/api/admin/export/submissions?challengeId=${selectedChallengeId || ""}`} target="_blank" rel="noreferrer">Export submissions CSV</a>
-            <a href={`/api/admin/export/teams?challengeId=${selectedChallengeId || ""}`} target="_blank" rel="noreferrer">Export team leaderboard CSV</a>
-            <a href={`/api/admin/export/weekly?challengeId=${selectedChallengeId || ""}&weekYear=${weekYear}&weekNumber=${weekNumber}`} target="_blank" rel="noreferrer">Export weekly leaderboard CSV</a>
+          <h3>{t("admin.sections.exports")}</h3>
+          <p className="hint">{t("admin.exports.hint")}</p>
+          <div className="list export-links">
+            {selectedChallengeId ? (
+              <>
+                <a
+                  href={getApiUrl(`/api/admin/export/submissions?challengeId=${encodeURIComponent(selectedChallengeId)}`)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {t("admin.exports.submissions")}
+                </a>
+                <a
+                  href={getApiUrl(`/api/admin/export/teams?challengeId=${encodeURIComponent(selectedChallengeId)}`)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {t("admin.exports.teams")}
+                </a>
+                <a
+                  href={getApiUrl(
+                    `/api/admin/export/weekly?challengeId=${encodeURIComponent(selectedChallengeId)}&weekYear=${weekYear}&weekNumber=${weekNumber}`
+                  )}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {t("admin.exports.weekly")}
+                </a>
+              </>
+            ) : (
+              <span className="hint">{t("admin.exports.selectChallengeFirstLink")}</span>
+            )}
           </div>
         </div>
       </div>
       {confirmTarget && (
         <ConfirmDialog
           open={!!confirmTarget}
-          title={confirmTarget.action === "delete" ? "Delete submission?" : "Edit submission?"}
+          title={confirmTarget.action === "delete" ? t("admin.confirm.deleteTitle") : t("admin.confirm.editTitle")}
           message={
             confirmTarget.action === "delete"
-              ? `Are you sure you want to delete this submission? (${confirmTarget.submission.user.name ?? confirmTarget.submission.user.email} · ${confirmTarget.submission.date.slice(0, 10)} · ${confirmTarget.submission.steps} steps) This cannot be undone.`
-              : `Edit steps for ${confirmTarget.submission.user.name ?? confirmTarget.submission.user.email} on ${confirmTarget.submission.date.slice(0, 10)}?`
+              ? t("admin.confirm.deleteMessage", {
+                  user: confirmTarget.submission.user.name ?? confirmTarget.submission.user.email,
+                  date: confirmTarget.submission.date.slice(0, 10),
+                  steps: confirmTarget.submission.steps,
+                })
+              : t("admin.confirm.editMessage", {
+                  user: confirmTarget.submission.user.name ?? confirmTarget.submission.user.email,
+                  date: confirmTarget.submission.date.slice(0, 10),
+                })
           }
-          confirmLabel={confirmTarget.action === "delete" ? "Delete" : "Save"}
+          confirmLabel={confirmTarget.action === "delete" ? t("admin.confirm.delete") : t("admin.confirm.save")}
           variant={confirmTarget.action === "delete" ? "danger" : "default"}
           onConfirm={() => {
             if (confirmTarget.action === "edit") executeEditSubmission(confirmTarget.submission.id);

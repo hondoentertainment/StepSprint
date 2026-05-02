@@ -34,13 +34,12 @@ services:
           property: connectionString
       - key: JWT_SECRET
         generateValue: true
-      # The Vercel client URL — used for CORS and OAuth redirect validation.
+      # The Vercel client URL — used for CORS and SPA redirects after OAuth.
       # Update this value if you use a custom domain on Vercel.
       - key: APP_ORIGIN
         value: https://step-sprint.vercel.app
-      # Public URL of this API — used for OAuth callback URIs registered in
-      # Fitbit / Google developer consoles.
-      - key: SERVER_URL
+      # Public URL of this Render service — required for OAuth redirect_uri (Fitbit / Google Fit).
+      - key: API_PUBLIC_ORIGIN
         value: https://stepsprint-api.onrender.com
       # Email (transactional — required for password reset and email verification).
       # Set RESEND_API_KEY to your Resend API key (resend.com).

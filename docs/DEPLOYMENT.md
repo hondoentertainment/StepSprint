@@ -7,7 +7,7 @@ StepSprint runs as two services:
 | React SPA (client) | Vercel | `https://step-sprint.vercel.app` |
 | Express API (server) | Render | `https://stepsprint-api.onrender.com` |
 
-Both URLs are already wired in `vercel.json` and `render.yaml` — no manual URL configuration is needed unless you use a custom domain.
+URLs are pinned in `vercel.json`, `render.yaml`, and **`API_PUBLIC_ORIGIN`** — update **both** `APP_ORIGIN` and `API_PUBLIC_ORIGIN` if you put the SPA or API behind custom domains, and rewrite OAuth callbacks in Fitbit/Google consoles to match **`API_PUBLIC_ORIGIN`** (not the SPA hostname).
 
 ---
 
@@ -22,6 +22,7 @@ Both URLs are already wired in `vercel.json` and `render.yaml` — no manual URL
    - `JWT_SECRET` — auto-generated
    - `DATABASE_URL` — wired from `stepsprint-db`
    - `APP_ORIGIN` — pre-filled as `https://step-sprint.vercel.app`
+   - `API_PUBLIC_ORIGIN` — public URL of **this Render web service**
    - `PORT=3001`, `NODE_ENV=production`
 
 3. After the blueprint provisions, set the required env vars in **Render dashboard → stepsprint-api → Environment**:
@@ -113,7 +114,8 @@ In the Vercel dashboard → set `VITE_POSTHOG_KEY` (and optionally `VITE_POSTHOG
 | `PORT` | `render.yaml` | Yes | `3001` |
 | `DATABASE_URL` | Render (auto) | Yes | PostgreSQL connection string |
 | `JWT_SECRET` | Render (auto) | Yes | Random 64-char secret |
-| `APP_ORIGIN` | `render.yaml` | Yes | `https://step-sprint.vercel.app` |
+| `APP_ORIGIN` | `render.yaml` | Yes | Vercel SPA origin (default `https://step-sprint.vercel.app`) — used for **CORS** and **browser redirects after OAuth**. |
+| `API_PUBLIC_ORIGIN` | `render.yaml` | Yes (split hosting) | Public origin where **this** API is hosted (Render URL). OAuth `redirect_uri` must pin here (`https://stepsprint-api.onrender.com`). Omit only for same-origin / local Vite-proxy setups — then it mirrors `APP_ORIGIN`. |
 | `RESEND_API_KEY` | Manual | **Yes** | Resend API key for transactional email |
 | `SMTP_FROM` | Manual | **Yes** | Email sender address |
 | `ADMIN_PASSWORD` | Manual | First deploy | Seed admin password |
@@ -125,6 +127,7 @@ In the Vercel dashboard → set `VITE_POSTHOG_KEY` (and optionally `VITE_POSTHOG
 | `FITBIT_CLIENT_SECRET` | Manual | No | Fitbit OAuth app secret |
 | `GOOGLE_CLIENT_ID` | Manual | No | Google OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | Manual | No | Google OAuth client secret |
+| `REMINDER_NOTIFICATION_HOUR_LOCAL` | Manual | No | Local hour per challenge TZ when opt-in reminders are evaluated (`0`-`23`; default `17`). Server runs checks hourly; see `scheduler` service |
 
 ### Client (Vercel)
 
@@ -145,11 +148,16 @@ git clone <repo>
 cd StepSprint
 npm install          # installs root + both workspaces
 
-# Database setup (SQLite)
+# Database setup — SQLite (default)
 cd server
-cp ../.env.example .env   # edit JWT_SECRET at minimum
+cp ../.env.example .env   # edit JWT_SECRET at minimum (+ API_PUBLIC_ORIGIN if testing OAuth locally without proxy)
 npm run db:migrate
 npm run db:seed
+
+# Optional Postgres parity (Docker) — repo root `docker-compose.yml`:
+# docker compose up -d
+# Then point DATABASE_URL at postgresql://stepsprint:stepsprint@localhost:5432/stepsprint
+# and follow `Dockerfile`/Postgres schema instructions for production parity.
 
 # Run both servers
 cd ..
@@ -170,6 +178,7 @@ All seed users have `emailVerified: true` so the email verification gate doesn't
 - **Prod DB**: PostgreSQL. The Dockerfile copies `schema.postgresql.prisma` over `schema.prisma` and replaces `migrations/` with `migrations_postgres/` before running `prisma migrate deploy`. Safe on re-deploy — only pending migrations are applied.
 - **Email verification**: new self-registered users must verify their email before logging in. Admin-added participants and invite-accepted users are pre-verified (the invite itself is the trust signal).
 - **JWT revocation**: each user has a `tokenVersion` counter embedded in their JWT. Logout, password change, and password reset all increment it, immediately invalidating all outstanding tokens on other devices.
+- **HTTPS split hosting**: SPA and API live on **different origins**. Production session cookies and CSRF pairing use **`SameSite=None`** + **`Secure`** so authenticated `credentials: include` fetch calls succeed from `APP_ORIGIN` to `API_PUBLIC_ORIGIN`.
 - **CSRF protection**: double-submit cookie pattern (production only). Bearer token requests (iOS Shortcuts / OAuth flows) bypass CSRF.
 - **Rate limiting**: production-only for general/API limiters. Login endpoint is limited to 10 attempts / 15 min per IP.
 - **CSP**: strict policy on all API routes (`script-src 'self'`); relaxed only for `/api/docs` and `/api/openapi.json` to accommodate Swagger UI assets from cdn.jsdelivr.net.
