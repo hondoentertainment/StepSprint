@@ -6,6 +6,7 @@ import { prisma } from "../prisma";
 import { authRequired, AuthenticatedRequest } from "../middleware/auth";
 import { toDateOnly, toJsDate } from "../utils/dates";
 import { logger } from "../logger";
+import { config } from "../config";
 import { integrationSyncLimiter } from "../middleware/rateLimit";
 
 const MAX_TOKENS_PER_USER = 10;
@@ -54,15 +55,51 @@ async function resolveTokenUser(plain: string) {
 // Fitness provider status
 // ---------------------------------------------------------------------------
 
-router.get("/fitness", authRequired, async (_req: AuthenticatedRequest, res) => {
+router.get("/fitness", authRequired, async (req: AuthenticatedRequest, res) => {
+  if (!req.user) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+
+  const fitbitAvail = Boolean(config.oauth.fitbitClientId && config.oauth.fitbitClientSecret);
+  const googleAvail = Boolean(config.oauth.googleClientId && config.oauth.googleClientSecret);
+
+  const [tokenCount, oauthConnections] = await Promise.all([
+    prisma.integrationToken.count({ where: { userId: req.user.id } }),
+    prisma.oAuthConnection.findMany({
+      where: { userId: req.user.id },
+      select: { provider: true },
+    }),
+  ]);
+
+  const oauthSet = new Set(oauthConnections.map((c) => c.provider));
+
   res.json({
-    connected: false,
+    connected: tokenCount > 0 || oauthConnections.length > 0,
     providers: [
-      { id: "apple_health", name: "Apple Health / Apple Watch", available: true },
-      { id: "google_fit", name: "Google Fit", available: false },
-      { id: "fitbit", name: "Fitbit", available: false },
+      {
+        id: "apple_health",
+        name: "Apple Health / Apple Watch",
+        available: true,
+        connected: tokenCount > 0,
+      },
+      {
+        id: "google_fit",
+        name: "Google Fit",
+        available: googleAvail,
+        connected: oauthSet.has("google_fit"),
+      },
+      {
+        id: "fitbit",
+        name: "Fitbit",
+        available: fitbitAvail,
+        connected: oauthSet.has("fitbit"),
+      },
     ],
-    message: "Use an API token to sync Apple Watch steps via iOS Shortcuts.",
+    message:
+      googleAvail || fitbitAvail
+        ? "Use OAuth for Fitbit or Google Fit when enabled on the server; use an API token for Apple Watch via iOS Shortcuts."
+        : "Use an API token to sync Apple Watch steps via iOS Shortcuts. OAuth providers appear when Fitbit/Google env vars are set.",
   });
 });
 

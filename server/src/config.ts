@@ -20,6 +20,9 @@ const envSchema = z.object({
   SMTP_FROM: z.string().optional(),
   SENTRY_DSN: z.string().optional(),
   NODE_ENV: z.string().optional(),
+  /** Public origin of this API (e.g. Render URL). Used for OAuth redirect_uri when the SPA runs on another origin. Defaults to APP_ORIGIN (same-origin / Vite proxy). */
+  API_PUBLIC_ORIGIN: z.string().optional(),
+  REMINDER_NOTIFICATION_HOUR_LOCAL: z.coerce.number().int().min(0).max(23).optional(),
   VAPID_PUBLIC_KEY: z.string().optional(),
   VAPID_PRIVATE_KEY: z.string().optional(),
   VAPID_SUBJECT: z.string().optional(),
@@ -41,7 +44,10 @@ export const config = {
   port: Number(parsed.data.PORT ?? "3001"),
   databaseUrl: parsed.data.DATABASE_URL,
   jwtSecret: parsed.data.JWT_SECRET,
-  appOrigin: parsed.data.APP_ORIGIN,
+  appOrigin: parsed.data.APP_ORIGIN.replace(/\/$/, ""),
+  /** Canonical base URL where this Express app is reachable (trailing slashes stripped). OAuth callbacks must use this in production split-hosting. */
+  apiPublicOrigin:
+    (parsed.data.API_PUBLIC_ORIGIN ?? parsed.data.APP_ORIGIN).replace(/\/$/, ""),
   defaultChallengeTz: parsed.data.DEFAULT_CHALLENGE_TZ,
   cookieName: "stepsprint_session",
   sentryDsn: parsed.data.SENTRY_DSN,
@@ -68,4 +74,7 @@ export const config = {
     googleClientId: parsed.data.GOOGLE_CLIENT_ID,
     googleClientSecret: parsed.data.GOOGLE_CLIENT_SECRET,
   },
+  reminderNotificationHourLocal:
+    parsed.data.REMINDER_NOTIFICATION_HOUR_LOCAL ?? 17,
+  emailTransportConfigured: Boolean(parsed.data.RESEND_API_KEY || parsed.data.SMTP_HOST),
 };

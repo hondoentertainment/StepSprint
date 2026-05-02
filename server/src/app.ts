@@ -124,7 +124,8 @@ const { generateCsrfToken, doubleCsrfProtection } = doubleCsrf({
     (req.cookies?.["stepsprint.csrf"] as string | undefined) ?? req.ip ?? "anon",
   cookieName: "stepsprint.csrf",
   cookieOptions: {
-    sameSite: "lax",
+    // Match session cookies so split-hosting (Vercel + Render) receives the CSRF pair.
+    sameSite: isProduction ? ("none" as const) : "lax",
     httpOnly: true,
     secure: isProduction,
     path: "/",

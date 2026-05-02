@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { api } from "../api";
-import { getErrorMessage } from "../api";
+import { api, getApiUrl, getErrorMessage } from "../api";
 import { ConfirmDialog } from "./ConfirmDialog";
 import type { User } from "../types";
 import type { Challenge } from "../types";
@@ -42,11 +41,18 @@ export function Admin({
   const [confirmTarget, setConfirmTarget] = useState<{ action: "edit" | "delete"; submission: Submission } | null>(null);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteUrl, setInviteUrl] = useState("");
+  const [inviteCopyOk, setInviteCopyOk] = useState(false);
   const [analytics, setAnalytics] = useState<{
     participationRate: number;
+    participantsWithSubmission: number;
+    participantCount: number;
     avgActiveDays: number;
     totalSubmissions: number;
     totalSteps: number;
+    neverLoggedCount: number;
+    dormantParticipantCount: number;
+    dormantLookbackDays: number;
+    submissionTrend: Array<{ date: string; submissionsCount: number }>;
   } | null>(null);
 
   useEffect(() => {
@@ -59,9 +65,18 @@ export function Admin({
 
   useEffect(() => {
     if (user.role !== "ADMIN" || !selectedChallengeId) return;
-    api<{ participationRate: number; avgActiveDays: number; totalSubmissions: number; totalSteps: number }>(
-      `/api/admin/analytics?challengeId=${selectedChallengeId}`
-    )
+    api<{
+      participationRate: number;
+      participantsWithSubmission: number;
+      participantCount: number;
+      avgActiveDays: number;
+      totalSubmissions: number;
+      totalSteps: number;
+      neverLoggedCount: number;
+      dormantParticipantCount: number;
+      dormantLookbackDays: number;
+      submissionTrend: Array<{ date: string; submissionsCount: number }>;
+    }>(`/api/admin/analytics?challengeId=${selectedChallengeId}`)
       .then(setAnalytics)
       .catch(() => setAnalytics(null));
   }, [user.role, selectedChallengeId]);
@@ -77,9 +92,21 @@ export function Admin({
         body: JSON.stringify({ challengeId: selectedChallengeId, email: inviteEmail }),
       });
       setInviteUrl(data.inviteUrl);
+      setInviteCopyOk(false);
       showFeedback("success", t("admin.feedback.inviteCreated"));
     } catch (err) {
       showFeedback("error", getErrorMessage(err));
+    }
+  }
+
+  async function copyInviteLink() {
+    if (!inviteUrl) return;
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
+      setInviteCopyOk(true);
+      setTimeout(() => setInviteCopyOk(false), 2500);
+    } catch {
+      showFeedback("error", t("admin.invite.clipboardUnavailable"));
     }
   }
 
@@ -87,6 +114,11 @@ export function Admin({
     setFeedback({ type, message });
     setTimeout(() => setFeedback(null), 4000);
   }
+
+  const trendMax =
+    analytics && analytics.submissionTrend.length > 0
+      ? Math.max(...analytics.submissionTrend.map((r) => r.submissionsCount), 1)
+      : 1;
 
   async function handleCreateChallenge() {
     try {
@@ -302,17 +334,53 @@ export function Admin({
           {inviteUrl && (
             <div className="invite-url">
               <label>{t("admin.invite.shareLink")}</label>
-              <input type="text" readOnly value={inviteUrl} onClick={(e) => (e.target as HTMLInputElement).select()} />
+              <div className="invite-url-row">
+                <input type="text" readOnly value={inviteUrl} onClick={(e) => (e.target as HTMLInputElement).select()} />
+                <button type="button" className="secondary" onClick={() => void copyInviteLink()}>
+                  {inviteCopyOk ? t("admin.invite.copied") : t("admin.invite.copy")}
+                </button>
+              </div>
+              <p className="hint invite-hint">{t("admin.invite.hintExpiry")}</p>
             </div>
           )}
 
           <h3>{t("admin.sections.analytics")}</h3>
           {analytics && selectedChallengeId ? (
-            <div className="analytics-stats">
-              <span>{t("admin.analytics.participation", { rate: analytics.participationRate })}</span>
-              <span>{t("admin.analytics.avgActiveDays", { days: analytics.avgActiveDays })}</span>
-              <span>{t("admin.analytics.totalSubmissions", { count: analytics.totalSubmissions })}</span>
-              <span>{t("admin.analytics.totalSteps", { steps: analytics.totalSteps.toLocaleString() })}</span>
+            <div className="analytics-dashboard">
+              <div className="analytics-stats">
+                <span>{t("admin.analytics.participation", { rate: analytics.participationRate })}</span>
+                <span>{t("admin.analytics.avgActiveDays", { days: analytics.avgActiveDays })}</span>
+                <span>{t("admin.analytics.totalSubmissions", { count: analytics.totalSubmissions })}</span>
+                <span>{t("admin.analytics.totalSteps", { steps: analytics.totalSteps.toLocaleString() })}</span>
+                <span>
+                  {t("admin.analytics.neverLogged", {
+                    never: analytics.neverLoggedCount,
+                    total: analytics.participantCount,
+                  })}
+                </span>
+                <span>
+                  {t("admin.analytics.dormant", {
+                    dormant: analytics.dormantParticipantCount,
+                    days: analytics.dormantLookbackDays,
+                  })}
+                </span>
+              </div>
+              <p className="analytics-chart-title">{t("admin.analytics.submissionsTrend")}</p>
+              <div className="analytics-chart" aria-label={t("admin.analytics.trendAria")}>
+                {analytics.submissionTrend.length === 0 ? (
+                  <p className="hint analytics-empty">{t("admin.analytics.emptyTrend")}</p>
+                ) : (
+                  analytics.submissionTrend.map((row) => (
+                    <div key={row.date} className="analytics-bar-wrap" title={`${row.date}: ${row.submissionsCount}`}>
+                      <div
+                        className="analytics-bar"
+                        style={{ height: `${Math.max(4, Math.round((row.submissionsCount / trendMax) * 48))}px` }}
+                      />
+                      <span className="analytics-bar-label">{row.date.slice(5)}</span>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           ) : (
             <p className="hint">{t("admin.analytics.selectChallenge")}</p>
@@ -320,10 +388,36 @@ export function Admin({
 
           <h3>{t("admin.sections.exports")}</h3>
           <p className="hint">{t("admin.exports.hint")}</p>
-          <div className="list">
-            <a href={`/api/admin/export/submissions?challengeId=${selectedChallengeId || ""}`} target="_blank" rel="noreferrer">{t("admin.exports.submissions")}</a>
-            <a href={`/api/admin/export/teams?challengeId=${selectedChallengeId || ""}`} target="_blank" rel="noreferrer">{t("admin.exports.teams")}</a>
-            <a href={`/api/admin/export/weekly?challengeId=${selectedChallengeId || ""}&weekYear=${weekYear}&weekNumber=${weekNumber}`} target="_blank" rel="noreferrer">{t("admin.exports.weekly")}</a>
+          <div className="list export-links">
+            {selectedChallengeId ? (
+              <>
+                <a
+                  href={getApiUrl(`/api/admin/export/submissions?challengeId=${encodeURIComponent(selectedChallengeId)}`)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {t("admin.exports.submissions")}
+                </a>
+                <a
+                  href={getApiUrl(`/api/admin/export/teams?challengeId=${encodeURIComponent(selectedChallengeId)}`)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {t("admin.exports.teams")}
+                </a>
+                <a
+                  href={getApiUrl(
+                    `/api/admin/export/weekly?challengeId=${encodeURIComponent(selectedChallengeId)}&weekYear=${weekYear}&weekNumber=${weekNumber}`
+                  )}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {t("admin.exports.weekly")}
+                </a>
+              </>
+            ) : (
+              <span className="hint">{t("admin.exports.selectChallengeFirstLink")}</span>
+            )}
           </div>
         </div>
       </div>

@@ -17,15 +17,9 @@ import {
   verifyResetToken,
 } from "../utils/resetToken";
 import { sendEmail } from "../services/email";
+import { sessionCookieClearOptions, sessionCookieOptions } from "../cookies";
 
 const router = Router();
-
-const cookieOptions = {
-  httpOnly: true,
-  sameSite: "lax" as const,
-  secure: process.env.NODE_ENV === "production",
-  maxAge: 1000 * 60 * 60 * 24 * 30, // 30 days
-};
 
 function issueSession(userId: string, role: string, tokenVersion: number) {
   return jwt.sign({ sub: userId, role, ver: tokenVersion }, config.jwtSecret, {
@@ -121,7 +115,7 @@ router.post("/login", ...(isProduction ? [loginLimiter] : []), async (req, res) 
   }
 
   const token = issueSession(user.id, user.role, user.tokenVersion);
-  res.cookie(config.cookieName, token, cookieOptions);
+  res.cookie(config.cookieName, token, sessionCookieOptions);
   res.json({
     user: { id: user.id, email: user.email, name: user.name, role: user.role },
   });
@@ -166,7 +160,7 @@ router.post("/register", async (req, res) => {
       },
     });
     const token = issueSession(user.id, user.role, user.tokenVersion);
-    res.cookie(config.cookieName, token, cookieOptions);
+    res.cookie(config.cookieName, token, sessionCookieOptions);
     res.json({
       user: {
         id: user.id,
@@ -432,7 +426,7 @@ router.post(
       select: { tokenVersion: true, role: true },
     });
     const token = issueSession(user.id, updated.role, updated.tokenVersion);
-    res.cookie(config.cookieName, token, cookieOptions);
+    res.cookie(config.cookieName, token, sessionCookieOptions);
 
     res.json({ ok: true, message: "Password updated successfully" });
   }
@@ -465,7 +459,7 @@ router.post("/logout", authRequired, async (req: AuthenticatedRequest, res) => {
       data: { tokenVersion: { increment: 1 } },
     });
   }
-  res.clearCookie(config.cookieName);
+  res.clearCookie(config.cookieName, sessionCookieClearOptions);
   res.json({ ok: true });
 });
 
@@ -513,7 +507,7 @@ router.delete(
       prisma.user.delete({ where: { id: user.id } }),
     ]);
 
-    res.clearCookie(config.cookieName);
+    res.clearCookie(config.cookieName, sessionCookieClearOptions);
     res.json({ ok: true, message: "Account deleted." });
   }
 );

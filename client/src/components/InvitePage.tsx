@@ -63,11 +63,17 @@ export function InvitePage({ onAccepted }: { onAccepted: (user: User) => void })
         <h2>{t("invite.title")}</h2>
         {status === "loading" && <p className="status">{t("invite.loading")}</p>}
         {status === "success" && (
-          <p className="status status-success" role="status" aria-live="polite">
-            {challengeName
-              ? t("invite.successWithChallenge", { challengeName })
-              : t("invite.successGeneric")}
-          </p>
+          <div role="status" aria-live="polite">
+            <p className="status status-success">
+              {challengeName
+                ? t("invite.successWithChallenge", { challengeName })
+                : t("invite.successGeneric")}
+            </p>
+            <p className="hint invite-next-hint">{t("invite.alreadyHaveAccountHint")}</p>
+            <button type="button" className="cta-primary" onClick={() => navigate("/home", { replace: true })}>
+              {t("invite.goHomeEarly")}
+            </button>
+          </div>
         )}
         {status === "error" && (
           <>

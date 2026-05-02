@@ -822,10 +822,21 @@ a.secondary:hover {
 .invite-url {
   margin-top: 0.5rem;
 }
-.invite-url input {
+.invite-url-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+  flex-wrap: wrap;
+  margin-top: 0.35rem;
+}
+.invite-url-row input {
+  flex: 1 1 240px;
+  min-width: 0;
   font-size: 0.8rem;
-  width: 100%;
-  max-width: 360px;
+  max-width: 420px;
+}
+.analytics-dashboard {
+  margin-top: 0.25rem;
 }
 .analytics-stats {
   display: flex;
@@ -836,6 +847,49 @@ a.secondary:hover {
 }
 .analytics-stats span {
   font-weight: 500;
+}
+
+.analytics-chart-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: 1rem 0 0.5rem;
+}
+.analytics-chart {
+  display: flex;
+  gap: 0.25rem;
+  align-items: flex-end;
+  min-height: 56px;
+  overflow-x: auto;
+  padding-bottom: 1.75rem;
+  border-bottom: 1px solid var(--border);
+}
+.analytics-bar-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  min-width: 1.65rem;
+}
+.analytics-bar {
+  width: 10px;
+  background: linear-gradient(180deg, var(--accent) 0%, var(--accent-dim, #475569) 100%);
+  border-radius: 2px 2px 0 0;
+  transition: opacity 0.2s ease;
+}
+.analytics-bar-label {
+  font-size: 0.65rem;
+  color: var(--text-muted, #64748b);
+  margin-top: 0.25rem;
+  white-space: nowrap;
+}
+
+.analytics-empty {
+  align-self: center;
+}
+
+.export-links a {
+  display: inline-flex;
 }
 
 .notification-prefs {

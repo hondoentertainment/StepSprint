@@ -9,9 +9,10 @@
  *   Fitbit:     FITBIT_CLIENT_ID, FITBIT_CLIENT_SECRET
  *   Google Fit: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
  *
- * Callback URLs that must be registered in each provider's developer console:
- *   Fitbit:     {APP_ORIGIN}/api/integrations/fitbit/callback
- *   Google Fit: {APP_ORIGIN}/api/integrations/google-fit/callback
+ * Callback URLs (register in each provider console) must match this app's
+ * canonical API base (`API_PUBLIC_ORIGIN`, defaulting to `APP_ORIGIN`):
+ *   Fitbit:     {API_PUBLIC_ORIGIN}/api/integrations/fitbit/callback
+ *   Google Fit: {API_PUBLIC_ORIGIN}/api/integrations/google-fit/callback
  */
 import { Router } from "express";
 import { z } from "zod";
@@ -60,7 +61,7 @@ const GOOGLE_FIT: ProviderConfig = {
 };
 
 function callbackUrl(provider: ProviderConfig): string {
-  return `${config.appOrigin}/api/integrations/${provider.id.replace("_", "-")}/callback`;
+  return `${config.apiPublicOrigin}/api/integrations/${provider.id.replace("_", "-")}/callback`;
 }
 
 function isAvailable(p: ProviderConfig) {

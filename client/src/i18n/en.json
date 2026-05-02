@@ -102,7 +102,7 @@
     "emptyState": "No summary yet. Submit your first steps to get started!",
     "logSteps": "Log your steps",
     "notifications": {
-      "dailyReminder": "Daily reminder to log steps",
+      "dailyReminder": "Remind me to log steps (Web Push when enabled, plus email when the server has email configured)",
       "notAvailable": "Push notifications not available.",
       "enable": "Enable push reminders",
       "enabling": "Enabling…",
@@ -179,7 +179,9 @@
     "loading": "Loading…",
     "successWithChallenge": "You've joined {{challengeName}}. Redirecting…",
     "successGeneric": "Welcome! Redirecting…",
-    "missingToken": "Missing invite token"
+    "missingToken": "Missing invite token",
+    "alreadyHaveAccountHint": "If you already had an account, your session stays active. Others can finish signing up from the Login page.",
+    "goHomeEarly": "Go to home now"
   },
   "errorBoundary": {
     "title": "Something went wrong",
@@ -236,17 +238,27 @@
       "delete": "Delete"
     },
     "invite": {
-      "shareLink": "Share this link:"
+      "shareLink": "Share this link:",
+      "copy": "Copy link",
+      "copied": "Copied!",
+      "hintExpiry": "The link expires in 7 days. The participant opens it to join and sign in.",
+      "clipboardUnavailable": "Copy failed. Select the URL and copy it manually."
     },
     "analytics": {
       "participation": "Participation: {{rate}}%",
-      "avgActiveDays": "Avg active days: {{days}}",
+      "avgActiveDays": "Avg active days per participant: {{days}}",
       "totalSubmissions": "Total submissions: {{count}}",
       "totalSteps": "Total steps: {{steps}}",
+      "neverLogged": "Never logged steps: {{never}} / {{total}} participants",
+      "dormant": "Quiet {{days}}+ days (no submissions): {{dormant}} participants",
+      "submissionsTrend": "Submission activity by day",
+      "trendAria": "Bar chart of submission counts per day",
+      "emptyTrend": "No submissions yet on this timeline.",
       "selectChallenge": "Select a challenge to view analytics."
     },
     "exports": {
-      "hint": "CSV exports open in a new tab. You must be logged in; your session cookie is sent automatically.",
+      "hint": "CSV exports open against the StepSprint API host. Stay logged in; your browser sends your session cookie to the API origin.",
+      "selectChallengeFirstLink": "Select a challenge above to enable export links.",
       "submissions": "Export submissions CSV",
       "teams": "Export team leaderboard CSV",
       "weekly": "Export weekly leaderboard CSV"
