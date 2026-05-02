@@ -23,6 +23,10 @@ const envSchema = z.object({
   /** Public origin of this API (e.g. Render URL). Used for OAuth redirect_uri when the SPA runs on another origin. Defaults to APP_ORIGIN (same-origin / Vite proxy). */
   API_PUBLIC_ORIGIN: z.string().optional(),
   REMINDER_NOTIFICATION_HOUR_LOCAL: z.coerce.number().int().min(0).max(23).optional(),
+  /** When `true`, disables the in-process hourly reminder loop (use POST /api/cron/reminder-sweep from a platform cron instead). */
+  REMINDER_USE_EXTERNAL_CRON: z.string().optional(),
+  /** Minimum 16 chars. Bearer token for POST /api/cron/reminder-sweep (Authorization: Bearer …). */
+  REMINDER_CRON_SECRET: z.string().min(16).optional(),
   VAPID_PUBLIC_KEY: z.string().optional(),
   VAPID_PRIVATE_KEY: z.string().optional(),
   VAPID_SUBJECT: z.string().optional(),
@@ -30,6 +34,13 @@ const envSchema = z.object({
   FITBIT_CLIENT_SECRET: z.string().optional(),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
+  /** Garmin Connect Developer Program (OAuth 2.0 + PKCE + confidential client exchange). Wellness API scopes are assigned in the Garmin app registration. */
+  GARMIN_CLIENT_ID: z.string().optional(),
+  GARMIN_CLIENT_SECRET: z.string().optional(),
+  /** Optional Garmin authorize `scope` (space-separated per Garmin app registration). Omit if your app preset handles scopes without this parameter. */
+  GARMIN_OAUTH_SCOPE: z.string().optional(),
+  /** When `true`, expose Swagger UI at /api/docs and /api/openapi.json. Defaults off in production. */
+  OPENAPI_DOCS_ENABLED: z.enum(["true", "false"]).optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -39,6 +50,14 @@ if (!parsed.success) {
 }
 
 const smtpFrom = parsed.data.SMTP_FROM ?? "noreply@stepsprint.app";
+
+const nodeEnv = parsed.data.NODE_ENV ?? "development";
+const openApiDocsEnabled =
+  parsed.data.OPENAPI_DOCS_ENABLED === "true"
+    ? true
+    : parsed.data.OPENAPI_DOCS_ENABLED === "false"
+      ? false
+      : nodeEnv !== "production";
 
 export const config = {
   port: Number(parsed.data.PORT ?? "3001"),
@@ -51,7 +70,8 @@ export const config = {
   defaultChallengeTz: parsed.data.DEFAULT_CHALLENGE_TZ,
   cookieName: "stepsprint_session",
   sentryDsn: parsed.data.SENTRY_DSN,
-  nodeEnv: parsed.data.NODE_ENV ?? "development",
+  nodeEnv,
+  openApiDocsEnabled,
   resendApiKey: parsed.data.RESEND_API_KEY,
   emailFrom: smtpFrom,
   vapid: {
@@ -73,8 +93,13 @@ export const config = {
     fitbitClientSecret: parsed.data.FITBIT_CLIENT_SECRET,
     googleClientId: parsed.data.GOOGLE_CLIENT_ID,
     googleClientSecret: parsed.data.GOOGLE_CLIENT_SECRET,
+    garminClientId: parsed.data.GARMIN_CLIENT_ID,
+    garminClientSecret: parsed.data.GARMIN_CLIENT_SECRET,
+    garminOAuthScope: parsed.data.GARMIN_OAUTH_SCOPE?.trim(),
   },
   reminderNotificationHourLocal:
     parsed.data.REMINDER_NOTIFICATION_HOUR_LOCAL ?? 17,
+  reminderUseExternalCron: parsed.data.REMINDER_USE_EXTERNAL_CRON === "true",
+  reminderCronSecret: parsed.data.REMINDER_CRON_SECRET,
   emailTransportConfigured: Boolean(parsed.data.RESEND_API_KEY || parsed.data.SMTP_HOST),
 };

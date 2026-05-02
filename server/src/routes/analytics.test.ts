@@ -44,3 +44,26 @@ describe("Admin analytics", () => {
     expect(Array.isArray(res.body.submissionTrend)).toBe(true);
   });
 });
+
+  it("returns cohort summary for admin", async () => {
+    const cookie = await adminCookie();
+    const res = await request(app)
+      .get("/api/admin/analytics/cohort")
+      .set("Cookie", cookie)
+      .expect(200);
+
+    expect(res.body).toHaveProperty("challenges");
+    expect(Array.isArray(res.body.challenges)).toBe(true);
+    const demo = res.body.challenges.find((c: { challengeId: string }) => c.challengeId === "demo-challenge");
+    expect(demo).toBeDefined();
+    expect(demo).toHaveProperty("lifecycle");
+    expect(demo).toHaveProperty("participationRate");
+    expect(demo).not.toHaveProperty("submissionTrend");
+  });
+
+  it("returns 403 for cohort when non-admin", async () => {
+    const cookie = await participantCookie();
+    await request(app).get("/api/admin/analytics/cohort").set("Cookie", cookie).expect(403);
+  });
+});
+

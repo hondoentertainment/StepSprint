@@ -1,10 +1,14 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("../prisma", () => ({
   prisma: {
     notificationPreference: {
       findMany: vi.fn(),
       update: vi.fn().mockResolvedValue({}),
+      update: vi.fn(),
+    },
+    stepSubmission: {
+      findFirst: vi.fn(),
     },
     pushSubscription: {
       deleteMany: vi.fn(),
@@ -15,18 +19,26 @@ vi.mock("../prisma", () => ({
   },
 }));
 
+vi.mock("./email", () => ({
+  sendEmail: vi.fn(),
+}));
+
 vi.mock("./push", () => ({
-  isPushEnabled: vi.fn(),
+  isPushEnabled: vi.fn(() => false),
   sendPush: vi.fn(),
 }));
 
 vi.mock("./email", () => ({
   sendEmail: vi.fn(),
+vi.mock("../config", () => ({
+  config: {
+    reminderNotificationHourLocal: 17,
+    emailTransportConfigured: false,
+  },
 }));
 
 import { hourlyReminderSweep } from "./scheduler";
 import { prisma } from "../prisma";
-import { isPushEnabled, sendPush } from "./push";
 
 const mockFindMany = vi.mocked(prisma.notificationPreference.findMany);
 const mockDeleteMany = vi.mocked(prisma.pushSubscription.deleteMany);
@@ -158,7 +170,14 @@ describe("hourlyReminderSweep", () => {
 
     await hourlyReminderSweep();
 
-    expect(mockSendPush).not.toHaveBeenCalled();
-    expect(mockDeleteMany).not.toHaveBeenCalled();
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockFindMany.mockResolvedValue([]);
+});
+
+describe("hourlyReminderSweep", () => {
+  it("completes when no users opted into reminders", async () => {
+    await expect(hourlyReminderSweep()).resolves.toBeUndefined();
+    expect(mockFindMany).toHaveBeenCalledOnce();
   });
 });

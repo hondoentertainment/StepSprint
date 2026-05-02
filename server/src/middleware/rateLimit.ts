@@ -45,7 +45,7 @@ export const passwordResetLimiter = rateLimit({
 
 /**
  * Rate limit for token-authenticated integration sync endpoints
- * (apple-health, fitbit/sync, google-fit/sync). 60 syncs per minute
+ * (apple-health, fitbit/sync, google-fit/sync, garmin/sync). 60 syncs per minute
  * per IP is far more than any legitimate automation needs.
  */
 export const integrationSyncLimiter = rateLimit({

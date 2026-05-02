@@ -1,0 +1,59 @@
+import crypto from "crypto";
+import { Router, type Request, type Response } from "express";
+import { config } from "../config";
+import { logger } from "../logger";
+import { hourlyReminderSweep } from "../services/scheduler";
+
+const router = Router();
+
+function timingSafeEqualString(a: string, b: string): boolean {
+  const bufA = Buffer.from(a, "utf8");
+  const bufB = Buffer.from(b, "utf8");
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+/** Exported for unit tests */
+export function verifyReminderCronAuth(
+  req: Pick<Request, "headers">,
+  secret: string | undefined
+): { ok: true } | { ok: false; status: number; error: string } {
+  if (!secret) {
+    return { ok: false, status: 503, error: "Reminder cron is not configured" };
+  }
+
+  const auth = req.headers.authorization;
+  if (typeof auth !== "string" || !auth.startsWith("Bearer ")) {
+    return { ok: false, status: 401, error: "Unauthorized" };
+  }
+
+  const token = auth.slice("Bearer ".length).trim();
+  if (!timingSafeEqualString(token, secret)) {
+    return { ok: false, status: 401, error: "Unauthorized" };
+  }
+
+  return { ok: true };
+}
+
+/**
+ * Platform cron (Render, GitHub Actions, etc.): POST hourly with
+ * `Authorization: Bearer <REMINDER_CRON_SECRET>`.
+ * Prefer `REMINDER_USE_EXTERNAL_CRON=true` on multi-instance deploys so only this route runs the sweep.
+ */
+router.post("/reminder-sweep", async (req: Request, res: Response) => {
+  const check = verifyReminderCronAuth(req, config.reminderCronSecret);
+  if (!check.ok) {
+    res.status(check.status).json({ error: check.error });
+    return;
+  }
+
+  try {
+    await hourlyReminderSweep();
+    res.json({ ok: true });
+  } catch (err: unknown) {
+    logger.error({ err }, "Cron reminder sweep failed");
+    res.status(500).json({ error: "Sweep failed" });
+  }
+});
+
+export default router;

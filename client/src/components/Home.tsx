@@ -318,9 +318,14 @@ export function Home({
             {selectedChallenge.locked ? t("common.locked") : t("common.open")}
           </span>
           {!selectedChallenge.locked && (
-            <Link to="/submit" className="btn-primary-sm">
-              {t("home.logSteps")}
-            </Link>
+            <>
+              <Link to="/submit" className="btn-primary-sm">
+                {t("home.logSteps")}
+              </Link>
+              <Link to="/integrations" className="secondary">
+                {t("home.devicesLink")}
+              </Link>
+            </>
           )}
         </div>
       )}

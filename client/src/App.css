@@ -724,6 +724,113 @@ a.secondary:hover {
   border-bottom: 1px solid var(--border);
 }
 
+.cohort-table-wrap {
+  overflow-x: auto;
+  margin-top: 0.5rem;
+}
+
+.cohort-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.cohort-table th,
+.cohort-table td {
+  text-align: left;
+  padding: 0.4rem 0.55rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.cohort-table th {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.cohort-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.activity-grid-wrap {
+  overflow-x: auto;
+  margin-top: 0.75rem;
+  max-width: 100%;
+}
+
+.activity-grid-table {
+  border-collapse: collapse;
+  font-size: 0.75rem;
+  min-width: max-content;
+}
+
+.activity-grid-table th,
+.activity-grid-table td {
+  padding: 0.35rem 0.45rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.activity-grid-sticky-col {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--bg-elevated);
+  box-shadow: 1px 0 0 var(--border);
+  text-align: left;
+  max-width: 11rem;
+}
+
+.activity-grid-table thead .activity-grid-sticky-col {
+  z-index: 2;
+}
+
+.activity-grid-user {
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.activity-grid-user-email {
+  display: block;
+  font-weight: 400;
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 10rem;
+}
+
+.activity-grid-day {
+  text-align: center;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.activity-grid-cell.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.activity-grid-empty {
+  color: var(--text-muted);
+}
+
+.activity-grid-flag {
+  margin-left: 0.15rem;
+  color: var(--accent-hover);
+  font-weight: 700;
+}
+
+.activity-grid-tz {
+  margin-top: 0.35rem;
+  font-size: 0.75rem;
+}
+
+.admin-activity-week-hint {
+  margin-bottom: 0.35rem;
+}
+
 .admin-grid .list a {
   display: block;
   padding: 0.5rem 0;
@@ -1385,4 +1492,76 @@ textarea:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 200px;
+}
+
+/* ========== Legal footer & cookie banner ========== */
+.legal-footer {
+  margin-top: auto;
+  padding-top: 1rem;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.legal-footer a {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.legal-footer a:hover {
+  color: var(--accent);
+}
+
+.legal-page {
+  max-width: 40rem;
+  margin: 0 auto;
+}
+
+.legal-page ul {
+  padding-left: 1.25rem;
+  margin: 0.5rem 0 1rem;
+  color: var(--text-secondary);
+}
+
+.cookie-consent-banner {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 200;
+  padding: 1rem;
+  background: var(--bg-elevated);
+  border-top: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+}
+
+.cookie-consent-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.cookie-consent-text {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+}
+
+.cookie-consent-links {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.cookie-consent-links a {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.cookie-consent-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
 }

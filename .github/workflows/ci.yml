@@ -5,6 +5,10 @@ on:
   push:
     branches: [master]
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   server-test:
     runs-on: ubuntu-latest
@@ -40,8 +44,63 @@ jobs:
         working-directory: server
         run: npm run test:run
 
+  server-test-postgres:
+    runs-on: ubuntu-latest
+    env:
+      JWT_SECRET: test-jwt-secret-min-16-chars
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/stepsprint?schema=public
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: stepsprint
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d stepsprint"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install server deps
+        working-directory: server
+        run: npm ci
+
+      - name: Use PostgreSQL schema and migrations
+        working-directory: server
+        run: |
+          cp prisma/schema.postgresql.prisma prisma/schema.prisma
+          rm -rf prisma/migrations
+          cp -r prisma/migrations_postgres prisma/migrations
+
+      - name: Generate Prisma client and migrate
+        working-directory: server
+        run: |
+          npx prisma generate
+          npx prisma migrate deploy
+
+      - name: Seed database
+        working-directory: server
+        run: npx prisma db seed
+
+      - name: Run server tests (Postgres)
+        working-directory: server
+        run: npm run test:run
+
   client-test:
     runs-on: ubuntu-latest
+    env:
+      VITE_API_URL: ${{ vars.VITE_API_URL || 'https://stepsprint-api.onrender.com' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -63,7 +122,7 @@ jobs:
         working-directory: client
         run: npm run test:run
 
-      - name: Build client
+      - name: Build client (matches Vercel build env)
         working-directory: client
         run: npm run build
 
@@ -115,3 +174,7 @@ jobs:
           kill $SERVER_PID
           echo "Server failed to become healthy within 30 seconds"
           exit 1
+      - name: Verify Vercel output path
+        run: |
+          test -f client/dist/index.html
+          test -d client/dist/assets

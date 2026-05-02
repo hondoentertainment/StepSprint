@@ -65,8 +65,25 @@
       "passwordTooShort": "Password must be at least 8 characters.",
       "passwordNeedsLetter": "Password must contain at least one letter.",
       "passwordNeedsNumber": "Password must contain at least one number.",
-      "passwordsDoNotMatch": "Passwords do not match."
+      "passwordsDoNotMatch": "Passwords do not match.",
+      "emailNotVerified": "Verify your email before signing in. Check your inbox for a link from StepSprint (and spam)."
+    },
+    "afterRegister": {
+      "title": "Check your email",
+      "resendPrompt": "No message yet? Try resending the verification email."
+    },
+    "verifyEmailActions": {
+      "resend": "Resend verification email",
+      "resending": "Sending…",
+      "resendDone": "If this address has an account that still needs verifying, another email has been sent."
     }
+  },
+  "verifyEmail": {
+    "title": "Confirm your email",
+    "working": "Confirming…",
+    "success": "Your email is verified. You can sign in.",
+    "failed": "This link is invalid or has expired.",
+    "invalidLink": "This verification link is missing details. Ask for a new link from sign in."
   },
   "layout": {
     "welcome": "Welcome, {{name}}",
@@ -76,10 +93,17 @@
     "tabs": {
       "Home": "Home",
       "Submit": "Submit",
+      "Devices": "Devices",
       "Weekly Top Steppers": "Weekly Top Steppers",
       "Team Standings": "Team Standings",
       "Admin": "Admin"
     }
+  },
+  "integrations": {
+    "title": "Fitness sync",
+    "subtitle": "Apple Watch shortcut tokens, Garmin Connect OAuth, Fitbit, and Google Fit all land here.",
+    "noChallenge": "Select an active challenge in the header to configure sync.",
+    "backToSubmit": "Back to Submit steps"
   },
   "home": {
     "title": "Participant Home",
@@ -101,6 +125,7 @@
     },
     "emptyState": "No summary yet. Submit your first steps to get started!",
     "logSteps": "Log your steps",
+    "devicesLink": "Wearables & sync",
     "notifications": {
       "dailyReminder": "Remind me to log steps (Web Push when enabled, plus email when the server has email configured)",
       "notAvailable": "Push notifications not available.",
@@ -112,6 +137,8 @@
   },
   "submit": {
     "title": "Submit steps",
+    "manualIntro": "Enter your step count below for any day in this challenge. Typing your total here works whether or not you connect a fitness sync.",
+    "manualHintNoIntegration": "No fitness sync is linked to your account yet — that is fine. Manual entries count the same as synced steps.",
     "noChallengeSelected": "Choose an active challenge before submitting steps.",
     "dateLabel": "Date",
     "stepsLabel": "Steps",
@@ -119,10 +146,8 @@
     "submitting": "Submitting…",
     "success": "Steps submitted successfully.",
     "flaggedHint": "Submissions above 100,000 steps are flagged.",
-    "connectDevice": "Connect fitness device",
-    "comingSoon": "Coming soon",
-    "syncAppleWatch": "Sync from Apple Watch",
-    "hideAppleWatch": "Hide Apple Watch sync"
+    "connectDevice": "Fitness sync & wearables",
+    "connectDeviceNeedChallenge": "(select a challenge first)"
   },
   "weeklyLeaderboard": {
     "title": "Weekly Top Steppers",
@@ -199,7 +224,9 @@
       "teamAssignment": "Team assignment",
       "moderation": "Moderation",
       "inviteParticipant": "Invite participant",
+      "cohort": "Compare challenges",
       "analytics": "Analytics",
+      "dailyActivity": "Daily activity grid",
       "exports": "Exports"
     },
     "scope": {
@@ -256,6 +283,35 @@
       "emptyTrend": "No submissions yet on this timeline.",
       "selectChallenge": "Select a challenge to view analytics."
     },
+    "cohort": {
+      "intro": "Benchmark engagement across every challenge (sorted by start date).",
+      "empty": "No challenges yet. Create one to see cohort metrics.",
+      "headers": {
+        "challenge": "Challenge",
+        "status": "Status",
+        "participants": "Participants",
+        "participation": "Participation",
+        "dormant": "Quiet (7d+)",
+        "neverLogged": "Never logged"
+      },
+      "lifecycle": {
+        "upcoming": "Upcoming",
+        "active": "Active",
+        "ended": "Ended"
+      }
+    },
+    "activityGrid": {
+      "intro": "Participant rows and calendar-day columns for the selected week (within this challenge). Uses the challenge timezone.",
+      "participant": "Participant",
+      "weekHint": "Choose the ISO week to inspect (same week state as Weekly Top Steppers).",
+      "loading": "Loading activity grid…",
+      "emptyWeek": "No challenge days fall in this ISO week.",
+      "selectChallenge": "Select a challenge to load the grid.",
+      "loadError": "Could not load the activity grid.",
+      "noSubmission": "No submission",
+      "flaggedSuffix": "flagged",
+      "ariaGrid": "Daily step counts per participant"
+    },
     "exports": {
       "hint": "CSV exports open against the StepSprint API host. Stay logged in; your browser sends your session cookie to the API origin.",
       "selectChallengeFirstLink": "Select a challenge above to enable export links.",
@@ -302,5 +358,34 @@
     "leads": "leads",
     "behind": "{{steps}} behind",
     "behindShort": "behind"
+  },
+  "legal": {
+    "privacy": "Privacy",
+    "terms": "Terms",
+    "privacyTitle": "Privacy",
+    "privacyIntro": "This summary describes how StepSprint handles information. Replace the contact details below with your organization before a public launch.",
+    "privacyCollected": "What we collect",
+    "privacyAccount": "Account information you provide (such as email and name) to run challenges and sign you in.",
+    "privacySteps": "Step counts and related activity you submit for challenges you join.",
+    "privacyAnalytics": "Optional usage analytics if you accept cookies and your administrator configures analytics (for example PostHog).",
+    "privacyCookies": "Cookies and similar technologies",
+    "privacyCookiesBody": "We use cookies for signing you in and protecting your session. If you accept optional analytics in the banner, a provider may set additional cookies or use local storage as described in their documentation.",
+    "privacyContact": "Contact",
+    "privacyContactBody": "For privacy requests, contact the person or team running your StepSprint instance.",
+    "termsTitle": "Terms of use",
+    "termsIntro": "By using StepSprint you agree to these terms. Replace this text with counsel-reviewed terms before a broad public launch.",
+    "termsUse": "Use of the service",
+    "termsUseBody": "Use StepSprint only for lawful purposes and in line with any rules your challenge organizer sets.",
+    "termsConduct": "Conduct",
+    "termsConductBody": "Do not attempt to disrupt the service, access others accounts without permission, or submit deliberately false data.",
+    "termsDisclaimer": "Disclaimer",
+    "termsDisclaimerBody": "Step counts and leaderboards are provided as-is for motivation. StepSprint is not a medical or fitness device.",
+    "backHome": "Back to home"
+  },
+  "cookieConsent": {
+    "title": "Cookie and analytics choices",
+    "body": "We use essential cookies for sign-in. If you accept, we also load optional product analytics to improve StepSprint.",
+    "accept": "Accept analytics",
+    "decline": "Essential only"
   }
 }

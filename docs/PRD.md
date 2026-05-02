@@ -70,11 +70,11 @@ StepSprint is a month-long step challenge platform that helps organizations run 
 
 ### Improvements roadmap (stretch)
 
-- [ ] Dedicated admin cohort analytics (forecasting churn, benchmarking across challenges)
+- [x] Dedicated admin cohort analytics (benchmark table across challenges; forecasting churn remains future work)
 - [ ] Native Apple Health / Google Fit in-app pairing without external developer consoles where platform allows
-- [ ] Broader **i18n** coverage beyond Login and shared keys (many screens still ship English-only strings outside `en.json` paths)
-- [ ] Dedicated Render/Vercel **cron webhook** hitting a signed internal route as an alternative to in-process hourly sweeps when scaling horizontally
-- [ ] Postgres as the default CI database with migration parity drills (SQLite remains dev-friendly)
+- [ ] Broader **i18n** coverage beyond Login and surfaces already in `en.json` (admin cohort / compare-challenge copy added)
+- [x] **Cron webhook** — `POST /api/cron/reminder-sweep` with `Authorization: Bearer <REMINDER_CRON_SECRET>` when `REMINDER_USE_EXTERNAL_CRON=true`
+- [x] Postgres migration parity CI job (`server-test-postgres` in GitHub Actions; SQLite remains the default local dev DB)
 
 ---
 

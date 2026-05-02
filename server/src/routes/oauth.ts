@@ -1,18 +1,14 @@
 /**
- * OAuth 2.0 flows for Fitbit and Google Fit.
+ * OAuth 2.0 flows for Fitbit, Google Fit, and Garmin Connect Developer Program (PKCE).
  *
- * All four env vars are optional — when absent the provider is reported as
- * unavailable and connect/sync routes return 503. This lets the server start
- * without OAuth credentials in dev while enabling full flows in prod via env.
+ * Optional OAuth env vars disable that provider gracefully (503 on connect/sync + hidden in SPA).
  *
- * Required env vars per provider:
- *   Fitbit:     FITBIT_CLIENT_ID, FITBIT_CLIENT_SECRET
- *   Google Fit: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
+ * Garmin uses OAuth 2.0 Authorization Code **with PKCE** (stored server-side pending states).
  *
- * Callback URLs (register in each provider console) must match this app's
- * canonical API base (`API_PUBLIC_ORIGIN`, defaulting to `APP_ORIGIN`):
- *   Fitbit:     {API_PUBLIC_ORIGIN}/api/integrations/fitbit/callback
- *   Google Fit: {API_PUBLIC_ORIGIN}/api/integrations/google-fit/callback
+ * Callback URLs (`API_PUBLIC_ORIGIN` canonical):
+ *   Fitbit:       /api/integrations/fitbit/callback
+ *   Google Fit:   /api/integrations/google-fit/callback
+ *   Garmin:       /api/integrations/garmin/callback
  */
 import crypto from "crypto";
 import { Router } from "express";
@@ -41,6 +37,16 @@ type ProviderConfig = {
   clientSecret: string | undefined;
 };
 
+type DaySteps = { date: string; steps: number };
+
+type TokenResponse = {
+  access_token: string;
+  refresh_token?: string;
+  expires_in?: number;
+  token_type: string;
+  user_id?: string; // Fitbit
+};
+
 const FITBIT: ProviderConfig = {
   id: "fitbit",
   name: "Fitbit",
@@ -60,6 +66,156 @@ const GOOGLE_FIT: ProviderConfig = {
   clientId: config.oauth.googleClientId,
   clientSecret: config.oauth.googleClientSecret,
 };
+
+const GARMIN = {
+  id: "garmin",
+  name: "Garmin Connect",
+  authUrl: "https://connect.garmin.com/oauth2Confirm",
+  tokenUrl: "https://diauth.garmin.com/di-oauth2-service/oauth/token",
+  dailiesUrl: "https://apis.garmin.com/wellness-api/rest/dailies",
+};
+
+const GARMIN_PKCE_TTL_MS = 15 * 60 * 1000;
+
+function garminScopesList(): string[] {
+  const raw = config.oauth.garminOAuthScope;
+  if (!raw) return [];
+  return raw.split(/\s+/u).map((s) => s.trim()).filter(Boolean);
+}
+
+function garminRedirectUri(): string {
+  return `${config.apiPublicOrigin}/api/integrations/garmin/callback`;
+}
+
+function isGarminAvailable(): boolean {
+  return Boolean(config.oauth.garminClientId && config.oauth.garminClientSecret);
+}
+
+function base64Url(buf: Buffer): string {
+  return buf.toString("base64url");
+}
+
+function generatePkcePair(): { verifier: string; challenge: string } {
+  const verifier = base64Url(crypto.randomBytes(32));
+  const challenge = base64Url(crypto.createHash("sha256").update(verifier).digest());
+  return { verifier, challenge };
+}
+
+async function deleteExpiredOAuthPkce(): Promise<void> {
+  await prisma.oAuthPkcePending.deleteMany({ where: { expiresAt: { lt: new Date() } } });
+}
+
+async function garminExchangeCode(code: string, codeVerifier: string): Promise<TokenResponse> {
+  const body = new URLSearchParams({
+    grant_type: "authorization_code",
+    code,
+    client_id: config.oauth.garminClientId!,
+    client_secret: config.oauth.garminClientSecret!,
+    redirect_uri: garminRedirectUri(),
+    code_verifier: codeVerifier,
+  });
+  const res = await fetch(GARMIN.tokenUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: body.toString(),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "(no body)");
+    throw new Error(`Garmin token exchange failed (${res.status}): ${text}`);
+  }
+  return res.json() as Promise<TokenResponse>;
+}
+
+async function garminRefreshToken(refreshToken: string): Promise<TokenResponse> {
+  const body = new URLSearchParams({
+    grant_type: "refresh_token",
+    refresh_token: refreshToken,
+    client_id: config.oauth.garminClientId!,
+    client_secret: config.oauth.garminClientSecret!,
+  });
+  const res = await fetch(GARMIN.tokenUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: body.toString(),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "(no body)");
+    throw new Error(`Garmin token refresh failed (${res.status}): ${text}`);
+  }
+  return res.json() as Promise<TokenResponse>;
+}
+
+async function ensureFreshGarminToken(
+  connection: { accessToken: string; refreshToken: string | null; expiresAt: Date | null; id: string }
+): Promise<string> {
+  const bufferMs = 5 * 60 * 1000;
+  if (!connection.expiresAt || connection.expiresAt.getTime() - bufferMs > Date.now()) {
+    return connection.accessToken;
+  }
+  if (!connection.refreshToken) {
+    throw new Error("Access token expired and no refresh token available. Please reconnect.");
+  }
+  const tokens = await garminRefreshToken(connection.refreshToken);
+  const expiresAt = tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000) : null;
+  await prisma.oAuthConnection.update({
+    where: { id: connection.id },
+    data: {
+      accessToken: tokens.access_token,
+      ...(tokens.refresh_token ? { refreshToken: tokens.refresh_token } : {}),
+      ...(expiresAt ? { expiresAt } : {}),
+    },
+  });
+  return tokens.access_token;
+}
+
+/** Pull daily summaries for calendar day interpreted in challenge `tz`. Wellness API payloads vary slightly by program; normalized here. */
+async function fetchGarminSteps(accessToken: string, dateISO: string, tz: string): Promise<DaySteps[]> {
+  const day = DateTime.fromISO(dateISO, { zone: tz });
+  const startSec = Math.floor(day.startOf("day").toSeconds());
+  const endSec = Math.floor(day.endOf("day").toSeconds());
+
+  const qs = new URLSearchParams({
+    uploadStartTimeInSeconds: String(startSec),
+    uploadEndTimeInSeconds: String(endSec),
+  });
+  const res = await fetch(`${GARMIN.dailiesUrl}?${qs.toString()}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const text = await res.text().catch(() => "");
+  if (!res.ok) {
+    throw new Error(`Garmin wellness API (${res.status}): ${text.slice(0, 500)}`);
+  }
+  let body: unknown;
+  try {
+    body = JSON.parse(text) as unknown;
+  } catch {
+    throw new Error("Garmin wellness API returned non-JSON.");
+  }
+
+  let rows: Record<string, unknown>[] = [];
+  if (Array.isArray(body)) {
+    rows = body as Record<string, unknown>[];
+  } else if (body && typeof body === "object" && Array.isArray((body as { dailies?: unknown }).dailies)) {
+    rows = (body as { dailies: Record<string, unknown>[] }).dailies;
+  } else if (body && typeof body === "object" && "calendarDate" in (body as object)) {
+    rows = [body as Record<string, unknown>];
+  }
+
+  const out: DaySteps[] = [];
+  for (const row of rows) {
+    const dRaw = row.calendarDate ?? row.startTimeGMT ?? row.startTimeOffset;
+    const stepsRaw = row.totalSteps ?? row.steps ?? row.stepsCount;
+    if (typeof dRaw !== "string" || stepsRaw === undefined) continue;
+    const datePart = dRaw.includes("T") ? dRaw.split("T")[0] ?? dRaw.slice(0, 10) : dRaw.slice(0, 10);
+    let stepsNum = typeof stepsRaw === "number" ? stepsRaw : parseInt(String(stepsRaw), 10);
+    if (Number.isNaN(stepsNum)) stepsNum = 0;
+    out.push({ date: datePart, steps: Math.max(0, stepsNum) });
+  }
+
+  const matchISO = DateTime.fromISO(dateISO).toISODate();
+  const sameDay = out.filter((x) => x.date === matchISO || x.date === dateISO.slice(0, 10));
+  return sameDay.length > 0 ? sameDay : out;
+}
 
 function callbackUrl(provider: ProviderConfig): string {
   return `${config.apiPublicOrigin}/api/integrations/${provider.id.replace("_", "-")}/callback`;
@@ -102,14 +258,6 @@ function isAvailable(p: ProviderConfig) {
 // ---------------------------------------------------------------------------
 // Token exchange helpers
 // ---------------------------------------------------------------------------
-
-type TokenResponse = {
-  access_token: string;
-  refresh_token?: string;
-  expires_in?: number;
-  token_type: string;
-  user_id?: string; // Fitbit
-};
 
 async function exchangeCode(
   provider: ProviderConfig,
@@ -188,8 +336,6 @@ async function ensureFreshToken(
 // ---------------------------------------------------------------------------
 // Step-fetch helpers (provider-specific)
 // ---------------------------------------------------------------------------
-
-type DaySteps = { date: string; steps: number };
 
 async function fetchFitbitSteps(accessToken: string, dateISO: string): Promise<DaySteps[]> {
   const url = `https://api.fitbit.com/1/user/-/activities/steps/date/${dateISO}/1d.json`;
@@ -283,7 +429,7 @@ function mountProviderRoutes(provider: ProviderConfig) {
     const { code, state, error: oauthError } = req.query as Record<string, string | undefined>;
 
     if (oauthError) {
-      res.redirect(`${config.appOrigin}/?oauth_error=${encodeURIComponent(oauthError)}`);
+      res.redirect(`${config.appOrigin}/integrations?oauth_error=${encodeURIComponent(oauthError)}`);
       return;
     }
     if (!code || !state) {
@@ -333,12 +479,12 @@ function mountProviderRoutes(provider: ProviderConfig) {
 
       // Redirect back to the SPA with a success signal
       const redirectUrl = parsedState.challengeId
-        ? `${config.appOrigin}/?oauth_success=${provider.id}`
-        : `${config.appOrigin}/?oauth_success=${provider.id}`;
+        ? `${config.appOrigin}/integrations?oauth_success=${provider.id}`
+        : `${config.appOrigin}/integrations?oauth_success=${provider.id}`;
       res.redirect(redirectUrl);
     } catch (err) {
       logger.error({ err, provider: provider.id }, "OAuth callback error");
-      res.redirect(`${config.appOrigin}/?oauth_error=token_exchange_failed`);
+      res.redirect(`${config.appOrigin}/integrations?oauth_error=token_exchange_failed`);
     }
   });
 
@@ -504,6 +650,300 @@ function mountProviderRoutes(provider: ProviderConfig) {
   });
 }
 
+/** Garmin Connect OAuth 2 PKCE flows (distinct from Fitbit/Google — verifier stored pending callback). */
+function mountGarminRoutes(): void {
+  const base = "/garmin";
+
+  router.get(`${base}/connect`, authRequired, async (req: AuthenticatedRequest, res) => {
+    if (!isGarminAvailable()) {
+      res.status(503).json({
+        error: "Garmin Connect integration is not configured on this server.",
+      });
+      return;
+    }
+    if (!req.user) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
+    const challengeId = (req.query as { challengeId?: string }).challengeId ?? "";
+    await deleteExpiredOAuthPkce();
+    const { verifier, challenge } = generatePkcePair();
+    const stateNonce = base64Url(crypto.randomBytes(24));
+
+    await prisma.oAuthPkcePending.create({
+      data: {
+        stateNonce,
+        codeVerifier: verifier,
+        userId: req.user.id,
+        challengeId: challengeId || null,
+        expiresAt: new Date(Date.now() + GARMIN_PKCE_TTL_MS),
+      },
+    });
+
+    const params = new URLSearchParams({
+      response_type: "code",
+      client_id: config.oauth.garminClientId!,
+      redirect_uri: garminRedirectUri(),
+      code_challenge: challenge,
+      code_challenge_method: "S256",
+      state: stateNonce,
+    });
+
+    const scoped = garminScopesList();
+    if (scoped.length > 0) params.set("scope", scoped.join(" "));
+
+    res.redirect(`${GARMIN.authUrl}?${params}`);
+  });
+
+  router.get(`${base}/callback`, async (req, res) => {
+    if (!isGarminAvailable()) {
+      res.status(503).json({ error: "Garmin Connect integration is not configured." });
+      return;
+    }
+
+    const { code, state, error: oauthError } = req.query as Record<string, string | undefined>;
+
+    if (oauthError) {
+      res.redirect(`${config.appOrigin}/integrations?oauth_error=${encodeURIComponent(oauthError)}`);
+      return;
+    }
+    if (!code || !state) {
+      res.status(400).json({ error: "Missing code or state" });
+      return;
+    }
+
+    const pending = await prisma.oAuthPkcePending.findUnique({
+      where: { stateNonce: state },
+    });
+
+    if (!pending || pending.expiresAt < new Date()) {
+      if (pending) {
+        await prisma.oAuthPkcePending.delete({ where: { id: pending.id } }).catch(() => {});
+      }
+      res.redirect(`${config.appOrigin}/integrations?oauth_error=oauth_state_invalid`);
+      return;
+    }
+
+    await prisma.oAuthPkcePending.delete({ where: { id: pending.id } });
+
+    try {
+      const tokens = await garminExchangeCode(code, pending.codeVerifier);
+      const expiresAt = tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000) : null;
+      const scopeStr = garminScopesList().join(" ");
+
+      await prisma.oAuthConnection.upsert({
+        where: {
+          userId_provider: {
+            userId: pending.userId,
+            provider: GARMIN.id,
+          },
+        },
+        update: {
+          accessToken: tokens.access_token,
+          refreshToken: tokens.refresh_token ?? null,
+          expiresAt,
+          providerUserId: tokens.user_id ?? null,
+          scopes: scopeStr.length > 0 ? scopeStr : null,
+        },
+        create: {
+          userId: pending.userId,
+          provider: GARMIN.id,
+          accessToken: tokens.access_token,
+          refreshToken: tokens.refresh_token ?? null,
+          expiresAt,
+          providerUserId: tokens.user_id ?? null,
+          scopes: scopeStr.length > 0 ? scopeStr : null,
+        },
+      });
+
+      await prisma.auditLog.create({
+        data: {
+          action: "oauth_connect_garmin",
+          actorId: pending.userId,
+          challengeId: pending.challengeId || null,
+        },
+      });
+
+      res.redirect(`${config.appOrigin}/integrations?oauth_success=garmin`);
+    } catch (err) {
+      logger.error({ err }, "Garmin OAuth callback error");
+      res.redirect(`${config.appOrigin}/integrations?oauth_error=token_exchange_failed`);
+    }
+  });
+
+  const garminSyncBodySchema = z.object({
+    challengeId: z.string().min(1),
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u).optional(),
+  });
+
+  router.post(`${base}/sync`, authRequired, integrationSyncLimiter, async (req: AuthenticatedRequest, res) => {
+    if (!isGarminAvailable()) {
+      res.status(503).json({
+        error: "Garmin Connect integration is not configured on this server.",
+      });
+      return;
+    }
+    if (!req.user) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
+    const parsed = garminSyncBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid request body" });
+      return;
+    }
+
+    const { challengeId } = parsed.data;
+    const connection = await prisma.oAuthConnection.findUnique({
+      where: { userId_provider: { userId: req.user.id, provider: GARMIN.id } },
+    });
+
+    if (!connection) {
+      res.status(403).json({
+        error: `${GARMIN.name} is not connected. Visit /api/integrations/garmin/connect first.`,
+      });
+      return;
+    }
+
+    const challenge = await prisma.challenge.findUnique({ where: { id: challengeId } });
+    if (!challenge) {
+      res.status(404).json({ error: "Challenge not found" });
+      return;
+    }
+    if (challenge.locked) {
+      res.status(409).json({ error: "Challenge is locked" });
+      return;
+    }
+
+    const membership = await prisma.teamMember.findUnique({
+      where: { userId_challengeId: { userId: req.user.id, challengeId } },
+    });
+    if (!membership) {
+      res.status(403).json({ error: "Not enrolled in this challenge" });
+      return;
+    }
+
+    const tz = challenge.timezone;
+    const dateISO =
+      parsed.data.date ?? DateTime.now().setZone(tz).toISODate() ?? "";
+
+    let accessToken: string;
+    try {
+      accessToken = await ensureFreshGarminToken(connection);
+    } catch (err) {
+      res.status(401).json({ error: (err as Error).message });
+      return;
+    }
+
+    let dayRows: DaySteps[];
+    try {
+      dayRows = await fetchGarminSteps(accessToken, dateISO, tz);
+    } catch (err) {
+      logger.warn({ err }, "Garmin step fetch failed");
+      res.status(502).json({
+        error: `Failed to fetch steps from ${GARMIN.name}: ${(err as Error).message}`,
+      });
+      return;
+    }
+
+    const challengeStart = toDateOnly(
+      DateTime.fromJSDate(challenge.startDate, { zone: tz }).toISODate() ?? "",
+      tz
+    );
+    const challengeEnd = toDateOnly(
+      DateTime.fromJSDate(challenge.endDate, { zone: tz }).toISODate() ?? "",
+      tz
+    );
+
+    const prepared: Array<{ date: Date; steps: number }> = [];
+    for (const row of dayRows) {
+      const day = toDateOnly(row.date, tz);
+      if (day < challengeStart || day > challengeEnd) continue;
+      prepared.push({ date: toJsDate(day), steps: row.steps });
+    }
+
+    if (prepared.length === 0) {
+      res.json({ imported: 0, updated: 0, skipped: dayRows.length });
+      return;
+    }
+
+    const existing = await prisma.stepSubmission.findMany({
+      where: {
+        userId: req.user.id,
+        challengeId,
+        date: { in: prepared.map((r) => r.date) },
+      },
+      select: { date: true },
+    });
+    const existingKeys = new Set(existing.map((s) => s.date.getTime()));
+
+    await prisma.$transaction(
+      prepared.map((row) =>
+        prisma.stepSubmission.upsert({
+          where: {
+            userId_challengeId_date: {
+              userId: req.user.id,
+              challengeId,
+              date: row.date,
+            },
+          },
+          update: {
+            steps: row.steps,
+            isFlagged: row.steps > 100_000,
+          },
+          create: {
+            userId: req.user.id,
+            challengeId,
+            date: row.date,
+            steps: row.steps,
+            isFlagged: row.steps > 100_000,
+          },
+        })
+      )
+    );
+
+    const updated = prepared.filter((r) => existingKeys.has(r.date.getTime())).length;
+    const imported = prepared.length - updated;
+    const skipped = dayRows.length - prepared.length;
+
+    await prisma.auditLog.create({
+      data: {
+        action: "garmin_sync",
+        actorId: req.user.id,
+        challengeId,
+        metadata: { imported, updated, skipped },
+      },
+    });
+
+    res.json({ imported, updated, skipped });
+  });
+
+  router.delete(`${base}/disconnect`, authRequired, async (req: AuthenticatedRequest, res) => {
+    if (!req.user) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
+    const deleted = await prisma.oAuthConnection.deleteMany({
+      where: { userId: req.user.id, provider: GARMIN.id },
+    });
+
+    if (deleted.count === 0) {
+      res.status(404).json({ error: `${GARMIN.name} is not connected.` });
+      return;
+    }
+
+    await prisma.auditLog.create({
+      data: { action: "oauth_disconnect_garmin", actorId: req.user.id },
+    });
+
+    res.status(204).send();
+  });
+}
+
+mountGarminRoutes();
 mountProviderRoutes(FITBIT);
 mountProviderRoutes(GOOGLE_FIT);
 
@@ -522,12 +962,16 @@ router.get("/connections", authRequired, async (req: AuthenticatedRequest, res) 
     select: { provider: true, createdAt: true, updatedAt: true },
   });
 
-  const providers = [FITBIT, GOOGLE_FIT].map((p) => {
+  const providers = [
+    { id: FITBIT.id, name: FITBIT.name, available: isAvailable(FITBIT) },
+    { id: GOOGLE_FIT.id, name: GOOGLE_FIT.name, available: isAvailable(GOOGLE_FIT) },
+    { id: GARMIN.id, name: GARMIN.name, available: isGarminAvailable() },
+  ].map((p) => {
     const conn = connections.find((c) => c.provider === p.id);
     return {
       id: p.id,
       name: p.name,
-      available: isAvailable(p),
+      available: p.available,
       connected: Boolean(conn),
       connectedAt: conn?.updatedAt?.toISOString() ?? null,
     };

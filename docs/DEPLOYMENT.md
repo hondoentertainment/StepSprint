@@ -59,6 +59,12 @@ After the first successful deploy, complete these steps:
 - [ ] **Verify email delivery** — register a test account and confirm the verification email arrives.
 - [ ] **Create a challenge** — log in as admin, create the first challenge, generate an invite code, and test the invite flow.
 - [ ] **Confirm database backups** — check the Render dashboard that daily backups are enabled for `stepsprint-db`.
+- [ ] **Health check monitoring** — point an external monitor at `GET /api/health` on the API URL. A `200` body includes `{ "ok": true, "db": "up" }`; `503` means the app cannot reach the database.
+- [ ] **OpenAPI / Swagger** — `/api/docs` is **off** in production by default. Set `OPENAPI_DOCS_ENABLED=true` on the API only if you need the interactive spec in prod.
+
+### Staging (recommended before a broad launch)
+
+Use a Vercel preview (or staging project) and a non-production API URL whose `APP_ORIGIN`, `API_PUBLIC_ORIGIN`, and client `VITE_API_URL` point at each other. Run `npm test`, `npm run build`, and `npm run test:e2e` against that stack so split-origin cookies, CSRF, and email flows match production.
 
 ---
 
@@ -71,7 +77,7 @@ In the Vercel dashboard → **Settings → Environment Variables** → set `VITE
 
 ### PostHog analytics
 
-In the Vercel dashboard → set `VITE_POSTHOG_KEY` (and optionally `VITE_POSTHOG_HOST`).
+In the Vercel dashboard → set `VITE_POSTHOG_KEY` (and optionally `VITE_POSTHOG_HOST`). The production build shows a cookie banner on first visit: analytics loads only if the visitor accepts. Legal pages (`/privacy`, `/terms`) are linked from the banner and from the app footer; replace placeholder copy with your jurisdiction-specific text before a public launch.
 
 ### Web Push notifications
 
@@ -128,6 +134,11 @@ In the Vercel dashboard → set `VITE_POSTHOG_KEY` (and optionally `VITE_POSTHOG
 | `GOOGLE_CLIENT_ID` | Manual | No | Google OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | Manual | No | Google OAuth client secret |
 | `REMINDER_NOTIFICATION_HOUR_LOCAL` | Manual | No | Local hour per challenge TZ when opt-in reminders are evaluated (`0`-`23`; default `17`). Server runs checks hourly; see `scheduler` service |
+| `REMINDER_USE_EXTERNAL_CRON` | Manual | No | Set to `true` to **disable** the in-process hourly reminder loop (use when running multiple API instances so only one sweep runs). |
+| `REMINDER_CRON_SECRET` | Manual | With external cron | Min 16 characters. Required for `POST /api/cron/reminder-sweep` with header `Authorization: Bearer <secret>`. |
+| `OPENAPI_DOCS_ENABLED` | Manual | No | Set to `true` to expose `/api/docs` and `/api/openapi.json` in production. Omit or `false` to keep them disabled (default when `NODE_ENV=production`). |
+
+Schedule the HTTP call from your host (for example Render **Cron Jobs**, GitHub Actions `schedule`, or Uptime Robot) at least once per hour. The sweep still only notifies users when their challenge timezone matches `REMINDER_NOTIFICATION_HOUR_LOCAL` and they are due for a reminder, so hourly pings are correct.
 
 ### Client (Vercel)
 

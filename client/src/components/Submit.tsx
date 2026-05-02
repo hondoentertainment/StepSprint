@@ -1,12 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 import { api } from "../api";
 import { getErrorMessage } from "../api";
 import { todayInTimezone, isFutureDate } from "../utils";
 import { track } from "../analytics";
 import type { Challenge } from "../types";
 import type { Summary } from "../types";
-import { AppleHealthSync } from "./AppleHealthSync";
 
 const MIN_STEPS = 0;
 const MAX_STEPS = 999999;
@@ -30,7 +30,26 @@ export function Submit({
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showAppleHealth, setShowAppleHealth] = useState(false);
+  /** null = unknown or skipped; false = no Apple/OAuth sync linked */
+  const [fitnessConnected, setFitnessConnected] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!challengeId) {
+      setFitnessConnected(null);
+      return;
+    }
+    let cancelled = false;
+    void api<{ connected: boolean }>("/api/integrations/fitness")
+      .then((data) => {
+        if (!cancelled) setFitnessConnected(data.connected);
+      })
+      .catch(() => {
+        if (!cancelled) setFitnessConnected(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [challengeId]);
 
   function resetDate() {
     setDate(todayInTimezone(selectedChallenge?.timezone));
@@ -87,6 +106,16 @@ export function Submit({
   return (
     <section className="panel">
       <h2>{t("submit.title")}</h2>
+      {challengeId && !challengesLoading && (
+        <>
+          <p className="hint">{t("submit.manualIntro")}</p>
+          {fitnessConnected === false && (
+            <p className="hint" role="note">
+              {t("submit.manualHintNoIntegration")}
+            </p>
+          )}
+        </>
+      )}
       {!challengeId && !challengesLoading && (
         <p className="status status-error">{t("submit.noChallengeSelected")}</p>
       )}
@@ -113,16 +142,11 @@ export function Submit({
       </form>
       <p className="hint">{t("submit.flaggedHint")}</p>
       <p className="hint">
-        <button
-          type="button"
-          className="link-button"
-          onClick={() => setShowAppleHealth((v) => !v)}
-          disabled={!challengeId}
-        >
-          {showAppleHealth ? t("submit.hideAppleWatch") : t("submit.syncAppleWatch")}
-        </button>
+        <Link to="/integrations" className="link-button">
+          {t("submit.connectDevice")}
+        </Link>
+        {challengeId ? "" : ` ${t("submit.connectDeviceNeedChallenge")}`}
       </p>
-      {showAppleHealth && challengeId && <AppleHealthSync challengeId={challengeId} />}
     </section>
   );
 }

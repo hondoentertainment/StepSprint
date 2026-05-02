@@ -4,12 +4,15 @@ import { useTranslation } from "react-i18next";
 import "./App.css";
 import { useAuth } from "./hooks/useAuth";
 import { useChallenges } from "./hooks/useChallenges";
-import { WeekProvider } from "./contexts/WeekContext";
-import { useWeek } from "./contexts/useWeek";
+import { WeekProvider } from "./contexts/WeekContext.tsx";
 import { Login } from "./components/Login";
 import { Layout } from "./components/Layout";
 import { Home } from "./components/Home";
 import { Submit } from "./components/Submit";
+import { IntegrationsPage } from "./components/IntegrationsPage";
+import { Privacy } from "./components/Privacy";
+import { Terms } from "./components/Terms";
+import { CookieConsentBanner } from "./components/CookieConsentBanner";
 
 // Route-based code splitting: lazy-load heavier, less critical-path routes.
 // Home, Login, and Submit stay eager as they're on the primary user journey.
@@ -23,6 +26,9 @@ const ResetPassword = lazy(() =>
 );
 const InvitePage = lazy(() =>
   import("./components/InvitePage").then((m) => ({ default: m.InvitePage })),
+);
+const VerifyEmail = lazy(() =>
+  import("./components/VerifyEmail").then((m) => ({ default: m.VerifyEmail })),
 );
 const WeeklyLeaderboard = lazy(() =>
   import("./components/WeeklyLeaderboard").then((m) => ({ default: m.WeeklyLeaderboard })),
@@ -54,12 +60,12 @@ function AuthenticatedApp() {
     error: challengesError,
     refreshChallenges,
   } = useChallenges();
-  const { week } = useWeek();
-
   if (!user) return null;
 
   return (
     <Routes>
+      <Route path="/privacy" element={<Privacy />} />
+      <Route path="/terms" element={<Terms />} />
       <Route
         path="/"
         element={
@@ -96,6 +102,15 @@ function AuthenticatedApp() {
           }
         />
         <Route
+          path="integrations"
+          element={
+            <IntegrationsPage
+              challengeId={selectedChallengeId}
+              challengesLoading={challengesLoading}
+            />
+          }
+        />
+        <Route
           path="weekly"
           element={
             <Suspense fallback={<RouteFallback />}>
@@ -123,8 +138,6 @@ function AuthenticatedApp() {
                   selectedChallengeId={selectedChallengeId}
                   selectedChallenge={selectedChallenge}
                   onChallengesRefresh={refreshChallenges}
-                  weekYear={week.year}
-                  weekNumber={week.week}
                 />
               </Suspense>
             )
@@ -153,9 +166,20 @@ function App() {
   if (!user) {
     return (
       <BrowserRouter>
+        <CookieConsentBanner />
         <Suspense fallback={<div className="panel" role="status">{t("common.loading")}</div>}>
           <Routes>
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
             <Route path="/invite" element={<InvitePage onAccepted={(u) => setUser(u)} />} />
+            <Route
+              path="/verify-email"
+              element={
+                <Suspense fallback={<RouteFallback />}>
+                  <VerifyEmail />
+                </Suspense>
+              }
+            />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="*" element={<Login onLogin={login} onRegister={register} />} />
@@ -167,6 +191,7 @@ function App() {
 
   return (
     <BrowserRouter>
+      <CookieConsentBanner />
       <WeekProvider>
         <AuthenticatedApp />
       </WeekProvider>

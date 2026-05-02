@@ -7,6 +7,7 @@ import { doubleCsrf } from "csrf-csrf";
 import * as Sentry from "@sentry/node";
 import { config } from "./config";
 import { logger } from "./logger";
+import { prisma } from "./prisma";
 import { authLimiter, apiLimiter, generalLimiter } from "./middleware/rateLimit";
 import authRoutes from "./routes/auth";
 import adminRoutes from "./routes/admin";
@@ -20,6 +21,7 @@ import integrationsRoutes from "./routes/integrations";
 import oauthRoutes from "./routes/oauth";
 import notificationsRoutes from "./routes/notifications";
 import openapiRoutes from "./routes/openapi";
+import cronRoutes from "./routes/cron";
 
 const app = express();
 const isProduction = config.nodeEnv === "production";
@@ -66,7 +68,10 @@ const swaggerCsp = helmet({
 });
 
 app.use((req, res, next) => {
-  if (req.path.startsWith("/api/docs") || req.path === "/api/openapi.json") {
+  const openApiPath =
+    config.openApiDocsEnabled &&
+    (req.path.startsWith("/api/docs") || req.path === "/api/openapi.json");
+  if (openApiPath) {
     return swaggerCsp(req, res, next);
   }
   return strictCsp(req, res, next);
@@ -149,6 +154,16 @@ function csrfProtection(req: Request, res: Response, next: NextFunction) {
   if (req.headers.authorization?.startsWith("Bearer ")) {
     return next();
   }
+  // These POSTs carry a secret token in the body (from email links). Users often
+  // open them without a prior API visit, so a CSRF cookie may not exist yet on
+  // split-hosting — same threat model as Bearer: attacker needs the token.
+  const pathOnly = req.originalUrl.split("?")[0];
+  if (
+    req.method === "POST" &&
+    (pathOnly === "/api/auth/reset-password" || pathOnly === "/api/auth/verify-email")
+  ) {
+    return next();
+  }
   return doubleCsrfProtection(req, res, next);
 }
 
@@ -159,13 +174,19 @@ if (isProduction) {
 // ---------------------------------------------------------------------------
 // Health check
 // ---------------------------------------------------------------------------
-app.get("/api/health", (_req, res) => {
-  res.json({ ok: true });
+app.get("/api/health", async (_req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({ ok: true, db: "up" as const });
+  } catch {
+    res.status(503).json({ ok: false, db: "down" as const });
+  }
 });
 
 // ---------------------------------------------------------------------------
 // Routes
 // ---------------------------------------------------------------------------
+app.use("/api/cron", cronRoutes);
 app.use("/api/auth", authLimiter, authRoutes);
 app.use("/api/admin/analytics", analyticsRoutes);
 app.use("/api/admin", adminRoutes);
@@ -177,7 +198,9 @@ app.use("/api/invites", inviteRoutes);
 app.use("/api/integrations", integrationsRoutes);
 app.use("/api/integrations", oauthRoutes);
 app.use("/api/me/notifications", notificationsRoutes);
-app.use("/api", openapiRoutes);
+if (config.openApiDocsEnabled) {
+  app.use("/api", openapiRoutes);
+}
 
 // Sentry must be attached AFTER all routes and BEFORE any custom error handler.
 Sentry.setupExpressErrorHandler(app);
