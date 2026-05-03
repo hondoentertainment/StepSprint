@@ -40,10 +40,13 @@ describe("Admin analytics", () => {
     expect(res.body).toHaveProperty("participationRate");
     expect(res.body).toHaveProperty("neverLoggedCount");
     expect(res.body).toHaveProperty("dormantParticipantCount");
+    expect(res.body).toHaveProperty("reEngagementNeededCount");
+    expect(typeof res.body.reEngagementNeededCount).toBe("number");
+    expect(res.body.reEngagementNeededCount).toBeGreaterThanOrEqual(0);
+    expect(res.body.reEngagementNeededCount).toBeLessThanOrEqual(res.body.dormantParticipantCount);
     expect(res.body).toHaveProperty("submissionTrend");
     expect(Array.isArray(res.body.submissionTrend)).toBe(true);
   });
-});
 
   it("returns cohort summary for admin", async () => {
     const cookie = await adminCookie();
@@ -58,6 +61,7 @@ describe("Admin analytics", () => {
     expect(demo).toBeDefined();
     expect(demo).toHaveProperty("lifecycle");
     expect(demo).toHaveProperty("participationRate");
+    expect(demo).toHaveProperty("reEngagementNeededCount");
     expect(demo).not.toHaveProperty("submissionTrend");
   });
 
@@ -66,4 +70,3 @@ describe("Admin analytics", () => {
     await request(app).get("/api/admin/analytics/cohort").set("Cookie", cookie).expect(403);
   });
 });
-

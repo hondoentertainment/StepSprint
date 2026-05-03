@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { api, getErrorMessage, getApiUrl } from "../api";
 
 type IntegrationToken = {
@@ -22,6 +23,7 @@ type Props = {
 };
 
 export function FitnessIntegrations({ challengeId }: Props) {
+  const { t } = useTranslation();
   const [tokens, setTokens] = useState<IntegrationToken[]>([]);
   const [providers, setProviders] = useState<OAuthProvider[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,9 +70,9 @@ export function FitnessIntegrations({ challengeId }: Props) {
       url.searchParams.delete("oauth_error");
       window.history.replaceState({}, "", url.toString());
       if (oauthSuccess) void loadData();
-      if (oauthError) setError(`OAuth error: ${oauthError}`);
+      if (oauthError) setError(t("integrations.oauthError", { error: oauthError }));
     }
-  }, [loadData]);
+  }, [loadData, t]);
 
   async function createToken() {
     try {
@@ -80,7 +82,7 @@ export function FitnessIntegrations({ challengeId }: Props) {
       setSyncResult(null);
       const data = await api<{ token: string; label: string }>("/api/integrations/tokens", {
         method: "POST",
-        body: JSON.stringify({ label: "Apple Watch Sync" }),
+        body: JSON.stringify({ label: t("integrations.appleHealth.tokenLabelDefault") }),
       });
       setNewToken(data.token);
       await loadData();
@@ -135,7 +137,12 @@ export function FitnessIntegrations({ challengeId }: Props) {
         }
       );
       setSyncResult(
-        `${provider.name}: ${result.imported} new, ${result.updated} updated, ${result.skipped} skipped.`
+        t("integrations.syncResult", {
+          name: provider.name,
+          imported: result.imported,
+          updated: result.updated,
+          skipped: result.skipped,
+        })
       );
     } catch (err) {
       setError(getErrorMessage(err));
@@ -160,19 +167,13 @@ export function FitnessIntegrations({ challengeId }: Props) {
     );
   }
 
-  if (loading) return <p className="hint">Loading…</p>;
+  if (loading) return <p className="hint">{t("common.loading")}</p>;
 
   return (
     <div className="apple-health-sync">
-      <h3>Apple Watch / Apple Health</h3>
-      <p className="hint">
-        Optional — use this if you want steps sent automatically from your iPhone. You can always enter totals
-        manually on the Submit page instead.
-      </p>
-      <p className="hint">
-        Use an iOS Shortcut to send Apple Watch steps to StepSprint each day (HealthKit cannot be read from this
-        website directly). Generate a token, then configure the Shortcut to POST to StepSprint.
-      </p>
+      <h3>{t("integrations.appleHealth.sectionTitle")}</h3>
+      <p className="hint">{t("integrations.appleHealth.introOptional")}</p>
+      <p className="hint">{t("integrations.appleHealth.introShortcut")}</p>
 
       {error && (
         <p className="status status-error" role="alert">
@@ -187,131 +188,123 @@ export function FitnessIntegrations({ challengeId }: Props) {
 
       {newToken && (
         <div className="token-reveal panel">
-          <p className="status status-success">
-            Token created. Copy it now — it will not be shown again.
-          </p>
-          <code className="token-value" aria-label="API token">
+          <p className="status status-success">{t("integrations.appleHealth.tokenCreated")}</p>
+          <code className="token-value" aria-label={t("integrations.appleHealth.tokenAriaLabel")}>
             {newToken}
           </code>
           <button type="button" className="secondary" onClick={() => void copyToClipboard(newToken)}>
-            {copied ? "Copied!" : "Copy token"}
+            {copied ? t("integrations.appleHealth.copied") : t("integrations.appleHealth.copyToken")}
           </button>
 
           <details className="shortcut-guide">
-            <summary>iOS Shortcut setup instructions</summary>
+            <summary>{t("integrations.appleHealth.shortcutGuideSummary")}</summary>
             <ol>
+              <li>{t("integrations.appleHealth.shortcutStep1")}</li>
+              <li>{t("integrations.appleHealth.shortcutStep2")}</li>
+              <li>{t("integrations.appleHealth.shortcutStep3")}</li>
+              <li>{t("integrations.appleHealth.shortcutStep4")}</li>
               <li>
-                Open the <strong>Shortcuts</strong> app on your iPhone and tap <strong>+</strong> to create a new
-                shortcut.
-              </li>
-              <li>
-                Add a <strong>Find Health Samples</strong> or <strong>Get Health Sample</strong> action. Set Type
-                to <strong>Steps</strong> and the period to cover the calendar day you are logging.
-              </li>
-              <li>
-                Add <strong>Calculate Statistics</strong> with Function set to <strong>Sum</strong> when you have
-                multiple samples.
-              </li>
-              <li>
-                Add <strong>Format Date</strong> on the chosen day. Use format <code>yyyy-MM-dd</code>.
-              </li>
-              <li>
-                Add <strong>Get Contents of URL</strong>:
+                {t("integrations.appleHealth.shortcutStep5Title")}
                 <ul>
                   <li>
-                    URL: <code>{syncUrl}</code>
+                    {t("integrations.appleHealth.shortcutStep5Url")} <code>{syncUrl}</code>
                   </li>
-                  <li>Method: POST</li>
+                  <li>{t("integrations.appleHealth.shortcutStep5Method")}</li>
                   <li>
-                    Header: <code>Authorization</code> ={" "}
-                    <code>Bearer {newToken}</code>
+                    {t("integrations.appleHealth.shortcutStep5Header", { token: newToken })}
                   </li>
                   <li>
-                    Request Body (JSON):
+                    {t("integrations.appleHealth.shortcutStep5Body")}
                     <pre className="shortcut-json">
-                      {`{
-  "challengeId": "${challengeId}",
-  "date": "<formatted date from prior step>",
-  "steps": <sum of steps>
-}`}
+                      {t("integrations.appleHealth.shortcutStep5Json", { challengeId })}
                     </pre>
                   </li>
                 </ul>
               </li>
-              <li>
-                Optionally add an <strong>Automation</strong> so the shortcut runs at the end of each day.
-              </li>
+              <li>{t("integrations.appleHealth.shortcutStep6")}</li>
             </ol>
           </details>
         </div>
       )}
 
       <div className="token-list">
-        <h4>API tokens</h4>
+        <h4>{t("integrations.appleHealth.apiTokensHeading")}</h4>
         {tokens.length === 0 ? (
-          <p className="hint">No tokens yet.</p>
+          <p className="hint">{t("integrations.appleHealth.noTokensYet")}</p>
         ) : (
           <ul>
-            {tokens.map((t) => (
-              <li key={t.id} className="token-row">
-                <span className="token-label">{t.label}</span>
+            {tokens.map((tokenRow) => (
+              <li key={tokenRow.id} className="token-row">
+                <span className="token-label">{tokenRow.label}</span>
                 <span className="token-meta">
-                  Created {new Date(t.createdAt).toLocaleDateString()}
-                  {t.lastUsedAt && (
-                    <> · Last used {new Date(t.lastUsedAt).toLocaleDateString()}</>
+                  {t("integrations.appleHealth.createdOn", {
+                    date: new Date(tokenRow.createdAt).toLocaleDateString(),
+                  })}
+                  {tokenRow.lastUsedAt && (
+                    <>
+                      {" \u00b7 "}
+                      {t("integrations.appleHealth.lastUsedOn", {
+                        date: new Date(tokenRow.lastUsedAt).toLocaleDateString(),
+                      })}
+                    </>
                   )}
-                  {t.expiresAt && <> · Expires {new Date(t.expiresAt).toLocaleDateString()}</>}
+                  {tokenRow.expiresAt && (
+                    <>
+                      {" \u00b7 "}
+                      {t("integrations.appleHealth.expiresOn", {
+                        date: new Date(tokenRow.expiresAt).toLocaleDateString(),
+                      })}
+                    </>
+                  )}
                 </span>
                 <button
                   type="button"
                   className="link-button danger"
-                  onClick={() => void revokeToken(t.id)}
-                  disabled={revoking === t.id}
-                  aria-label={`Revoke token ${t.label}`}
+                  onClick={() => void revokeToken(tokenRow.id)}
+                  disabled={revoking === tokenRow.id}
+                  aria-label={t("integrations.appleHealth.revokeAriaLabel", { label: tokenRow.label })}
                 >
-                  {revoking === t.id ? "Revoking…" : "Revoke"}
+                  {revoking === tokenRow.id
+                    ? t("integrations.appleHealth.revoking")
+                    : t("integrations.appleHealth.revoke")}
                 </button>
               </li>
             ))}
           </ul>
         )}
         <button type="button" className="secondary" onClick={() => void createToken()} disabled={creating}>
-          {creating ? "Generating…" : "Generate new token"}
+          {creating ? t("integrations.appleHealth.generating") : t("integrations.appleHealth.generateToken")}
         </button>
       </div>
 
       {!newToken && tokens.length > 0 && (
         <details className="shortcut-guide">
-          <summary>Apple Health API reference</summary>
-          <p>
-            POST to <code>{syncUrl}</code> with header <code>Authorization: Bearer {"<your-token>"}</code>:
-          </p>
-          <pre className="shortcut-json">{`// Single day
-{ "challengeId": "${challengeId}", "date": "YYYY-MM-DD", "steps": 8000 }
-
-// Batch (up to 31 days)
-{ "challengeId": "${challengeId}", "rows": [{ "date": "YYYY-MM-DD", "steps": 8000 }] }`}</pre>
+          <summary>{t("integrations.appleHealth.apiReferenceSummary")}</summary>
+          <p>{t("integrations.appleHealth.apiReferenceIntro", { url: syncUrl })}</p>
+          <pre className="shortcut-json">
+            {t("integrations.appleHealth.apiReferenceExample", { challengeId })}
+          </pre>
         </details>
       )}
 
       {showOAuthSection && (
         <div className="oauth-providers">
-          <h4>OAuth services (Fitbit, Google Fit, Garmin Connect)</h4>
-          <p className="hint">
-            Sign in once with each provider below, then tap <strong>Sync today</strong> to import steps into this
-            challenge. Garmin requires your server to register with the Garmin Connect Developer Program with the
-            correct redirect URI and OAuth scopes.
-          </p>
+          <h4>{t("integrations.oauth.sectionTitle")}</h4>
+          <p className="hint">{t("integrations.oauth.intro")}</p>
           <ul>
             {oauthProviders.map((p) => (
               <li key={p.id} className="oauth-provider-row">
                 <span className="provider-name">{p.name}</span>
                 {!p.available ? (
-                  <span className="badge-coming-soon">Not configured</span>
+                  <span className="badge-coming-soon">{t("integrations.oauth.notConfigured")}</span>
                 ) : p.connected ? (
                   <span className="provider-actions">
                     <span className="token-meta">
-                      Connected{p.connectedAt ? ` ${new Date(p.connectedAt).toLocaleDateString()}` : ""}
+                      {p.connectedAt
+                        ? t("integrations.oauth.connectedOn", {
+                            date: new Date(p.connectedAt).toLocaleDateString(),
+                          })
+                        : t("integrations.oauth.connected")}
                     </span>
                     <button
                       type="button"
@@ -319,7 +312,7 @@ export function FitnessIntegrations({ challengeId }: Props) {
                       onClick={() => void syncProvider(p)}
                       disabled={syncing === p.id}
                     >
-                      {syncing === p.id ? "Syncing…" : "Sync today"}
+                      {syncing === p.id ? t("integrations.oauth.syncing") : t("integrations.oauth.syncToday")}
                     </button>
                     <button
                       type="button"
@@ -327,12 +320,14 @@ export function FitnessIntegrations({ challengeId }: Props) {
                       onClick={() => void disconnectProvider(p)}
                       disabled={disconnecting === p.id}
                     >
-                      {disconnecting === p.id ? "Disconnecting…" : "Disconnect"}
+                      {disconnecting === p.id
+                        ? t("integrations.oauth.disconnecting")
+                        : t("integrations.oauth.disconnect")}
                     </button>
                   </span>
                 ) : (
                   <a href={connectUrl(p)} className="secondary">
-                    Connect {p.name}
+                    {t("integrations.oauth.connectProvider", { name: p.name })}
                   </a>
                 )}
               </li>

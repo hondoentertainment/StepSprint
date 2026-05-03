@@ -6,7 +6,18 @@
  * messages, and navigation links. The full token redemption path is covered by
  * server-side unit tests.
  */
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
+
+function resetPasswordNewInput(page: Page) {
+  return page.locator(".panel-login .password-field input");
+}
+
+function resetPasswordConfirmInput(page: Page) {
+  return page
+    .locator(".panel-login form label")
+    .filter({ hasText: /Confirm new password|Confirmar contraseña/i })
+    .locator("input");
+}
 
 test.describe("Forgot password flow", () => {
   test.use({ viewport: { width: 1280, height: 720 } });
@@ -39,9 +50,10 @@ test.describe("Forgot password flow", () => {
 
   test("invalid email format shows validation error", async ({ page }) => {
     await page.goto("/forgot-password");
-    await page.getByLabel(/email/i).fill("notanemail");
-    await page.getByRole("button", { name: /send reset link/i }).click();
-    await expect(page.getByRole("alert")).toBeVisible({ timeout: 5_000 });
+    await page.locator(".panel-login form").evaluate((f) => f.setAttribute("novalidate", ""));
+    await page.getByLabel(/email|correo/i).fill("notanemail");
+    await page.getByRole("button", { name: /send reset link|Enviar enlace/i }).click();
+    await expect(page.getByRole("alert")).toContainText(/valid|válido/i, { timeout: 5_000 });
   });
 
   test("back to sign in link navigates to login", async ({ page }) => {
@@ -68,33 +80,35 @@ test.describe("Reset password page", () => {
 
   test("visiting /reset-password with token+email shows the password form", async ({ page }) => {
     await page.goto("/reset-password?token=sometoken&email=user1%40stepsprint.local");
-    await expect(page.getByRole("heading", { name: /set new password/i })).toBeVisible();
-    await expect(page.getByLabel(/new password/i)).toBeVisible();
-    await expect(page.getByLabel(/confirm new password/i)).toBeVisible();
-    await expect(page.getByRole("button", { name: /reset password/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Set new password|Nueva contraseña/i })).toBeVisible();
+    await expect(resetPasswordNewInput(page)).toBeVisible();
+    await expect(resetPasswordConfirmInput(page)).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /Reset password|Restablecer contraseña/i })
+    ).toBeVisible();
   });
 
   test("reset password form validates weak password", async ({ page }) => {
     await page.goto("/reset-password?token=sometoken&email=user1%40stepsprint.local");
-    await page.getByLabel(/new password/i).fill("weak");
-    await page.getByLabel(/confirm new password/i).fill("weak");
-    await page.getByRole("button", { name: /reset password/i }).click();
+    await resetPasswordNewInput(page).fill("weak");
+    await resetPasswordConfirmInput(page).fill("weak");
+    await page.getByRole("button", { name: /Reset password|Restablecer contraseña/i }).click();
     await expect(page.getByRole("alert")).toBeVisible({ timeout: 5_000 });
   });
 
   test("reset password form shows error for mismatched passwords", async ({ page }) => {
     await page.goto("/reset-password?token=sometoken&email=user1%40stepsprint.local");
-    await page.getByLabel(/new password/i).fill("NewPass1!");
-    await page.getByLabel(/confirm new password/i).fill("DifferentPass1!");
-    await page.getByRole("button", { name: /reset password/i }).click();
-    await expect(page.getByText(/do not match/i)).toBeVisible({ timeout: 5_000 });
+    await resetPasswordNewInput(page).fill("NewPass1!");
+    await resetPasswordConfirmInput(page).fill("DifferentPass1!");
+    await page.getByRole("button", { name: /Reset password|Restablecer contraseña/i }).click();
+    await expect(page.getByText(/do not match|no coinciden/i)).toBeVisible({ timeout: 5_000 });
   });
 
   test("reset password with an invalid token shows an error from the API", async ({ page }) => {
     await page.goto("/reset-password?token=invalid-token-xyz&email=user1%40stepsprint.local");
-    await page.getByLabel(/new password/i).fill("NewPass1!");
-    await page.getByLabel(/confirm new password/i).fill("NewPass1!");
-    await page.getByRole("button", { name: /reset password/i }).click();
+    await resetPasswordNewInput(page).fill("NewPass1!");
+    await resetPasswordConfirmInput(page).fill("NewPass1!");
+    await page.getByRole("button", { name: /Reset password|Restablecer contraseña/i }).click();
     await expect(page.getByRole("alert")).toBeVisible({ timeout: 10_000 });
   });
 });

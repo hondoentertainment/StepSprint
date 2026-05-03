@@ -6,6 +6,9 @@ export function Terms() {
   return (
     <div className="app">
       <main id="main-content" className="panel legal-page" tabIndex={-1}>
+        <p className="hint legal-production-notice" role="note">
+          {t("legal.productionNotice")}
+        </p>
         <h1>{t("legal.termsTitle")}</h1>
         <p className="hint">{t("legal.termsIntro")}</p>
         <h2>{t("legal.termsUse")}</h2>

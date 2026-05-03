@@ -1,33 +1,16 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect } from "@playwright/test";
+import { loginAsSeededAdmin } from "./test-helpers";
 
 // Seed data expected:
 //   admin@stepsprint.local  (password `password123`, role ADMIN)
 //   user1@stepsprint.local  (participant with submissions on `demo-challenge`)
 //   `demo-challenge` challenge with ~10 days of submissions per participant.
-// Login flow mirrors client/e2e/desktop.spec.ts: email field, "Get started" button.
-// If login requires a password (register/login combined on Login.tsx) the helper
-// fills it when present; participant seed password is `password123`.
-
-const ADMIN_EMAIL = "admin@stepsprint.local";
-const ADMIN_PASSWORD = "password123";
-
-async function loginAsAdmin(page: Page): Promise<void> {
-  await page.goto("/");
-  await page.getByLabel(/email/i).fill(ADMIN_EMAIL);
-  const passwordField = page.getByLabel(/^password/i).first();
-  if (await passwordField.isVisible().catch(() => false)) {
-    await passwordField.fill(ADMIN_PASSWORD);
-  }
-  await page.getByRole("button", { name: /get started|log in|sign in/i }).first().click();
-  // Admin lands on the authed shell; the Admin tab is only rendered for ADMIN users.
-  await expect(page.getByTestId("tab-admin")).toBeVisible({ timeout: 15_000 });
-}
 
 test.describe("Admin console", () => {
   test.use({ viewport: { width: 1280, height: 720 } });
 
   test("admin login and challenge list renders", async ({ page }) => {
-    await loginAsAdmin(page);
+    await loginAsSeededAdmin(page);
     await page.getByTestId("tab-admin").click();
 
     await expect(page.getByRole("heading", { name: /Admin console/i })).toBeVisible();
@@ -43,12 +26,18 @@ test.describe("Admin console", () => {
   });
 
   test("admin can flag a submission via steps edit (>100k auto-flags)", async ({ page }) => {
-    await loginAsAdmin(page);
+    await loginAsSeededAdmin(page);
     await page.getByTestId("tab-admin").click();
     await expect(page.getByRole("heading", { name: /Admin console/i })).toBeVisible();
 
     // Target a known seeded participant so the moderation list is deterministic.
-    await page.getByLabel(/Search/i).fill("user1@stepsprint.local");
+    await page.getByRole("heading", { name: /Moderation|Moderación/i }).scrollIntoViewIfNeeded();
+    const submissionsReq = page.waitForResponse((r) => {
+      const u = r.url();
+      return u.includes("/api/admin/submissions") && r.request().method() === "GET" && r.ok();
+    });
+    await page.getByLabel(/Search|Buscar/i).fill("user1@stepsprint.local");
+    await submissionsReq;
 
     // First submission row for this user.
     const firstRow = page.locator(".list-row").first();
@@ -63,17 +52,23 @@ test.describe("Admin console", () => {
     // 150_000 via the moderation form is the supported way to flag via the UI.
     await page.getByLabel(/Reason/i).fill("E2E flag test");
     await page.getByLabel(/Edit steps/i).fill("150000");
-    await firstRow.getByRole("button", { name: /^Edit$/ }).click();
+    await firstRow.getByRole("button", { name: /^Edit$|^Editar$/i }).click();
 
     // Confirm the modal.
-    await page.getByRole("button", { name: /^Save$/ }).click();
+    await page.getByRole("button", { name: /^Save$|^Guardar$/i }).click();
 
     await expect(page.getByText(/Submission updated\./i)).toBeVisible({ timeout: 10_000 });
 
     // Persistence check: reload, re-search, confirm the row renders with `(flagged)`.
     await page.reload();
     await page.getByTestId("tab-admin").click();
-    await page.getByLabel(/Search/i).fill("user1@stepsprint.local");
+    await page.getByRole("heading", { name: /Moderation|Moderación/i }).scrollIntoViewIfNeeded();
+    const submissionsAfter = page.waitForResponse((r) => {
+      const u = r.url();
+      return u.includes("/api/admin/submissions") && r.request().method() === "GET" && r.ok();
+    });
+    await page.getByLabel(/Search|Buscar/i).fill("user1@stepsprint.local");
+    await submissionsAfter;
 
     const rowAfter = page
       .locator(".list-row")
@@ -83,21 +78,25 @@ test.describe("Admin console", () => {
   });
 
   test("admin can create a new challenge", async ({ page }) => {
-    await loginAsAdmin(page);
+    await loginAsSeededAdmin(page);
     await page.getByTestId("tab-admin").click();
     await expect(page.getByRole("heading", { name: /Admin console/i })).toBeVisible();
 
     const challengeName = `E2E Challenge ${Date.now()}`;
 
-    // Form labels: Name / Start date / End date / Timezone / Team size.
-    await page.getByLabel(/^Name$/).fill(challengeName);
-    await page.getByLabel(/Start date/i).fill("2026-05-01");
-    await page.getByLabel(/End date/i).fill("2026-05-31");
+    const setupSection = page
+      .getByRole("heading", { name: /Challenge setup|Configuración del reto/i })
+      .locator("..");
+    await setupSection.scrollIntoViewIfNeeded();
+    const setupFields = setupSection.getByRole("textbox");
+    await setupFields.nth(0).fill(challengeName);
+    await setupFields.nth(1).fill("2026-05-01");
+    await setupFields.nth(2).fill("2026-05-31");
     // Timezone/team size keep their defaults (America/Chicago, 4).
 
-    await page.getByRole("button", { name: /Create challenge/i }).click();
+    await page.getByRole("button", { name: /Create challenge|Crear reto/i }).click();
 
-    await expect(page.getByText(/Challenge created\./i)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/Challenge created|Reto creado/i)).toBeVisible({ timeout: 10_000 });
 
     // New challenge should appear in the header selector.
     const challengeSelect = page.locator("header select").first();

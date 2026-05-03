@@ -1,3 +1,5 @@
+import { noteApiRequestId } from "./requestContext";
+
 const API_BASE = (import.meta.env.VITE_API_URL as string)?.replace(/\/$/, "") ?? "";
 
 export class ApiError extends Error {
@@ -62,6 +64,9 @@ export async function api<T>(path: string, options: RequestInit = {}) {
     ...options,
     headers: baseHeaders,
   });
+
+  const reqId = response.headers.get("x-request-id");
+  noteApiRequestId(reqId && reqId.length > 0 ? reqId : null);
 
   if (!response.ok) {
     // Clear cached CSRF token if the server rejects it so the next request

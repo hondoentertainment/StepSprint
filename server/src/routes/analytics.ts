@@ -18,6 +18,8 @@ export type ChallengeAnalyticsPayload = {
   participationRate: number;
   neverLoggedCount: number;
   dormantParticipantCount: number;
+  /** Logged at least once historically, but no submission in the dormant lookback window */
+  reEngagementNeededCount: number;
   dormantLookbackDays: number;
   avgActiveDays: number;
   totalSubmissions: number;
@@ -75,6 +77,13 @@ async function buildChallengeAnalytics(
     return last < cutoffDormant;
   }).length;
 
+  const reEngagementNeededCount = members.filter((m) => {
+    const last = lastSubmissionByUser.get(m.userId);
+    const daysLogged = activeByUser.get(m.userId) ?? 0;
+    if (daysLogged === 0 || !last) return false;
+    return last < cutoffDormant;
+  }).length;
+
   const participationRate = members.length > 0 ? participantsWithSubmission / members.length : 0;
   const avgActiveDays =
     members.length > 0
@@ -105,6 +114,7 @@ async function buildChallengeAnalytics(
     participationRate: Math.round(participationRate * 100),
     neverLoggedCount,
     dormantParticipantCount,
+    reEngagementNeededCount,
     dormantLookbackDays: DORMANT_LOOKBACK_DAYS,
     avgActiveDays: Math.round(avgActiveDays * 10) / 10,
     totalSubmissions,
@@ -144,6 +154,7 @@ router.get("/cohort", async (_req: AuthenticatedRequest, res) => {
         participationRate: full.participationRate,
         neverLoggedCount: full.neverLoggedCount,
         dormantParticipantCount: full.dormantParticipantCount,
+        reEngagementNeededCount: full.reEngagementNeededCount,
         avgActiveDays: full.avgActiveDays,
         totalSubmissions: full.totalSubmissions,
         totalSteps: full.totalSteps,

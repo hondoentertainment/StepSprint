@@ -52,8 +52,8 @@ export function Layout({
         </div>
         <div className="topbar-actions">
           {!isOnSubmit && selectedChallengeId && (
-            <Link to="/submit" className="topbar-log-btn" aria-label="Log today's steps">
-              + Log steps
+            <Link to="/submit" className="topbar-log-btn" aria-label={t("layout.logStepsShortcutAria")}>
+              {t("layout.logStepsShortcut")}
             </Link>
           )}
           <select

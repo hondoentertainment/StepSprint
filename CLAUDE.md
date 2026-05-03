@@ -20,7 +20,7 @@ server/             Express 5 + TypeScript API (JWT auth, Zod validation)
   src/              App code, routes, middleware, logger, sentry, openapi
   src/seed.ts       Seed entry point (wired via server/prisma.config.ts)
   Dockerfile        Multi-stage server image (targets Postgres prod)
-docs/               Screenshots, DEPLOYMENT.md, design notes
+docs/               Screenshots, DEPLOYMENT.md, PRODUCTION.md, design notes
 .github/workflows/  CI (server + client tests + lint + build)
 render.yaml         Render.com blueprint (web service + Postgres)
 vercel.json         Frontend deploy config
@@ -87,7 +87,7 @@ Seed users after `db:seed`:
 - `hooks/` — `useAuth`, `useChallenges`, etc.
 - `sentry.ts` — `initSentry()` + `captureException` helper; `ErrorBoundary.componentDidCatch` forwards here
 - `analytics.ts` — `track()` / `identify()` abstraction; lazy-imports `posthog-js` only if `VITE_POSTHOG_KEY` set; wired in `Login` (identify on success), `Submit` (track on submission), `Home` (track on challenge view)
-- `i18n/` — react-i18next setup; `en.json` with Login page strings (other components still hardcoded)
+- `i18n/` — react-i18next setup; `en.json` and `es.json` hold user-visible copy; `LegalFooter` includes a language control (persists `stepsprint-locale`)
 - Styling: CSS-in-JS + `App.css` / `index.css`; no UI framework
 - PWA: `vite-plugin-pwa` with `registerType: 'autoUpdate'`; manifest inlined in vite.config; icons in `public/icons/`
 
@@ -118,15 +118,15 @@ Team assignment supports random and snake-draft at challenge creation.
 
 - **Sentry and PostHog**: Server Sentry is silent until `SENTRY_DSN` is set. Client Sentry needs `VITE_SENTRY_DSN`. PostHog loads only when `VITE_POSTHOG_KEY` is set **and** (in production) the user accepts analytics in the banner; in development, analytics runs unless the user chose “Essential only”.
 - **No real SMTP provider**: Nodemailer wired, password reset emails no-op without SMTP env.
-- **i18n coverage is thin**: `Login` and legal/cookie strings use `useTranslation` via `en.json`; most other screens still hardcode English.
-- **Health-sync integrations**: Apple Watch sync via API token and Shortcuts is implemented; Fitbit and Google Fit use OAuth when server env credentials are set (`routes/oauth.ts`, `routes/integrations.ts`).
-- **Push notifications**: daily reminders are email-only; no Web Push / VAPID yet.
+- **i18n**: Most screens use `useTranslation` with `en.json`; Spanish lives in `es.json` — language switcher in `LegalFooter` (persists `stepsprint-locale` in `localStorage`).
+- **Health-sync integrations**: Apple Watch via Shortcuts + bearer token to `POST /api/integrations/apple-health`; Fitbit, Google Fit, and Garmin via OAuth when server env credentials are set (`routes/oauth.ts`, `routes/integrations.ts`). In-browser HealthKit/Health Connect pairing is not a PWA goal (see `docs/PRD.md` stretch decision).
+- **Push notifications**: Daily reminders can use Web Push when VAPID keys are configured; email when SMTP/Resend is configured; see notifications routes and `REMINDER_*` env.
 - **CSP**: API responses use helmet with pinned CSP (strict for API routes; relaxed only for `/api/docs` and `/api/openapi.json` when OpenAPI docs are enabled).
 - **CSRF**: Production uses double-submit cookie validation on `/api/*` (except Bearer-auth and specific auth endpoints); the SPA fetches `/api/csrf-token` and sends `x-csrf-token` (`server/src/app.ts`, `client/src/api.ts`).
 - **OpenAPI / Swagger**: Disabled by default when `NODE_ENV=production`. Set `OPENAPI_DOCS_ENABLED=true` on the server to expose `/api/docs` and `/api/openapi.json`.
-- **Deploy**: Client (Vercel) and API (Docker on Render) are described in `docs/DEPLOYMENT.md`; `render.yaml` and `server/Dockerfile` run `prisma migrate deploy` before the process starts.
+- **Deploy**: See `docs/DEPLOYMENT.md` and the production checklist in `docs/PRODUCTION.md`; `render.yaml` and `server/Dockerfile` run `prisma migrate deploy` before the process starts.
 - **Postgres cutover pending**: dev uses SQLite; `server/prisma/schema.postgresql.prisma` is kept in sync but not yet the live schema.
-- **Dependency vulnerabilities**: 4 high advisories in `vite-plugin-pwa > workbox-build > @rollup/plugin-terser > serialize-javascript` (client) and 3 moderate in `@prisma/dev > @hono/node-server` (server) remain after `npm audit fix`. Resolving either chain requires `--force` with breaking downgrades, so they're deferred.
+- **Dependency vulnerabilities**: Root `npm audit` clean after `npm audit fix`. In **client**, `vite-plugin-pwa` / `workbox-build` / `serialize-javascript` still report high until a non-breaking upgrade path exists (avoid `npm audit fix --force` without testing the PWA build). In **server**, moderate advisories in `@prisma/dev` → `@hono/node-server`; fixing cleanly may require a Prisma major alignment — verify before forcing.
 - **Bundle size**: `Admin`, `WeeklyLeaderboard`, `TeamStandings` are code-split; `Home`, `Login`, `Submit` stay eager (critical path). Initial bundle is ~97 KB gzipped — room for more splitting, image optimization, and response caching.
 
 ## When making changes

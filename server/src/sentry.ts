@@ -24,6 +24,7 @@ export function initSentry(): void {
     dsn,
     environment: env,
     tracesSampleRate: isProduction ? 0.1 : 1.0,
+    release: config.deploymentRelease,
   });
 
   initialized = true;

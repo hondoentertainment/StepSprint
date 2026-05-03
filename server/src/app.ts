@@ -177,9 +177,27 @@ if (isProduction) {
 app.get("/api/health", async (_req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
-    res.json({ ok: true, db: "up" as const });
+    const body: {
+      ok: true;
+      db: "up";
+      service: string;
+      release?: string;
+    } = {
+      ok: true,
+      db: "up",
+      service: "stepsprint-api",
+    };
+    if (config.deploymentRelease) {
+      body.release = config.deploymentRelease;
+    }
+    res.json(body);
   } catch {
-    res.status(503).json({ ok: false, db: "down" as const });
+    res.status(503).json({
+      ok: false,
+      db: "down" as const,
+      service: "stepsprint-api",
+      ...(config.deploymentRelease ? { release: config.deploymentRelease } : {}),
+    });
   }
 });
 
@@ -187,7 +205,7 @@ app.get("/api/health", async (_req, res) => {
 // Routes
 // ---------------------------------------------------------------------------
 app.use("/api/cron", cronRoutes);
-app.use("/api/auth", authLimiter, authRoutes);
+app.use("/api/auth", ...(isProduction ? [authLimiter] : []), authRoutes);
 app.use("/api/admin/analytics", analyticsRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/challenges", challengeRoutes);

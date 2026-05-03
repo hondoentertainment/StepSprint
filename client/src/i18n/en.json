@@ -90,12 +90,15 @@
     "noChallenges": "No challenges available",
     "logout": "Log out",
     "selectChallenge": "Select challenge",
+    "logStepsShortcut": "+ Log steps",
+    "logStepsShortcutAria": "Log today's steps",
+    "languageSelectAria": "Choose language",
     "tabs": {
       "Home": "Home",
       "Submit": "Submit",
       "Devices": "Devices",
-      "Weekly Top Steppers": "Weekly Top Steppers",
-      "Team Standings": "Team Standings",
+      "Leaderboard": "Weekly Top Steppers",
+      "Teams": "Team Standings",
       "Admin": "Admin"
     }
   },
@@ -103,7 +106,56 @@
     "title": "Fitness sync",
     "subtitle": "Apple Watch shortcut tokens, Garmin Connect OAuth, Fitbit, and Google Fit all land here.",
     "noChallenge": "Select an active challenge in the header to configure sync.",
-    "backToSubmit": "Back to Submit steps"
+    "backToSubmit": "Back to Submit steps",
+    "oauthError": "OAuth error: {{error}}",
+    "syncResult": "{{name}}: {{imported}} new, {{updated}} updated, {{skipped}} skipped.",
+    "appleHealth": {
+      "sectionTitle": "Apple Watch / Apple Health",
+      "introOptional": "Optional — use this if you want steps sent automatically from your iPhone. You can always enter totals manually on the Submit page instead.",
+      "introShortcut": "Use an iOS Shortcut to send Apple Watch steps to StepSprint each day (HealthKit cannot be read from this website directly). Generate a token, then configure the Shortcut to POST to StepSprint.",
+      "tokenCreated": "Token created. Copy it now — it will not be shown again.",
+      "tokenAriaLabel": "API token",
+      "copyToken": "Copy token",
+      "copied": "Copied!",
+      "shortcutGuideSummary": "iOS Shortcut setup instructions",
+      "shortcutStep1": "Open the Shortcuts app on your iPhone and tap + to create a new shortcut.",
+      "shortcutStep2": "Add a Find Health Samples or Get Health Sample action. Set Type to Steps and the period to cover the calendar day you are logging.",
+      "shortcutStep3": "Add Calculate Statistics with Function set to Sum when you have multiple samples.",
+      "shortcutStep4": "Add Format Date on the chosen day. Use format yyyy-MM-dd.",
+      "shortcutStep5Title": "Add Get Contents of URL:",
+      "shortcutStep5Url": "URL:",
+      "shortcutStep5Method": "Method: POST",
+      "shortcutStep5Header": "Header: Authorization = Bearer {{token}}",
+      "shortcutStep5Body": "Request Body (JSON):",
+      "shortcutStep5Json": "{\n  \"challengeId\": \"{{challengeId}}\",\n  \"date\": \"<formatted date from prior step>\",\n  \"steps\": <sum of steps>\n}",
+      "shortcutStep6": "Optionally add an Automation so the shortcut runs at the end of each day.",
+      "apiTokensHeading": "API tokens",
+      "noTokensYet": "No tokens yet.",
+      "createdOn": "Created {{date}}",
+      "lastUsedOn": "Last used {{date}}",
+      "expiresOn": "Expires {{date}}",
+      "revokeAriaLabel": "Revoke token {{label}}",
+      "revoking": "Revoking…",
+      "revoke": "Revoke",
+      "generating": "Generating…",
+      "generateToken": "Generate new token",
+      "apiReferenceSummary": "Apple Health API reference",
+      "apiReferenceIntro": "POST to {{url}} with header Authorization: Bearer <your-token>:",
+      "apiReferenceExample": "// Single day\n{ \"challengeId\": \"{{challengeId}}\", \"date\": \"YYYY-MM-DD\", \"steps\": 8000 }\n\n// Batch (up to 31 days)\n{ \"challengeId\": \"{{challengeId}}\", \"rows\": [{ \"date\": \"YYYY-MM-DD\", \"steps\": 8000 }] }",
+      "tokenLabelDefault": "Apple Watch Sync"
+    },
+    "oauth": {
+      "sectionTitle": "OAuth services (Fitbit, Google Fit, Garmin Connect)",
+      "intro": "Sign in once with each provider below, then tap Sync today to import steps into this challenge. Garmin requires your server to register with the Garmin Connect Developer Program with the correct redirect URI and OAuth scopes.",
+      "notConfigured": "Not configured",
+      "connected": "Connected",
+      "connectedOn": "Connected {{date}}",
+      "syncing": "Syncing…",
+      "syncToday": "Sync today",
+      "disconnecting": "Disconnecting…",
+      "disconnect": "Disconnect",
+      "connectProvider": "Connect {{name}}"
+    }
   },
   "home": {
     "title": "Participant Home",
@@ -278,6 +330,7 @@
       "totalSteps": "Total steps: {{steps}}",
       "neverLogged": "Never logged steps: {{never}} / {{total}} participants",
       "dormant": "Quiet {{days}}+ days (no submissions): {{dormant}} participants",
+      "reEngagement": "Previously active, now quiet {{days}}+ days: {{count}} participants (simple churn-risk signal).",
       "submissionsTrend": "Submission activity by day",
       "trendAria": "Bar chart of submission counts per day",
       "emptyTrend": "No submissions yet on this timeline.",
@@ -292,7 +345,8 @@
         "participants": "Participants",
         "participation": "Participation",
         "dormant": "Quiet (7d+)",
-        "neverLogged": "Never logged"
+        "neverLogged": "Never logged",
+        "reEngagement": "Churn risk (7d+)"
       },
       "lifecycle": {
         "upcoming": "Upcoming",
@@ -360,6 +414,7 @@
     "behindShort": "behind"
   },
   "legal": {
+    "productionNotice": "Production readiness: replace placeholder privacy and terms copy, contact details, and analytics disclosures with text reviewed for your jurisdiction before a public launch.",
     "privacy": "Privacy",
     "terms": "Terms",
     "privacyTitle": "Privacy",

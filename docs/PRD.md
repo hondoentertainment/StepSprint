@@ -70,9 +70,9 @@ StepSprint is a month-long step challenge platform that helps organizations run 
 
 ### Improvements roadmap (stretch)
 
-- [x] Dedicated admin cohort analytics (benchmark table across challenges; forecasting churn remains future work)
-- [ ] Native Apple Health / Google Fit in-app pairing without external developer consoles where platform allows
-- [ ] Broader **i18n** coverage beyond Login and surfaces already in `en.json` (admin cohort / compare-challenge copy added)
+- [x] Dedicated admin cohort analytics (benchmark table across challenges; optional **re-engagement / churn-risk count** — participants who logged at least once but have no submission in the dormant window; fuller forecasting remains future work)
+- [x] **Health platform scope (roadmap decision)** — The web/PWA client does not target in-browser Apple HealthKit or Android Health Connect reads (browser APIs do not allow it). **Supported:** iOS Shortcuts posting to `/api/integrations/apple-health` with a user-generated bearer token; OAuth for Fitbit, Google Fit, and Garmin when the server is registered with each provider (production always uses each vendor’s developer program / OAuth client where applicable). **Future optional:** a native shell (for example Capacitor) could add HealthKit or Health Connect; that is not part of the current PWA scope.
+- [x] Broader **i18n** — Primary participant and admin UI strings live in `client/src/i18n/en.json` (including fitness sync, legal, cohort analytics, and core flows). Add languages by registering locale resources in `client/src/i18n`.
 - [x] **Cron webhook** — `POST /api/cron/reminder-sweep` with `Authorization: Bearer <REMINDER_CRON_SECRET>` when `REMINDER_USE_EXTERNAL_CRON=true`
 - [x] Postgres migration parity CI job (`server-test-postgres` in GitHub Actions; SQLite remains the default local dev DB)
 

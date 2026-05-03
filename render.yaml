@@ -57,6 +57,9 @@ services:
       # Observability (optional)
       - key: SENTRY_DSN
         sync: false
+      # Optional: overrides auto-derived release from git (see docs/PRODUCTION.md)
+      - key: SENTRY_RELEASE
+        sync: false
       # OAuth integrations (optional — server starts and runs without these).
       # Register apps in each provider's developer console, then paste the values here.
       # Fitbit redirect URI:     https://stepsprint-api.onrender.com/api/integrations/fitbit/callback

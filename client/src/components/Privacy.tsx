@@ -6,6 +6,9 @@ export function Privacy() {
   return (
     <div className="app">
       <main id="main-content" className="panel legal-page" tabIndex={-1}>
+        <p className="hint legal-production-notice" role="note">
+          {t("legal.productionNotice")}
+        </p>
         <h1>{t("legal.privacyTitle")}</h1>
         <p className="hint">{t("legal.privacyIntro")}</p>
         <h2>{t("legal.privacyCollected")}</h2>

@@ -54,14 +54,16 @@ export default defineConfig({
       timeout: 120_000,
     },
     {
-      command: "npm run dev",
+      command: "npm run dev:e2e",
       url: "http://localhost:3001/api/health",
       cwd: serverDir,
       reuseExistingServer: !process.env.CI,
-      timeout: 120_000,
+      timeout: 180_000,
       env: {
         ...process.env,
         JWT_SECRET: process.env.JWT_SECRET || "test-jwt-secret-min-16-chars",
+        DATABASE_URL: process.env.DATABASE_URL || "file:./e2e.db",
+        NODE_ENV: process.env.NODE_ENV || "development",
       },
     },
   ],

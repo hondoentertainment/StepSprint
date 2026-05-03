@@ -41,6 +41,8 @@ const envSchema = z.object({
   GARMIN_OAUTH_SCOPE: z.string().optional(),
   /** When `true`, expose Swagger UI at /api/docs and /api/openapi.json. Defaults off in production. */
   OPENAPI_DOCS_ENABLED: z.enum(["true", "false"]).optional(),
+  /** Optional release string for Sentry and /api/health (e.g. stepsprint-api@abc1234). */
+  SENTRY_RELEASE: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -52,6 +54,26 @@ if (!parsed.success) {
 const smtpFrom = parsed.data.SMTP_FROM ?? "noreply@stepsprint.app";
 
 const nodeEnv = parsed.data.NODE_ENV ?? "development";
+
+/** Resolve a release identifier for observability (Sentry, health JSON). */
+function resolveDeploymentRelease(explicit?: string): string | undefined {
+  const trimmed = explicit?.trim();
+  if (trimmed) return trimmed;
+  const candidates = [
+    process.env.RENDER_GIT_COMMIT,
+    process.env.GITHUB_SHA,
+    process.env.VERCEL_GIT_COMMIT_SHA,
+    process.env.COMMIT_REF,
+  ];
+  for (const c of candidates) {
+    const sha = c?.trim();
+    if (sha) return `stepsprint-api@${sha.slice(0, 7)}`;
+  }
+  return undefined;
+}
+
+const deploymentRelease = resolveDeploymentRelease(parsed.data.SENTRY_RELEASE);
+
 const openApiDocsEnabled =
   parsed.data.OPENAPI_DOCS_ENABLED === "true"
     ? true
@@ -102,4 +124,6 @@ export const config = {
   reminderUseExternalCron: parsed.data.REMINDER_USE_EXTERNAL_CRON === "true",
   reminderCronSecret: parsed.data.REMINDER_CRON_SECRET,
   emailTransportConfigured: Boolean(parsed.data.RESEND_API_KEY || parsed.data.SMTP_HOST),
+  /** Release string for Sentry and optional health payload */
+  deploymentRelease,
 };

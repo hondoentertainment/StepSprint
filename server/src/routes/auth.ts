@@ -280,7 +280,7 @@ router.post("/verify-email", async (req, res) => {
 /* ------------------------------------------------------------------ */
 /*  POST /forgot-password                                             */
 /* ------------------------------------------------------------------ */
-router.post("/forgot-password", passwordResetLimiter, async (req, res) => {
+router.post("/forgot-password", ...(isProduction ? [passwordResetLimiter] : []), async (req, res) => {
   const parsed = z.object({ email: z.string().email() }).safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Valid email required" });

@@ -126,6 +126,45 @@ jobs:
         working-directory: client
         run: npm run build
 
+  e2e:
+    needs: [server-test, client-test]
+    runs-on: ubuntu-latest
+    env:
+      JWT_SECRET: test-jwt-secret-min-16-chars
+      DATABASE_URL: "file:./e2e.db"
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: |
+            server/package-lock.json
+            client/package-lock.json
+
+      - name: Server install, migrate, seed
+        working-directory: server
+        run: |
+          npm ci
+          npx prisma generate
+          npx prisma migrate deploy
+          npx prisma db seed
+
+      - name: Client install and Playwright (Chromium)
+        working-directory: client
+        run: |
+          npm ci
+          npx playwright install chromium --with-deps
+
+      - name: Run Playwright E2E (desktop Chrome)
+        working-directory: client
+        env:
+          JWT_SECRET: test-jwt-secret-min-16-chars
+          DATABASE_URL: "file:./e2e.db"
+        run: npx playwright test --project=desktop-chrome
+
   smoke-test:
     needs: server-test
     runs-on: ubuntu-latest

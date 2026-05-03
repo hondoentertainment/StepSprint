@@ -1,5 +1,7 @@
 # StepSprint Deployment Guide
 
+For a **production-readiness checklist** (secrets, cron, Sentry releases, legal, monitoring), see [PRODUCTION.md](PRODUCTION.md).
+
 StepSprint runs as two services:
 
 | Service | Platform | URL |
@@ -193,6 +195,22 @@ All seed users have `emailVerified: true` so the email verification gate doesn't
 - **CSRF protection**: double-submit cookie pattern (production only). Bearer token requests (iOS Shortcuts / OAuth flows) bypass CSRF.
 - **Rate limiting**: production-only for general/API limiters. Login endpoint is limited to 10 attempts / 15 min per IP.
 - **CSP**: strict policy on all API routes (`script-src 'self'`); relaxed only for `/api/docs` and `/api/openapi.json` to accommodate Swagger UI assets from cdn.jsdelivr.net.
+
+---
+
+## PostgreSQL production cutover checklist
+
+Use this when moving the live API from SQLite (never in prod) or recovering from a misconfigured DB to the managed Postgres defined in `render.yaml`.
+
+1. **Provision or verify `stepsprint-db`** on Render (or your host): note connection limit, region, and that automated backups are on.
+2. **Set `DATABASE_URL`** on the web service to the Postgres URL (the Docker entrypoint runs `prisma migrate deploy` against `migrations_postgres/`).
+3. **Run a single-instance deploy first** so migrations finish without two processes racing; confirm logs for `migrate deploy` success.
+4. **Smoke test after cutover**: `GET /api/health` (`db: up`), sign-in, create or open a challenge, one step submission, admin analytics (including cohort).
+5. **Retain a snapshot** (Render backup or manual `pg_dump`) before major structural migrations or data fixes.
+6. **Connection hygiene**: if you scale to multiple web instances, ensure your Prisma/database pool settings match Postgres `max_connections`; avoid sharing one tiny instance across many workers without a pooler.
+7. **Rollback plan**: restore from the latest backup to a new DB, point `DATABASE_URL` at it, redeploy — document who can trigger this on your team.
+
+Local parity: `docker compose up -d` from the repo root and `DATABASE_URL=postgresql://…` (see comments in **Local development** above) exercise the same schema as production.
 
 ---
 

@@ -9,6 +9,14 @@ const options: LoggerOptions = {
   level,
   base: undefined,
   timestamp: pino.stdTimeFunctions.isoTime,
+  redact: {
+    paths: [
+      "req.headers.authorization",
+      "req.headers.cookie",
+      'req.headers["x-csrf-token"]',
+    ],
+    remove: true,
+  },
 };
 
 if (!isProduction && !isTest) {

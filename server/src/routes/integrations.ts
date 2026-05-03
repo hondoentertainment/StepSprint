@@ -9,7 +9,7 @@ import { logger } from "../logger";
 import { config } from "../config";
 import { integrationSyncLimiter } from "../middleware/rateLimit";
 
-const MAX_TOKENS_PER_USER = 10;
+const MAX_TOKENS_PER_USER = config.nodeEnv === "production" ? 10 : 50;
 
 const router = Router();
 

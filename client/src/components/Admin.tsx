@@ -19,6 +19,7 @@ type CohortRow = {
   participationRate: number;
   neverLoggedCount: number;
   dormantParticipantCount: number;
+  reEngagementNeededCount: number;
   avgActiveDays: number;
   totalSubmissions: number;
   totalSteps: number;
@@ -73,6 +74,7 @@ export function Admin({
     totalSteps: number;
     neverLoggedCount: number;
     dormantParticipantCount: number;
+    reEngagementNeededCount: number;
     dormantLookbackDays: number;
     submissionTrend: Array<{ date: string; submissionsCount: number }>;
   } | null>(null);
@@ -112,6 +114,7 @@ export function Admin({
       totalSteps: number;
       neverLoggedCount: number;
       dormantParticipantCount: number;
+      reEngagementNeededCount: number;
       dormantLookbackDays: number;
       submissionTrend: Array<{ date: string; submissionsCount: number }>;
     }>(`/api/admin/analytics?challengeId=${selectedChallengeId}`)
@@ -447,6 +450,7 @@ export function Admin({
                     <th scope="col">{t("admin.cohort.headers.participation")}</th>
                     <th scope="col">{t("admin.cohort.headers.dormant")}</th>
                     <th scope="col">{t("admin.cohort.headers.neverLogged")}</th>
+                    <th scope="col">{t("admin.cohort.headers.reEngagement")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -458,6 +462,7 @@ export function Admin({
                       <td>{row.participationRate}%</td>
                       <td>{row.dormantParticipantCount}</td>
                       <td>{row.neverLoggedCount}</td>
+                      <td>{row.reEngagementNeededCount}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -482,6 +487,12 @@ export function Admin({
                 <span>
                   {t("admin.analytics.dormant", {
                     dormant: analytics.dormantParticipantCount,
+                    days: analytics.dormantLookbackDays,
+                  })}
+                </span>
+                <span>
+                  {t("admin.analytics.reEngagement", {
+                    count: analytics.reEngagementNeededCount,
                     days: analytics.dormantLookbackDays,
                   })}
                 </span>

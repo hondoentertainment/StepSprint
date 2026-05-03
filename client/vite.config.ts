@@ -3,8 +3,22 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
+const sentryRelease =
+  process.env.VITE_SENTRY_RELEASE?.trim() ||
+  (process.env.VERCEL_GIT_COMMIT_SHA?.trim()
+    ? `stepsprint-client@${process.env.VERCEL_GIT_COMMIT_SHA.slice(0, 7)}`
+    : process.env.GITHUB_SHA?.trim()
+      ? `stepsprint-client@${process.env.GITHUB_SHA.slice(0, 7)}`
+      : "");
+
 // https://vite.dev/config/
 export default defineConfig({
+  define: {
+    "import.meta.env.VITE_SENTRY_RELEASE": JSON.stringify(sentryRelease),
+  },
+  build: {
+    sourcemap: "hidden",
+  },
   plugins: [
     react(),
     VitePWA({
