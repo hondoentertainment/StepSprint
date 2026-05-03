@@ -75,5 +75,15 @@ export async function api<T>(path: string, options: RequestInit = {}) {
     const payload = await response.json().catch(() => ({}));
     throw new ApiError(payload.error ?? "Request failed", response.status);
   }
-  return response.json() as Promise<T>;
+
+  const text = await response.text();
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return undefined as T;
+  }
+  try {
+    return JSON.parse(trimmed) as T;
+  } catch {
+    throw new ApiError("Invalid JSON response", response.status);
+  }
 }

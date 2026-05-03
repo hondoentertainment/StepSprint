@@ -30,6 +30,11 @@ test.describe("Admin console", () => {
     await page.getByTestId("tab-admin").click();
     await expect(page.getByRole("heading", { name: /Admin console/i })).toBeVisible();
 
+    // Seeded submissions for user1 live on `demo-challenge`; other challenges may exist from prior E2E runs.
+    const challengeSelect = page.locator("header select").first();
+    await expect(challengeSelect.locator('option[value="demo-challenge"]')).toBeAttached();
+    await challengeSelect.selectOption("demo-challenge");
+
     // Target a known seeded participant so the moderation list is deterministic.
     await page.getByRole("heading", { name: /Moderation|Moderación/i }).scrollIntoViewIfNeeded();
     const submissionsReq = page.waitForResponse((r) => {
@@ -62,6 +67,8 @@ test.describe("Admin console", () => {
     // Persistence check: reload, re-search, confirm the row renders with `(flagged)`.
     await page.reload();
     await page.getByTestId("tab-admin").click();
+    await expect(page.getByRole("heading", { name: /Admin console/i })).toBeVisible();
+    await challengeSelect.selectOption("demo-challenge");
     await page.getByRole("heading", { name: /Moderation|Moderación/i }).scrollIntoViewIfNeeded();
     const submissionsAfter = page.waitForResponse((r) => {
       const u = r.url();

@@ -112,6 +112,11 @@ async function main() {
 
   await prisma.teamMember.createMany({ data: assignments });
 
+  const user1 = participants[0];
+  if (user1) {
+    await prisma.integrationToken.deleteMany({ where: { userId: user1.id } });
+  }
+
   const dates = Array.from({ length: 10 }).map((_, offset) =>
     now.minus({ days: offset }).toISODate()
   );
