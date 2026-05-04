@@ -217,7 +217,8 @@ const appleHealthSchema = z.object({
  * or a batch `{ challengeId, rows: [{ date, steps }] }`.
  *
  * This is the endpoint iOS Shortcuts call automatically after reading step
- * count from Apple Health.
+ * count from Apple Health. If the same calendar day appears multiple times in
+ * `rows`, the highest step value is kept so batch shortcuts surface a full-day total.
  */
 router.post("/apple-health", integrationSyncLimiter, async (req, res) => {
   const plain = extractBearerToken(req.headers.authorization);
@@ -294,18 +295,30 @@ router.post("/apple-health", integrationSyncLimiter, async (req, res) => {
     prepared.push({ date: toJsDate(day), steps: row.steps });
   }
 
+  // Same calendar day may appear more than once (Shortcuts batching). Keep the
+  // highest step count so the sync reflects the fullest daily total.
+  const byDayMs = new Map<number, { date: Date; steps: number }>();
+  for (const row of prepared) {
+    const ms = row.date.getTime();
+    const prev = byDayMs.get(ms);
+    if (!prev || row.steps > prev.steps) {
+      byDayMs.set(ms, row);
+    }
+  }
+  const daysToSync = [...byDayMs.values()];
+
   const existing = await prisma.stepSubmission.findMany({
     where: {
       userId: user.id,
       challengeId: challenge.id,
-      date: { in: prepared.map((r) => r.date) },
+      date: { in: daysToSync.map((r) => r.date) },
     },
     select: { date: true },
   });
   const existingKeys = new Set(existing.map((s) => s.date.getTime()));
 
   await prisma.$transaction(
-    prepared.map((row) =>
+    daysToSync.map((row) =>
       prisma.stepSubmission.upsert({
         where: {
           userId_challengeId_date: { userId: user.id, challengeId: challenge.id, date: row.date },
@@ -322,15 +335,20 @@ router.post("/apple-health", integrationSyncLimiter, async (req, res) => {
     )
   );
 
-  const updated = prepared.filter((r) => existingKeys.has(r.date.getTime())).length;
-  const imported = prepared.length - updated;
+  const updated = daysToSync.filter((r) => existingKeys.has(r.date.getTime())).length;
+  const imported = daysToSync.length - updated;
 
   await prisma.auditLog.create({
     data: {
       action: "apple_health_sync",
       actorId: user.id,
       challengeId: challenge.id,
-      metadata: { imported, updated, rows: prepared.length },
+      metadata: {
+        imported,
+        updated,
+        days: daysToSync.length,
+        inputRows: prepared.length,
+      },
     },
   });
 

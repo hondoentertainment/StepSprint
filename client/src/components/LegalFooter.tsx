@@ -24,8 +24,8 @@ export function LegalFooter() {
             }
           }}
         >
-          <option value="en">English</option>
-          <option value="es">Español</option>
+          <option value="en">{t("layout.localeEnglish")}</option>
+          <option value="es">{t("layout.localeSpanish")}</option>
         </select>
       </label>
       <span aria-hidden> · </span>

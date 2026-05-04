@@ -32,6 +32,7 @@
     "@axe-core/playwright": "^4.11.2",
     "@eslint/js": "^9.39.1",
     "@playwright/test": "^1.49.0",
+    "@sentry/vite-plugin": "^5.2.1",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",
     "@types/node": "^24.10.1",

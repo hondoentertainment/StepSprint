@@ -14,7 +14,8 @@
     "tryAgain": "Try again",
     "backToSignIn": "Back to sign in",
     "confirm": "Confirm",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "notApplicable": "—"
   },
   "login": {
     "title": {
@@ -93,6 +94,10 @@
     "logStepsShortcut": "+ Log steps",
     "logStepsShortcutAria": "Log today's steps",
     "languageSelectAria": "Choose language",
+    "localeEnglish": "English",
+    "localeSpanish": "Español",
+    "siteHeaderAria": "Site header",
+    "mainNavAria": "Main navigation",
     "tabs": {
       "Home": "Home",
       "Submit": "Submit",
@@ -112,20 +117,23 @@
     "appleHealth": {
       "sectionTitle": "Apple Watch / Apple Health",
       "introOptional": "Optional — use this if you want steps sent automatically from your iPhone. You can always enter totals manually on the Submit page instead.",
-      "introShortcut": "Use an iOS Shortcut to send Apple Watch steps to StepSprint each day (HealthKit cannot be read from this website directly). Generate a token, then configure the Shortcut to POST to StepSprint.",
+      "introShortcut": "Use an iOS Shortcut to send your Apple Health daily step total to StepSprint (HealthKit cannot be read from this website directly). Generate a token, then configure the Shortcut to POST to StepSprint.",
+      "challengeTimezoneHint": "Use YYYY-MM-DD dates for calendar days in this challenge's time zone ({{timezone}}), matching what you see on the Submit page.",
+      "batchBackfillHint": "To backfill several days, send one request with a \"rows\" array (up to 31 days). StepSprint keeps the highest value if the same day appears more than once.",
       "tokenCreated": "Token created. Copy it now — it will not be shown again.",
       "tokenAriaLabel": "API token",
       "copyToken": "Copy token",
       "copied": "Copied!",
       "shortcutGuideSummary": "iOS Shortcut setup instructions",
       "shortcutStep1": "Open the Shortcuts app on your iPhone and tap + to create a new shortcut.",
-      "shortcutStep2": "Add a Find Health Samples or Get Health Sample action. Set Type to Steps and the period to cover the calendar day you are logging.",
-      "shortcutStep3": "Add Calculate Statistics with Function set to Sum when you have multiple samples.",
+      "shortcutStep2": "Add Find Health Samples (or Get Health Sample). Set Type to Steps and choose a period that covers the full calendar day you are submitting (from the start of that day through the end of that day), so the result reflects your whole day including Apple Watch and iPhone where Health merges sources.",
+      "shortcutStep3": "If you have many samples, add Calculate Statistics with Function set to Sum. If that total still differs from the Steps value in the Health app for that day, adjust your query (for example group by day or refine sources) until the shortcut matches the daily total you expect.",
       "shortcutStep4": "Add Format Date on the chosen day. Use format yyyy-MM-dd.",
       "shortcutStep5Title": "Add Get Contents of URL:",
       "shortcutStep5Url": "URL:",
       "shortcutStep5Method": "Method: POST",
       "shortcutStep5Header": "Header: Authorization = Bearer {{token}}",
+      "shortcutStep5HeaderJson": "Header: Content-Type = application/json",
       "shortcutStep5Body": "Request Body (JSON):",
       "shortcutStep5Json": "{\n  \"challengeId\": \"{{challengeId}}\",\n  \"date\": \"<formatted date from prior step>\",\n  \"steps\": <sum of steps>\n}",
       "shortcutStep6": "Optionally add an Automation so the shortcut runs at the end of each day.",
@@ -178,6 +186,16 @@
     "emptyState": "No summary yet. Submit your first steps to get started!",
     "logSteps": "Log your steps",
     "devicesLink": "Wearables & sync",
+    "loadingSummaryAria": "Loading summary",
+    "challengeProgress": {
+      "label_one": "Day {{elapsed}} of {{total}} — {{remaining}} day left",
+      "label_other": "Day {{elapsed}} of {{total}} — {{remaining}} days left"
+    },
+    "streakToast": {
+      "title": "{{days}}-day streak!",
+      "body": "You're on fire. Keep it up!",
+      "dismissAria": "Dismiss"
+    },
     "notifications": {
       "dailyReminder": "Remind me to log steps (Web Push when enabled, plus email when the server has email configured)",
       "notAvailable": "Push notifications not available.",
@@ -198,6 +216,12 @@
     "submitting": "Submitting…",
     "success": "Steps submitted successfully.",
     "flaggedHint": "Submissions above 100,000 steps are flagged.",
+    "validation": {
+      "selectDate": "Please select a date.",
+      "futureDate": "Cannot submit steps for a future date.",
+      "minSteps": "Steps must be at least {{min}}.",
+      "maxSteps": "Steps cannot exceed {{max}}."
+    },
     "connectDevice": "Fitness sync & wearables",
     "connectDeviceNeedChallenge": "(select a challenge first)"
   },
@@ -257,6 +281,7 @@
     "successWithChallenge": "You've joined {{challengeName}}. Redirecting…",
     "successGeneric": "Welcome! Redirecting…",
     "missingToken": "Missing invite token",
+    "invalidInviteFallback": "Invalid invite",
     "alreadyHaveAccountHint": "If you already had an account, your session stays active. Others can finish signing up from the Login page.",
     "goHomeEarly": "Go to home now"
   },

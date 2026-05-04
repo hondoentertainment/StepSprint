@@ -42,7 +42,7 @@ export function Layout({
       <a href="#main-content" className="skip-link">
         {t("common.skipToContent")}
       </a>
-      <header className="topbar" role="banner" aria-label="Site header">
+      <header className="topbar" role="banner" aria-label={t("layout.siteHeaderAria")}>
         <div className="topbar-brand">
           <StepSprintLogo size={26} />
           <div>
@@ -77,7 +77,7 @@ export function Layout({
         </div>
       </header>
 
-      <nav className="tabs" aria-label="Main navigation">
+      <nav className="tabs" aria-label={t("layout.mainNavAria")}>
         {visibleTabs.map((label) => (
           <NavLink
             key={label}

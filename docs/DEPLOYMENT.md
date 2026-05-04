@@ -48,8 +48,14 @@ Vercel deployments run automatically on push to `master` via the GitHub integrat
 - Build: `cd client && npm run build`
 - `VITE_API_URL=https://stepsprint-api.onrender.com` injected at build time
 - SPA rewrites and security headers included
+- Vercel respects the root `package.json` **`engines.node`** (`20.x`), aligning deploy builds with the client workspace `engines` constraint.
+- Use **`.nvmrc`** at the repo root with nvm or fnm to match that Node version locally.
 
 The client will be live at `https://step-sprint.vercel.app`.
+
+## Local development (Postgres parity)
+
+Default development uses SQLite (`DATABASE_URL` with a `file:` URL). For Postgres parity, point `DATABASE_URL` at managed Postgres (for example Render `stepsprint-db` from the blueprint) or at a local instance. From the repo root, **`docker-compose.yml`** can supply local Postgres (`docker compose up -d`); then run migrations from `server/` against **`server/prisma/schema.postgresql.prisma`** (production uses `migrations_postgres/` via the Docker image—mirror that workflow when validating Postgres locally).
 
 ---
 
@@ -68,6 +74,15 @@ After the first successful deploy, complete these steps:
 
 Use a Vercel preview (or staging project) and a non-production API URL whose `APP_ORIGIN`, `API_PUBLIC_ORIGIN`, and client `VITE_API_URL` point at each other. Run `npm test`, `npm run build`, and `npm run test:e2e` against that stack so split-origin cookies, CSRF, and email flows match production.
 
+| | Production (example) | Staging (you define) |
+|---|----------------------|----------------------|
+| SPA origin | `https://stepsprint.vercel.app` (or custom) | Preview URL or `staging.example.com` |
+| API public URL | Render service URL | Separate Render service or preview API |
+| `APP_ORIGIN` (API env) | SPA origin above | Staging SPA origin |
+| `API_PUBLIC_ORIGIN` (API env) | API public URL | Staging API URL |
+| `VITE_API_URL` (client build) | Same as production API | Staging API URL |
+| OAuth redirect URIs | Match `API_PUBLIC_ORIGIN` | Match staging API URL |
+
 ---
 
 ## Optional integrations
@@ -76,6 +91,7 @@ Use a Vercel preview (or staging project) and a non-production API URL whose `AP
 
 In the Render dashboard → `stepsprint-api` → **Environment** → set `SENTRY_DSN`.
 In the Vercel dashboard → **Settings → Environment Variables** → set `VITE_SENTRY_DSN`.
+To symbolicate browser stacks, set **`SENTRY_AUTH_TOKEN`**, **`SENTRY_ORG`**, and **`SENTRY_PROJECT`** on Vercel for **production builds** (same release as `VITE_SENTRY_RELEASE` / git SHA — see `client/vite.config.ts`).
 
 ### PostHog analytics
 
@@ -142,12 +158,22 @@ In the Vercel dashboard → set `VITE_POSTHOG_KEY` (and optionally `VITE_POSTHOG
 
 Schedule the HTTP call from your host (for example Render **Cron Jobs**, GitHub Actions `schedule`, or Uptime Robot) at least once per hour. The sweep still only notifies users when their challenge timezone matches `REMINDER_NOTIFICATION_HOUR_LOCAL` and they are due for a reminder, so hourly pings are correct.
 
+Example (replace URL and secret):
+
+```bash
+curl -fsS -X POST "https://stepsprint-api.onrender.com/api/cron/reminder-sweep" \
+  -H "Authorization: Bearer $REMINDER_CRON_SECRET"
+```
+
 ### Client (Vercel)
 
 | Variable | Source | Required | Description |
 |----------|--------|----------|-------------|
 | `VITE_API_URL` | `vercel.json` | Yes | `https://stepsprint-api.onrender.com` |
 | `VITE_SENTRY_DSN` | Vercel dashboard | No | Sentry DSN for browser errors |
+| `SENTRY_AUTH_TOKEN` | Vercel dashboard | No | Upload **hidden** source maps at build (with `SENTRY_ORG` + `SENTRY_PROJECT`) |
+| `SENTRY_ORG` | Vercel dashboard | No | Sentry org slug for upload |
+| `SENTRY_PROJECT` | Vercel dashboard | No | Sentry project slug for browser / `stepsprint-client` |
 | `VITE_POSTHOG_KEY` | Vercel dashboard | No | PostHog project key |
 | `VITE_POSTHOG_HOST` | Vercel dashboard | No | PostHog host (defaults to `app.posthog.com`) |
 

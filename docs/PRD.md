@@ -1,5 +1,7 @@
 # StepSprint Product Requirements Document
 
+[Master roadmap (priorities & phases)](MASTER_ROADMAP.md)
+
 ## Vision
 
 StepSprint is a month-long step challenge platform that helps organizations run team-based fitness competitions. Teams compete on cumulative steps, building habits through accountability and friendly competition.

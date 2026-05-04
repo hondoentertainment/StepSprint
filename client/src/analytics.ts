@@ -1,6 +1,12 @@
 type Properties = Record<string, unknown>;
 type Traits = Record<string, unknown>;
 
+/** PostHog event names used in product code — keep stable for dashboards; change only with a migration plan. */
+export const ANALYTICS_EVENTS = {
+  challengeViewed: "challenge_viewed",
+  submissionCreated: "submission_created",
+} as const;
+
 type PostHogLike = {
   init: (key: string, options?: Record<string, unknown>) => void;
   capture: (event: string, properties?: Properties) => void;

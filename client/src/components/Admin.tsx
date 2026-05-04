@@ -45,7 +45,8 @@ export function Admin({
   selectedChallenge,
   onChallengesRefresh,
 }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const numberLocale = i18n.resolvedLanguage ?? undefined;
   const { week, setWeek } = useWeek();
   const [createForm, setCreateForm] = useState({
     name: "",
@@ -477,7 +478,7 @@ export function Admin({
                 <span>{t("admin.analytics.participation", { rate: analytics.participationRate })}</span>
                 <span>{t("admin.analytics.avgActiveDays", { days: analytics.avgActiveDays })}</span>
                 <span>{t("admin.analytics.totalSubmissions", { count: analytics.totalSubmissions })}</span>
-                <span>{t("admin.analytics.totalSteps", { steps: analytics.totalSteps.toLocaleString() })}</span>
+                <span>{t("admin.analytics.totalSteps", { steps: analytics.totalSteps.toLocaleString(numberLocale) })}</span>
                 <span>
                   {t("admin.analytics.neverLogged", {
                     never: analytics.neverLoggedCount,
@@ -570,14 +571,14 @@ export function Admin({
                             const label =
                               cell.steps === null
                                 ? `${row.name ?? row.email}, ${day}: ${t("admin.activityGrid.noSubmission")}`
-                                : `${row.name ?? row.email}, ${day}: ${cell.steps.toLocaleString()} ${t("common.steps")}${cell.flagged ? ` (${t("admin.activityGrid.flaggedSuffix")})` : ""}`;
+                                : `${row.name ?? row.email}, ${day}: ${cell.steps.toLocaleString(numberLocale)} ${t("common.steps")}${cell.flagged ? ` (${t("admin.activityGrid.flaggedSuffix")})` : ""}`;
                             return (
                               <td key={day} className="activity-grid-cell num" title={label}>
                                 {cell.steps === null ? (
                                   <span className="activity-grid-empty">—</span>
                                 ) : (
                                   <>
-                                    <span className="activity-grid-steps">{cell.steps.toLocaleString()}</span>
+                                    <span className="activity-grid-steps">{cell.steps.toLocaleString(numberLocale)}</span>
                                     {cell.flagged ? <span className="activity-grid-flag" title={t("admin.submission.flagged")}>*</span> : null}
                                   </>
                                 )}

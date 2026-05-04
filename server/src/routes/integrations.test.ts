@@ -494,6 +494,31 @@ describe("Integrations routes", () => {
       expect(res.body).toEqual({ imported: 2, updated: 0, skipped: 0 });
     });
 
+    it("collapses duplicate dates in one batch to the highest step count", async () => {
+      const res = await request(app)
+        .post("/api/integrations/apple-health")
+        .set("Authorization", `Bearer ${bearerToken}`)
+        .send({
+          challengeId,
+          rows: [
+            { date: "2026-03-17", steps: 4000 },
+            { date: "2026-03-17", steps: 11000 },
+          ],
+        })
+        .expect(200);
+
+      expect(res.body).toEqual({ imported: 1, updated: 0, skipped: 0 });
+
+      const sub = await prisma.stepSubmission.findFirst({
+        where: {
+          userId,
+          challengeId,
+          date: DateTime.fromISO("2026-03-17", { zone: tz }).startOf("day").toJSDate(),
+        },
+      });
+      expect(sub?.steps).toBe(11000);
+    });
+
     it("403 when outsider token tries to sync", async () => {
       await request(app)
         .post("/api/integrations/apple-health")

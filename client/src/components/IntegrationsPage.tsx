@@ -4,10 +4,11 @@ import { FitnessIntegrations } from "./FitnessIntegrations";
 
 type Props = {
   challengeId: string;
+  challengeTimezone?: string;
   challengesLoading: boolean;
 };
 
-export function IntegrationsPage({ challengeId, challengesLoading }: Props) {
+export function IntegrationsPage({ challengeId, challengeTimezone, challengesLoading }: Props) {
   const { t } = useTranslation();
 
   return (
@@ -19,7 +20,9 @@ export function IntegrationsPage({ challengeId, challengesLoading }: Props) {
           {t("integrations.noChallenge")}
         </p>
       )}
-      {challengeId && <FitnessIntegrations challengeId={challengeId} />}
+      {challengeId && (
+        <FitnessIntegrations challengeId={challengeId} challengeTimezone={challengeTimezone} />
+      )}
       <p className="hint" style={{ marginTop: "1.25rem" }}>
         <Link to="/submit">{t("integrations.backToSubmit")}</Link>
       </p>

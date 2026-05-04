@@ -12,7 +12,8 @@ type Props = {
 
 /** Date-based week picker: pick a week by selecting a date within it */
 export function WeekPicker({ value, onChange, challengeStart, challengeEnd }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const weekRangeLocale = i18n.language?.startsWith("es") ? "es-ES" : "en-US";
   const mondayOfWeek = weekToDate(value.year, value.week);
   const min = challengeStart || "2020-01-01";
   const max = challengeEnd || "2030-12-31";
@@ -58,7 +59,7 @@ export function WeekPicker({ value, onChange, challengeStart, challengeEnd }: Pr
         </button>
         <div className="week-nav-center">
           <label className="week-nav-label" aria-live="polite">
-            <span className="week-range">{formatWeekRange(value.year, value.week)}</span>
+            <span className="week-range">{formatWeekRange(value.year, value.week, weekRangeLocale)}</span>
             <span className="week-number">{t("weekPicker.weekNumber", { week: value.week })}</span>
           </label>
           <input

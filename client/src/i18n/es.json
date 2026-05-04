@@ -14,7 +14,8 @@
     "tryAgain": "Volver a intentar",
     "backToSignIn": "Volver al inicio de sesión",
     "confirm": "Confirmar",
-    "cancel": "Cancelar"
+    "cancel": "Cancelar",
+    "notApplicable": "—"
   },
   "login": {
     "title": {
@@ -93,6 +94,10 @@
     "logStepsShortcut": "+ Registrar pasos",
     "logStepsShortcutAria": "Registrar los pasos de hoy",
     "languageSelectAria": "Elegir idioma",
+    "localeEnglish": "English",
+    "localeSpanish": "Español",
+    "siteHeaderAria": "Cabecera del sitio",
+    "mainNavAria": "Navegación principal",
     "tabs": {
       "Home": "Inicio",
       "Submit": "Registrar",
@@ -112,20 +117,23 @@
     "appleHealth": {
       "sectionTitle": "Apple Watch / Apple Health",
       "introOptional": "Opcional: úsalo si quieres que los pasos lleguen automáticamente desde el iPhone. Siempre puedes introducir totales a mano en Registrar.",
-      "introShortcut": "Usa un Atajo de iOS para enviar los pasos del Apple Watch a StepSprint cada día (HealthKit no se puede leer desde esta web). Genera un token y configura el Atajo para hacer POST a StepSprint.",
+      "introShortcut": "Usa un Atajo de iOS para enviar el total diario de pasos de Apple Health a StepSprint (HealthKit no se puede leer desde esta web). Genera un token y configura el Atajo para hacer POST a StepSprint.",
+      "challengeTimezoneHint": "Usa fechas YYYY-MM-DD como días naturales en la zona horaria del reto ({{timezone}}), igual que en Registrar pasos.",
+      "batchBackfillHint": "Para varios días en bloque, envía una sola petición con un array \"rows\" (hasta 31 días). Si un día sale repetido, StepSprint conserva el mayor valor de pasos.",
       "tokenCreated": "Token creado. Cópialo ahora: no se volverá a mostrar.",
       "tokenAriaLabel": "Token de API",
       "copyToken": "Copiar token",
       "copied": "¡Copiado!",
       "shortcutGuideSummary": "Instrucciones del Atajo de iOS",
       "shortcutStep1": "Abre la app Atajos en el iPhone y pulsa + para crear un atajo nuevo.",
-      "shortcutStep2": "Añade Buscar muestras de salud u Obtener muestra de salud. Tipo Pasos y el periodo debe cubrir el día del calendario que registras.",
-      "shortcutStep3": "Añade Calcular estadísticas con función Suma si tienes varias muestras.",
+      "shortcutStep2": "Añade Buscar muestras de salud (u Obtener muestra de salud). Tipo Pasos y el periodo debe cubrir el día natural completo que envías (desde el inicio hasta el final de ese día), para que el total refleje todo el día, incluidos Apple Watch e iPhone cuando Salud fusiona fuentes.",
+      "shortcutStep3": "Con muchas muestras, añade Calcular estadísticas con función Suma. Si el total sigue sin coincidir con Pasos en Salud para ese día, ajusta la consulta (por ejemplo agrupar por día o filtrar fuentes) hasta que el atajo coincida con el total diario esperado.",
       "shortcutStep4": "Añade Formatear fecha del día elegido. Formato yyyy-MM-dd.",
       "shortcutStep5Title": "Añade Obtener contenidos de URL:",
       "shortcutStep5Url": "URL:",
       "shortcutStep5Method": "Método: POST",
       "shortcutStep5Header": "Cabecera: Authorization = Bearer {{token}}",
+      "shortcutStep5HeaderJson": "Cabecera: Content-Type = application/json",
       "shortcutStep5Body": "Cuerpo (JSON):",
       "shortcutStep5Json": "{\n  \"challengeId\": \"{{challengeId}}\",\n  \"date\": \"<fecha formateada del paso anterior>\",\n  \"steps\": <suma de pasos>\n}",
       "shortcutStep6": "Opcional: añade una Automatización para ejecutar el atajo al final del día.",
@@ -178,6 +186,16 @@
     "emptyState": "Aún no hay resumen. ¡Registra tus primeros pasos!",
     "logSteps": "Registrar pasos",
     "devicesLink": "Dispositivos y sincronización",
+    "loadingSummaryAria": "Cargando resumen",
+    "challengeProgress": {
+      "label_one": "Día {{elapsed}} de {{total}} — queda {{remaining}} día",
+      "label_other": "Día {{elapsed}} de {{total}} — quedan {{remaining}} días"
+    },
+    "streakToast": {
+      "title": "¡Racha de {{days}} días!",
+      "body": "Lo estás bordando. ¡Sigue así!",
+      "dismissAria": "Cerrar"
+    },
     "notifications": {
       "dailyReminder": "Recordatorios para registrar pasos (notificación web si está activada y correo si el servidor lo tiene configurado)",
       "notAvailable": "Notificaciones push no disponibles.",
@@ -198,6 +216,12 @@
     "submitting": "Enviando…",
     "success": "Pasos registrados correctamente.",
     "flaggedHint": "Las entregas superiores a 100.000 pasos se marcan para revisión.",
+    "validation": {
+      "selectDate": "Selecciona una fecha.",
+      "futureDate": "No puedes registrar pasos para una fecha futura.",
+      "minSteps": "Los pasos deben ser al menos {{min}}.",
+      "maxSteps": "Los pasos no pueden superar {{max}}."
+    },
     "connectDevice": "Sincronización y wearables",
     "connectDeviceNeedChallenge": "(elige un reto primero)"
   },
@@ -257,6 +281,7 @@
     "successWithChallenge": "Te has unido a {{challengeName}}. Redirigiendo…",
     "successGeneric": "¡Bienvenido! Redirigiendo…",
     "missingToken": "Falta el token de invitación",
+    "invalidInviteFallback": "Invitación no válida",
     "alreadyHaveAccountHint": "Si ya tenías cuenta, tu sesión sigue activa. El resto puede registrarse desde Inicio de sesión.",
     "goHomeEarly": "Ir al inicio ahora"
   },

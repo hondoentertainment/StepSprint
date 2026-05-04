@@ -572,7 +572,15 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
       challengeId: z.string(),
       date: z.string().optional().openapi({ description: "Single-day shorthand (YYYY-MM-DD). Use instead of rows." }),
       steps: z.number().int().min(0).max(200_000).optional(),
-      rows: z.array(AppleHealthRowSchema).min(1).max(31).optional().openapi({ description: "Batch up to 31 days. Use instead of date+steps." }),
+      rows: z
+        .array(AppleHealthRowSchema)
+        .min(1)
+        .max(31)
+        .optional()
+        .openapi({
+          description:
+            "Batch up to 31 days. Use instead of date+steps. If the same date appears more than once, the highest step count is stored.",
+        }),
     })
     .openapi("AppleHealthSyncRequest");
 
@@ -590,7 +598,8 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
     method: "post",
     path: "/api/integrations/apple-health",
     summary: "Sync Apple Watch / Health steps",
-    description: "Upsert step data from Apple Health. Authenticate with an integration token via `Authorization: Bearer ssp_…`. Accepts a single-day shorthand or a batch of up to 31 days.",
+    description:
+      "Upsert step data from Apple Health. Authenticate with an integration token via `Authorization: Bearer ssp_…`. Send `Content-Type: application/json`. Accepts a single-day shorthand or a batch of up to 31 days (duplicate dates in one request keep the highest steps).",
     tags: ["Integrations"],
     security: [{ [integrationTokenAuth.name]: [] }],
     request: { body: { content: { "application/json": { schema: AppleHealthSyncRequest } } } },

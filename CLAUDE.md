@@ -111,12 +111,12 @@ Team assignment supports random and snake-draft at challenge creation.
 - **Prisma transactions** for multi-row writes (team allocation, submission edits).
 - **Error handling**: throw `ApiError` on the server; catch `ApiError` in the client `api.ts` layer and surface typed messages; the client `ErrorBoundary` forwards render-time errors to Sentry.
 - **Logging**: use the exported `logger` (pino) — no `console.log` in production code paths.
-- **Analytics**: use `track()` / `identify()` from `client/src/analytics.ts`; keep event names stable (they're a public-ish contract for PostHog dashboards). In production builds, PostHog initializes only after the user accepts optional analytics in the cookie banner (see `CookieConsentBanner.tsx`).
+- **Analytics**: use `track()` / `identify()` from `client/src/analytics.ts`; keep event names stable — use `ANALYTICS_EVENTS` for values sent from components (see `analytics.ts`). In production builds, PostHog initializes only after the user accepts optional analytics in the cookie banner (see `CookieConsentBanner.tsx`).
 - **No emojis** in code or UI unless the user asks.
 
 ## Known gaps / gotchas
 
-- **Sentry and PostHog**: Server Sentry is silent until `SENTRY_DSN` is set. Client Sentry needs `VITE_SENTRY_DSN`. PostHog loads only when `VITE_POSTHOG_KEY` is set **and** (in production) the user accepts analytics in the banner; in development, analytics runs unless the user chose “Essential only”.
+- **Sentry and PostHog**: Server Sentry is silent until `SENTRY_DSN` is set. Client Sentry needs `VITE_SENTRY_DSN`. Optional **browser source maps**: set `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, and `SENTRY_PROJECT` at Vite build time so `@sentry/vite-plugin` uploads hidden maps (see `client/vite.config.ts`). PostHog loads only when `VITE_POSTHOG_KEY` is set **and** (in production) the user accepts analytics in the banner; in development, analytics runs unless the user chose "Essential only".
 - **No real SMTP provider**: Nodemailer wired, password reset emails no-op without SMTP env.
 - **i18n**: Most screens use `useTranslation` with `en.json`; Spanish lives in `es.json` — language switcher in `LegalFooter` (persists `stepsprint-locale` in `localStorage`).
 - **Health-sync integrations**: Apple Watch via Shortcuts + bearer token to `POST /api/integrations/apple-health`; Fitbit, Google Fit, and Garmin via OAuth when server env credentials are set (`routes/oauth.ts`, `routes/integrations.ts`). In-browser HealthKit/Health Connect pairing is not a PWA goal (see `docs/PRD.md` stretch decision).

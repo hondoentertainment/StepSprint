@@ -1,6 +1,7 @@
 /// <reference types="vitest" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { sentryVitePlugin } from "@sentry/vite-plugin";
 import { VitePWA } from "vite-plugin-pwa";
 
 const sentryRelease =
@@ -10,6 +11,21 @@ const sentryRelease =
     : process.env.GITHUB_SHA?.trim()
       ? `stepsprint-client@${process.env.GITHUB_SHA.slice(0, 7)}`
       : "");
+
+const sentryAuth = process.env.SENTRY_AUTH_TOKEN?.trim();
+const sentryOrg = process.env.SENTRY_ORG?.trim();
+const sentryProject = process.env.SENTRY_PROJECT?.trim();
+
+const sentrySourceMapsPlugin =
+  sentryAuth && sentryOrg && sentryProject && sentryRelease
+    ? sentryVitePlugin({
+        org: sentryOrg,
+        project: sentryProject,
+        authToken: sentryAuth,
+        release: { name: sentryRelease },
+        telemetry: false,
+      })
+    : null;
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -54,6 +70,7 @@ export default defineConfig({
         navigateFallback: "index.html",
       },
     }),
+    ...(sentrySourceMapsPlugin ? [sentrySourceMapsPlugin] : []),
   ],
   test: {
     globals: true,

@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { api } from "../api";
 import { ApiError, getErrorMessage } from "../api";
-import { track } from "../analytics";
+import { ANALYTICS_EVENTS, track } from "../analytics";
 import type { Challenge } from "../types";
 import type { Summary } from "../types";
 import {
@@ -45,8 +45,9 @@ function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
 const STREAK_MILESTONES = [7, 14, 21, 30, 60, 90];
 
 function HomeSkeleton() {
+  const { t } = useTranslation();
   return (
-    <div className="loading-skeleton" aria-label="Loading summary">
+    <div className="loading-skeleton" aria-label={t("home.loadingSummaryAria")}>
       <div className="skeleton skeleton-title" />
       <div className="stats-grid stats-grid-skeleton">
         <div className="skeleton skeleton-card" />
@@ -78,6 +79,7 @@ function computeProgress(startDate: string, endDate: string, now: number): Progr
 }
 
 function ChallengeProgress({ challenge, now }: { challenge: Challenge; now: number }) {
+  const { t } = useTranslation();
   const progress = computeProgress(challenge.startDate, challenge.endDate, now);
 
   if (challenge.locked || progress.pct >= 100) return null;
@@ -88,13 +90,19 @@ function ChallengeProgress({ challenge, now }: { challenge: Challenge; now: numb
         <div className="challenge-progress-fill" style={{ width: `${progress.pct}%` }} />
       </div>
       <p className="challenge-progress-label">
-        Day {progress.elapsedDays} of {progress.totalDays} &mdash; {progress.remainingDays} day{progress.remainingDays === 1 ? "" : "s"} left
+        {t("home.challengeProgress.label", {
+          count: progress.remainingDays,
+          elapsed: progress.elapsedDays,
+          total: progress.totalDays,
+          remaining: progress.remainingDays,
+        })}
       </p>
     </div>
   );
 }
 
 function StreakToast({ days, onDismiss }: { days: number; onDismiss: () => void }) {
+  const { t } = useTranslation();
   useEffect(() => {
     const timer = setTimeout(onDismiss, 5000);
     return () => clearTimeout(timer);
@@ -105,14 +113,14 @@ function StreakToast({ days, onDismiss }: { days: number; onDismiss: () => void 
       <div className="streak-toast-inner">
         <IconFlame size={20} className="streak-toast-icon" />
         <div>
-          <strong className="streak-toast-title">{days}-day streak!</strong>
-          <span className="streak-toast-body">You&apos;re on fire. Keep it up!</span>
+          <strong className="streak-toast-title">{t("home.streakToast.title", { days })}</strong>
+          <span className="streak-toast-body">{t("home.streakToast.body")}</span>
         </div>
         <button
           type="button"
           className="streak-toast-close"
           onClick={onDismiss}
-          aria-label="Dismiss"
+          aria-label={t("home.streakToast.dismissAria")}
         >
           &times;
         </button>
@@ -127,7 +135,8 @@ export function Home({
   challengesLoading,
   challengesError,
 }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const numberLocale = i18n.resolvedLanguage ?? undefined;
   const [summary, setSummary] = useState<Summary | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -255,7 +264,7 @@ export function Home({
   useEffect(() => {
     if (!challengeId) return;
 
-    track("challenge_viewed", { challengeId });
+    track(ANALYTICS_EVENTS.challengeViewed, { challengeId });
 
     let cancelled = false;
 
@@ -343,7 +352,7 @@ export function Home({
           <div className="stats-hero">
             <div className="card card-hero">
               <h3><IconFootstep size={13} className="card-icon" /> {t("home.stats.today")}</h3>
-              <p>{summary.personalTotals.today.toLocaleString()} {t("common.steps")}</p>
+              <p>{summary.personalTotals.today.toLocaleString(numberLocale)} {t("common.steps")}</p>
             </div>
             <div className="card card-streak">
               <h3><IconFlame size={13} className="card-icon" /> {t("home.stats.streak")}</h3>
@@ -374,26 +383,26 @@ export function Home({
           </div>
           <div className="card">
             <h3><IconCalendarWeek size={13} className="card-icon" /> {t("home.stats.thisWeek")}</h3>
-            <p>{summary.personalTotals.week.toLocaleString()} {t("common.steps")}</p>
+            <p>{summary.personalTotals.week.toLocaleString(numberLocale)} {t("common.steps")}</p>
           </div>
           <div className="card">
             <h3><IconCalendarMonth size={13} className="card-icon" /> {t("home.stats.thisMonth")}</h3>
-            <p>{summary.personalTotals.month.toLocaleString()} {t("common.steps")}</p>
+            <p>{summary.personalTotals.month.toLocaleString(numberLocale)} {t("common.steps")}</p>
           </div>
           <div className="card">
             <h3><IconTeam size={13} className="card-icon" /> {t("home.stats.teamTotal")}</h3>
             <p>
               {summary.teamTotals.teamName || t("common.unassigned")} &middot;{" "}
-              {summary.teamTotals.total.toLocaleString()} {t("common.steps")}
+              {summary.teamTotals.total.toLocaleString(numberLocale)} {t("common.steps")}
             </p>
           </div>
           <div className="card">
             <h3><IconTrophy size={13} className="card-icon" /> {t("home.stats.rank")}</h3>
-            <p>{summary.rank ?? "—"}</p>
+            <p>{summary.rank != null ? summary.rank : t("common.notApplicable")}</p>
           </div>
           <div className="card">
             <h3><IconArrowUp size={13} className="card-icon" /> {t("home.stats.gapToFirst")}</h3>
-            <p>{summary.gapToFirst.toLocaleString()} {t("common.steps")}</p>
+            <p>{summary.gapToFirst.toLocaleString(numberLocale)} {t("common.steps")}</p>
           </div>
         </div>
       ) : (

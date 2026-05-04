@@ -1,6 +1,9 @@
 {
   "name": "schaffer-shufflers",
   "private": true,
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "lint": "cd client && npm run lint",
     "build": "cd client && npm run build && cd ../server && npm run build",

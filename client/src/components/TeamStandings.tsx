@@ -13,7 +13,8 @@ type Props = {
 };
 
 export function TeamStandings({ challengeId, user }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const numberLocale = i18n.resolvedLanguage ?? undefined;
   const [teams, setTeams] = useState<TeamEntry[]>([]);
   const [userTeamName, setUserTeamName] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -113,9 +114,9 @@ export function TeamStandings({ challengeId, user }: Props) {
                 )}
               </div>
               <div className="meta">
-                <span className="meta-steps">{entry.totalSteps.toLocaleString()} {t("common.steps")}</span>
+                <span className="meta-steps">{entry.totalSteps.toLocaleString(numberLocale)} {t("common.steps")}</span>
                 <span className="meta-detail">
-                  {entry.leaderName || "—"} {t("teamStandings.leads")} &middot; {entry.stepsBehind.toLocaleString()} {t("teamStandings.behindShort")}
+                  {entry.leaderName || t("common.notApplicable")} {t("teamStandings.leads")} &middot; {entry.stepsBehind.toLocaleString(numberLocale)} {t("teamStandings.behindShort")}
                 </span>
               </div>
             </div>

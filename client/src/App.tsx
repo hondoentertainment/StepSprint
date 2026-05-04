@@ -106,6 +106,7 @@ function AuthenticatedApp() {
           element={
             <IntegrationsPage
               challengeId={selectedChallengeId}
+              challengeTimezone={selectedChallenge?.timezone}
               challengesLoading={challengesLoading}
             />
           }

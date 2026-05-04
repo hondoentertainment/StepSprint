@@ -38,7 +38,7 @@ export function InvitePage({ onAccepted }: { onAccepted: (user: User) => void })
         setTimeout(() => navigate(targetPath, { replace: true }), 1500);
       } else {
         setStatus("error");
-        setError(data.error || "Invalid invite");
+        setError(data.error || t("invite.invalidInviteFallback"));
       }
     } catch (err) {
       setStatus("error");

@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api";
 import { getErrorMessage } from "../api";
 import { todayInTimezone, isFutureDate } from "../utils";
-import { track } from "../analytics";
+import { ANALYTICS_EVENTS, track } from "../analytics";
 import type { Challenge } from "../types";
 import type { Summary } from "../types";
 
@@ -24,7 +24,8 @@ export function Submit({
   challengesLoading,
   onSummaryUpdated,
 }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const numberLocale = i18n.resolvedLanguage ?? undefined;
   const [date, setDate] = useState(() => todayInTimezone());
   const [steps, setSteps] = useState(8000);
   const [error, setError] = useState("");
@@ -56,13 +57,13 @@ export function Submit({
   }
 
   function getValidationError(): string | null {
-    if (!date) return "Please select a date.";
+    if (!date) return t("submit.validation.selectDate");
     if (isFutureDate(date, selectedChallenge?.timezone)) {
-      return "Cannot submit steps for a future date.";
+      return t("submit.validation.futureDate");
     }
     const n = Number(steps);
-    if (Number.isNaN(n) || n < MIN_STEPS) return `Steps must be at least ${MIN_STEPS}.`;
-    if (n > MAX_STEPS) return `Steps cannot exceed ${MAX_STEPS.toLocaleString()}.`;
+    if (Number.isNaN(n) || n < MIN_STEPS) return t("submit.validation.minSteps", { min: MIN_STEPS });
+    if (n > MAX_STEPS) return t("submit.validation.maxSteps", { max: MAX_STEPS.toLocaleString(numberLocale) });
     return null;
   }
 
@@ -87,7 +88,7 @@ export function Submit({
           steps: Number(steps),
         }),
       });
-      track("submission_created", { challengeId, steps: Number(steps) });
+      track(ANALYTICS_EVENTS.submissionCreated, { challengeId, steps: Number(steps) });
       setSteps(8000);
       resetDate();
       setSuccess(t("submit.success"));

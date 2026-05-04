@@ -4,7 +4,7 @@ Companion to [DEPLOYMENT.md](DEPLOYMENT.md). Use this as an internal checklist b
 
 ## 1. Platform and operations
 
-- **Database**: Production must use **PostgreSQL** only (Render `stepsprint-db` or equivalent). Run a **backup restore drill** and document RTO/RPO.
+- **Database**: Production must use **PostgreSQL** only (Render `stepsprint-db` or equivalent). Run a **backup restore drill** and document RTO/RPO (example: RPO = daily backup retention window; RTO = time to restore from backup plus redeploy — replace with your measured values).
 - **Secrets**: `JWT_SECRET`, `REMINDER_CRON_SECRET`, OAuth secrets, Resend/SMTP, and VAPID keys belong in the host secret store—never in the repo. Rotate after any leak.
 - **Multi-instance API**: Set `REMINDER_USE_EXTERNAL_CRON=true` and schedule an hourly `POST /api/cron/reminder-sweep` with `Authorization: Bearer <REMINDER_CRON_SECRET>` so reminder sweeps are not duplicated per replica.
 - **Health**: Expose `GET /api/health`. Response includes `service: "stepsprint-api"`, `db: "up" | "down"`, and **`release`** when `SENTRY_RELEASE`, `RENDER_GIT_COMMIT`, `GITHUB_SHA`, or similar is set. Point an external monitor at this endpoint.
@@ -13,7 +13,7 @@ Companion to [DEPLOYMENT.md](DEPLOYMENT.md). Use this as an internal checklist b
 ## 2. Client build and Sentry
 
 - **Vercel / CI**: The client build sets `import.meta.env.VITE_SENTRY_RELEASE` from `VITE_SENTRY_RELEASE`, `VERCEL_GIT_COMMIT_SHA`, or `GITHUB_SHA` (see `client/vite.config.ts`). Configure `VITE_SENTRY_DSN` in Vercel for browser errors.
-- **Source maps**: Production uses **hidden** source maps (`build.sourcemap: "hidden"`). Upload symbols to Sentry in CI with `sentry-cli` when you want readable stack traces (optional follow-up).
+- **Source maps**: Production uses **hidden** source maps (`build.sourcemap: "hidden"`). When `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, and `SENTRY_PROJECT` are set at **build time** (for example on Vercel), `@sentry/vite-plugin` uploads maps to Sentry for that release. Omit those variables if you are not using Sentry or not ready to upload maps. Alternatively, use `sentry-cli` in a release job.
 
 ## 3. Security
 

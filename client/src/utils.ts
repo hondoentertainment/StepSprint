@@ -29,14 +29,14 @@ export function weekToDate(year: number, week: number): string {
 }
 
 /** Given year + ISO week number, return formatted date range (e.g. "Feb 10–16, 2025") */
-export function formatWeekRange(year: number, week: number): string {
+export function formatWeekRange(year: number, week: number, locale = "en-US"): string {
   const mondayStr = weekToDate(year, week);
   const monday = new Date(mondayStr);
   const sunday = new Date(monday);
   sunday.setDate(sunday.getDate() + 6);
   const sameMonth = monday.getMonth() === sunday.getMonth();
   const sameYear = monday.getFullYear() === sunday.getFullYear();
-  const fmt = new Intl.DateTimeFormat("en-US", {
+  const fmt = new Intl.DateTimeFormat(locale, {
     month: "short",
     day: "numeric",
     year: sameMonth && sameYear ? undefined : "numeric",

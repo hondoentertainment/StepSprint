@@ -20,9 +20,10 @@ type OAuthProvider = {
 
 type Props = {
   challengeId: string;
+  challengeTimezone?: string;
 };
 
-export function FitnessIntegrations({ challengeId }: Props) {
+export function FitnessIntegrations({ challengeId, challengeTimezone }: Props) {
   const { t } = useTranslation();
   const [tokens, setTokens] = useState<IntegrationToken[]>([]);
   const [providers, setProviders] = useState<OAuthProvider[]>([]);
@@ -174,6 +175,12 @@ export function FitnessIntegrations({ challengeId }: Props) {
       <h3>{t("integrations.appleHealth.sectionTitle")}</h3>
       <p className="hint">{t("integrations.appleHealth.introOptional")}</p>
       <p className="hint">{t("integrations.appleHealth.introShortcut")}</p>
+      {challengeTimezone && (
+        <p className="hint" role="note">
+          {t("integrations.appleHealth.challengeTimezoneHint", { timezone: challengeTimezone })}
+        </p>
+      )}
+      <p className="hint">{t("integrations.appleHealth.batchBackfillHint")}</p>
 
       {error && (
         <p className="status status-error" role="alert">
@@ -213,6 +220,7 @@ export function FitnessIntegrations({ challengeId }: Props) {
                   <li>
                     {t("integrations.appleHealth.shortcutStep5Header", { token: newToken })}
                   </li>
+                  <li>{t("integrations.appleHealth.shortcutStep5HeaderJson")}</li>
                   <li>
                     {t("integrations.appleHealth.shortcutStep5Body")}
                     <pre className="shortcut-json">

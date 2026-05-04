@@ -14,7 +14,8 @@ type Props = {
 };
 
 export function WeeklyLeaderboard({ challengeId, selectedChallenge }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const numberLocale = i18n.resolvedLanguage ?? undefined;
   const { week, setWeek } = useWeek();
   const weekYear = week.year;
   const weekNumber = week.week;
@@ -65,7 +66,7 @@ export function WeeklyLeaderboard({ challengeId, selectedChallenge }: Props) {
           <span className="spotlight-label">{t("weeklyLeaderboard.biggestImprovement")}</span>
           <span className="spotlight-name">{biggest.name || biggest.email}</span>
           <span className="spotlight-steps">
-            {t("weeklyLeaderboard.vsLastWeek", { delta: biggest.delta.toLocaleString() })}
+            {t("weeklyLeaderboard.vsLastWeek", { delta: biggest.delta.toLocaleString(numberLocale) })}
           </span>
         </div>
       )}
@@ -105,11 +106,11 @@ export function WeeklyLeaderboard({ challengeId, selectedChallenge }: Props) {
                 </span>
               </div>
               <div className="meta">
-                {entry.steps.toLocaleString()} {t("common.steps")}
+                {entry.steps.toLocaleString(numberLocale)} {t("common.steps")}
                 {entry.delta !== 0 && (
                   <span className="delta">
                     {" "}({entry.delta > 0 ? "+" : ""}
-                    {entry.delta.toLocaleString()})
+                    {entry.delta.toLocaleString(numberLocale)})
                   </span>
                 )}
               </div>
