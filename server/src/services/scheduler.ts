@@ -182,8 +182,20 @@ let sweeping = false;
 /**
  * Runs the reminder sweep hourly. Each user-local reminder fires when their
  * challenge timezone reaches `REMINDER_NOTIFICATION_HOUR_LOCAL` (default 17).
+ *
+ * Disabled automatically on serverless platforms (Vercel) where there is no
+ * long-running process — Vercel Cron calls /api/cron/reminder-sweep directly.
  */
 export function startDailyReminderScheduler(): void {
+  // Vercel sets `VERCEL=1` in every function/build environment. Serverless
+  // functions have no persistent process to host setInterval, and even if they
+  // did each cold-started instance would queue duplicate sweeps.
+  if (process.env.VERCEL === "1") {
+    logger.info(
+      "In-process reminder scheduler disabled (running on Vercel — use the Vercel Cron entry in vercel.json)."
+    );
+    return;
+  }
   if (config.reminderUseExternalCron) {
     logger.info("In-process reminder scheduler disabled (REMINDER_USE_EXTERNAL_CRON=true)");
     return;

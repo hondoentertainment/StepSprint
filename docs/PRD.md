@@ -66,7 +66,7 @@ StepSprint is a month-long step challenge platform that helps organizations run 
 - [x] Admin analytics: participation, never-logged count, dormant (7-day) count, submissions-by-day trend
 - [x] Reminders (opt-in `dailyReminder`): Web Push where VAPID is configured + email where Resend/SMTP configured; hourly sweep at each challenge’s local reminder hour (`REMINDER_NOTIFICATION_HOUR_LOCAL`)
 - [x] Fitness integrations: Apple Watch Shortcut token endpoint; OAuth Fitbit and Google Fit (connect/sync/disconnect); server reports provider availability accurately
-- [x] PostgreSQL-ready schema + Render blueprint (`render.yaml`), Docker Compose for optional local Postgres, SQLite for dev defaults
+- [x] PostgreSQL-ready schema + single-Vercel deploy (SPA + Function + Vercel Postgres via Marketplace Neon), Docker Compose for optional local Postgres, SQLite for dev defaults
 - [x] Security: CSP on API (+ Swagger carve-out), CSP connect-src on Vercel client; JWT session cookies with `SameSite=None` + `Secure` in production split hosting; CSRF double-submit on mutating API calls in production; rate limiting tiers in production
 - [x] Unit, API, and E2E tests; OpenAPI `/api/docs`
 

@@ -1,6 +1,6 @@
 # StepSprint master roadmap
 
-Single place to see **where we are**, **what ships next**, and **longer bets**. Detailed requirements stay in [PRD.md](PRD.md); launch checklist in [PRODUCTION.md](PRODUCTION.md); hosting steps in [DEPLOYMENT.md](DEPLOYMENT.md).
+Single place to see **where we are**, **what ships next**, and **longer bets**. Detailed requirements stay in [PRD.md](PRD.md); production-readiness review in [PRODUCTION.md](PRODUCTION.md); hosting steps in [DEPLOYMENT.md](DEPLOYMENT.md); ordered launch-day runbook in [LAUNCH.md](LAUNCH.md).
 
 ---
 
@@ -8,41 +8,42 @@ Single place to see **where we are**, **what ships next**, and **longer bets**. 
 
 The PRD **core product** is implemented: auth, challenges, teams, submissions, leaderboards, admin moderation and analytics, exports, invites, fitness integrations (Shortcuts + OAuth providers when configured), reminders (email / Web Push when configured), security baseline (CSRF, CSP, rate limits), tests, OpenAPI, i18n (`en` + `es`), and Postgres-ready schema with CI parity.
 
-**Ongoing expectation:** keep `server/prisma/schema.prisma` and `schema.postgresql.prisma` in sync; keep CI green (unit, Postgres job, Docker image build, client, E2E).
+**Ongoing expectation:** keep `server/prisma/schema.prisma` and `schema.postgresql.prisma` in sync; keep CI green (unit, Postgres parity, client, smoke, E2E).
 
 ---
 
 ## Phase 1 — Production launch hardening
 
-*Goal: safe first broad launch on split hosting (e.g. Vercel + Render) with operability and compliance basics.*
+*Goal: safe first broad launch on a single Vercel project (SPA + Function + Vercel Postgres) with operability and compliance basics.*
 
 ### Done in repository (automatable)
 
 | Item | Notes |
 |------|--------|
-| PostgreSQL schema + migrations + CI job | `server-test-postgres`; Docker image uses `schema.postgresql.prisma` |
-| Blueprint Docker path | [`render.yaml`](../render.yaml): `dockerfilePath: ./server/Dockerfile`, `dockerContext: ./server` |
-| Health endpoint | `GET /api/health`; `npm run check:api` |
+| Single-Vercel deploy shape | [`api/[...all].js`](../api/%5B...all%5D.js) wraps Express; [`vercel.json`](../vercel.json) crons + function config + same-origin CSP |
+| Vercel build orchestrator | [`scripts/vercel-build.mjs`](../scripts/vercel-build.mjs) — Postgres schema swap, `prisma generate` + `migrate deploy`, server `tsc`, `vite build` |
+| PostgreSQL schema + migrations + CI parity | `server-test-postgres` job; `binaryTargets = ["native", "rhel-openssl-3.0.x"]` for Vercel runtime |
+| Bundle hygiene | `prismaClientFactory.ts` lazy-loads `@prisma/adapter-better-sqlite3` so the native binding stays out of the Vercel function bundle |
+| Health endpoint | `GET /api/health` returns `release` + `transactionalEmail`; `npm run check:api -- <url> --strict` is a launch gate |
 | Node 20 alignment | [`.nvmrc`](../.nvmrc), root `engines`; CI uses `node-version-file: .nvmrc` |
-| CORS | `APP_ORIGIN`, `APP_ORIGIN_ALLOWLIST`, optional `APP_ALLOW_VERCEL_PREVIEW_ORIGINS` |
-| Reminder cron contract | `POST /api/cron/reminder-sweep`, [`scripts/curl-reminder-sweep.sh`](../scripts/curl-reminder-sweep.sh) |
+| Same-origin defaults | `APP_ORIGIN`, optional `APP_ORIGIN_ALLOWLIST`, opt-in `APP_ALLOW_VERCEL_PREVIEW_ORIGINS` for staging |
+| Reminder cron contract | `GET/POST /api/cron/reminder-sweep`, Vercel Cron entry in `vercel.json`; in-process scheduler auto-disabled when `VERCEL=1`; legacy `scripts/curl-reminder-sweep.sh` kept for non-Vercel hosts |
 | Local Postgres DX | `docker-compose.yml`, `npm run postgres:parity` |
 | Backup drill doc | [BACKUP_DRILL.md](BACKUP_DRILL.md) |
-| CI gates | `docker-api-image` required for E2E + smoke; Playwright desktop Chrome on PR/push |
-| Prod env + health | Strict startup (Postgres, origins, JWT, email + **`SMTP_FROM` when using Resend/SMTP); `/api/health` exposes `transactionalEmail` in production |
+| CI gates | server-test (SQLite), server-test-postgres, client lint/test/build, smoke health, Playwright E2E (desktop Chrome) |
+| Prod env validation | Strict startup (Postgres, origins, JWT length, email + `SMTP_FROM`); `/api/health` exposes `transactionalEmail` in production |
 
 ### Operator actions (hosting / secrets / legal)
 
 | Priority | Item | Notes |
 |----------|------|--------|
-| P0 | Provision Render + Postgres | Blueprint apply; verify [`DEPLOYMENT.md`](DEPLOYMENT.md) health check |
-| P0 | Secrets only in dashboard | `JWT_SECRET`, Resend/SMTP, OAuth, `REMINDER_CRON_SECRET`, VAPID |
-| P0 | Match origins | `APP_ORIGIN`, `VITE_API_URL`, `API_PUBLIC_ORIGIN`, CSP `connect-src` |
-| P0 | Multi-instance reminders | `REMINDER_USE_EXTERNAL_CRON` + hourly cron |
-| P1 | Sentry DSNs + optional source maps | Env on Render / Vercel |
+| P0 | Create Vercel project + add **Vercel Marketplace Postgres (Neon)** | `POSTGRES_PRISMA_URL` / `POSTGRES_URL_NON_POOLING` auto-injected and aliased to `DATABASE_URL` / `DIRECT_URL` by the build script |
+| P0 | Set required env in Vercel dashboard | `JWT_SECRET`, `APP_ORIGIN`, `RESEND_API_KEY`, `SMTP_FROM`, `ADMIN_PASSWORD`, `REMINDER_USE_EXTERNAL_CRON=true`, `CRON_SECRET` |
+| P0 | First deploy + `npm run check:api -- <url> --strict` | Gates `release`, `transactionalEmail`, CSP, db |
+| P1 | Sentry DSNs + optional source maps | `SENTRY_DSN`, `VITE_SENTRY_DSN`, `SENTRY_AUTH_TOKEN`/`ORG`/`PROJECT` |
 | P1 | [Post-deploy email smoke](DEPLOYMENT.md#post-deploy-email-smoke-recommended) | After Resend configured |
 | P1 | Legal | Counsel copy; `VITE_LEGAL_CONTENT_REVIEWED` or i18n edits |
-| P2 | Staging stack | Preview API + `APP_ALLOW_VERCEL_PREVIEW_ORIGINS` or explicit allowlist |
+| P2 | Staging | Vercel Preview + per-preview Neon dev branch (Marketplace setting) |
 
 ---
 
@@ -77,4 +78,4 @@ From [PRD.md](PRD.md) **Out of scope** — revisit when business drivers justify
 2. **Source of truth:** Feature truth lives in the PRD; this file is the **timeline and priority lens**.
 3. **Updates:** When a Phase 1 item is done, tick it in your runbook or issue tracker; optionally add a short “last reviewed” line below.
 
-_Last reviewed: 2026-05._
+_Last reviewed: 2026-05-04 — API migrated from Render to a single Vercel Function (`api/[...all].js` + `scripts/vercel-build.mjs`); `render.yaml` and `server/Dockerfile` deleted; in-process reminder scheduler auto-disabled on Vercel; `CRON_SECRET` is the canonical cron bearer name (legacy `REMINDER_CRON_SECRET` still accepted); `npm run check:api -- --strict` gates the cutover._

@@ -5,9 +5,30 @@ import { z } from "zod";
 dotenv.config({ path: path.resolve(process.cwd(), "..", ".env") });
 dotenv.config();
 
+// ---------------------------------------------------------------------------
+// Vercel Postgres compatibility
+// ---------------------------------------------------------------------------
+// The Vercel Postgres integration auto-injects POSTGRES_PRISMA_URL (pooled,
+// safe for the app at runtime) and POSTGRES_URL_NON_POOLING (direct, used by
+// `prisma migrate deploy` during builds). Map them onto Prisma's expected env
+// names so the schema can keep using DATABASE_URL / DIRECT_URL unchanged and
+// no operator-side env aliasing is required.
+if (!process.env.DATABASE_URL && process.env.POSTGRES_PRISMA_URL) {
+  process.env.DATABASE_URL = process.env.POSTGRES_PRISMA_URL;
+}
+if (!process.env.DIRECT_URL && process.env.POSTGRES_URL_NON_POOLING) {
+  process.env.DIRECT_URL = process.env.POSTGRES_URL_NON_POOLING;
+}
+
 const envSchema = z.object({
   PORT: z.string().optional(),
   DATABASE_URL: z.string().min(1).default("file:./dev.db"),
+  /** Direct (non-pooled) URL used by `prisma migrate deploy`. Optional locally; required when DATABASE_URL points at a pooler (Vercel Postgres / Neon). */
+  DIRECT_URL: z.string().optional(),
+  /** Auto-injected by the Vercel Postgres integration. Mapped to DATABASE_URL above when DATABASE_URL is unset. */
+  POSTGRES_PRISMA_URL: z.string().optional(),
+  /** Auto-injected by the Vercel Postgres integration. Mapped to DIRECT_URL above when DIRECT_URL is unset. */
+  POSTGRES_URL_NON_POOLING: z.string().optional(),
   JWT_SECRET: z.string().min(16),
   APP_ORIGIN: z.string().default("http://localhost:5173"),
   /** Comma-separated extra browser origins allowed for CORS (custom domains, staging). Must match the full Origin header (e.g. https://www.example.com). */
@@ -32,7 +53,13 @@ const envSchema = z.object({
   REMINDER_NOTIFICATION_HOUR_LOCAL: z.coerce.number().int().min(0).max(23).optional(),
   /** When `true`, disables the in-process hourly reminder loop (use POST /api/cron/reminder-sweep from a platform cron instead). */
   REMINDER_USE_EXTERNAL_CRON: z.string().optional(),
-  /** Minimum 16 chars. Bearer token for POST /api/cron/reminder-sweep (Authorization: Bearer …). */
+  /**
+   * Bearer token for POST/GET /api/cron/reminder-sweep. Min 16 chars.
+   * Vercel Cron auto-populates this header from a project env var named
+   * `CRON_SECRET`, so that's the canonical name. We also accept the legacy
+   * `REMINDER_CRON_SECRET` so existing deploys keep working.
+   */
+  CRON_SECRET: z.string().min(16).optional(),
   REMINDER_CRON_SECRET: z.string().min(16).optional(),
   VAPID_PUBLIC_KEY: z.string().optional(),
   VAPID_PRIVATE_KEY: z.string().optional(),
@@ -62,16 +89,19 @@ const envSchemaWithRefinements = envSchema.superRefine((data, ctx) => {
   /** Vitest sets `VITEST` so production-like tests can load SQLite + short secrets. Real deploys must not set this. */
   const skipStrictProduction = process.env.VITEST === "true";
 
+  /** Either CRON_SECRET (Vercel convention) or legacy REMINDER_CRON_SECRET satisfies the check. */
+  const cronSecret = data.CRON_SECRET ?? data.REMINDER_CRON_SECRET;
+  const cronSecretValid = Boolean(cronSecret && cronSecret.length >= 16);
   if (
     nodeEnv === "production" &&
     data.REMINDER_USE_EXTERNAL_CRON === "true" &&
-    (!data.REMINDER_CRON_SECRET || data.REMINDER_CRON_SECRET.length < 16)
+    !cronSecretValid
   ) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      path: ["REMINDER_CRON_SECRET"],
+      path: ["CRON_SECRET"],
       message:
-        "REMINDER_CRON_SECRET (min 16 chars) is required when REMINDER_USE_EXTERNAL_CRON=true in production",
+        "CRON_SECRET (min 16 chars) is required when REMINDER_USE_EXTERNAL_CRON=true in production. Vercel Cron uses this name; REMINDER_CRON_SECRET is also accepted for backwards compatibility.",
     });
   }
 
@@ -217,7 +247,13 @@ export const config = {
   reminderNotificationHourLocal:
     parsed.data.REMINDER_NOTIFICATION_HOUR_LOCAL ?? 17,
   reminderUseExternalCron: parsed.data.REMINDER_USE_EXTERNAL_CRON === "true",
-  reminderCronSecret: parsed.data.REMINDER_CRON_SECRET,
+  /**
+   * Bearer secret accepted by /api/cron/reminder-sweep.
+   * Vercel Cron auto-fills the Authorization header from `CRON_SECRET`;
+   * the legacy `REMINDER_CRON_SECRET` is still accepted so existing platform
+   * cron schedules keep working without a flag day.
+   */
+  cronSecret: parsed.data.CRON_SECRET ?? parsed.data.REMINDER_CRON_SECRET,
   emailTransportConfigured: Boolean(parsed.data.RESEND_API_KEY || parsed.data.SMTP_HOST),
   /** Escape hatch: production boot without Resend/SMTP (not for public launches). */
   allowProductionWithoutEmail: parsed.data.ALLOW_PRODUCTION_WITHOUT_EMAIL === "true",

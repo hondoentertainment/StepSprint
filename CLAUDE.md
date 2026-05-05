@@ -13,17 +13,19 @@ Note: `package.json` still names the root workspace `schaffer-shufflers` — leg
 ```
 client/             Vite + React 19 + TypeScript frontend (React Router 7)
   public/icons/     PWA icons (192, 512)
-  tests/            Playwright specs (desktop + mobile)
+  e2e/              Playwright specs (desktop + mobile)
 server/             Express 5 + TypeScript API (JWT auth, Zod validation)
   prisma/           Canonical Prisma schema (SQLite active;
                     Postgres variant at schema.postgresql.prisma), migrations
   src/              App code, routes, middleware, logger, sentry, openapi
   src/seed.ts       Seed entry point (wired via server/prisma.config.ts)
-  Dockerfile        Multi-stage server image (targets Postgres prod)
-docs/               Screenshots, DEPLOYMENT.md, PRODUCTION.md, design notes
-.github/workflows/  CI (server + client tests + lint + build)
-render.yaml         Render.com blueprint (web service + Postgres)
-vercel.json         Frontend deploy config
+api/                Vercel Function entry (api/[...all].js) — wraps the
+                    compiled Express app at /api/*
+docs/               LAUNCH.md, DEPLOYMENT.md, PRODUCTION.md, design notes
+.github/workflows/  CI (server + client tests + lint + build + smoke + E2E)
+scripts/            vercel-build.mjs (Vercel build orchestrator),
+                    check-api-health.mjs, switch-to-postgres-schema.mjs
+vercel.json         Single Vercel project (SPA + Function + Cron)
 ```
 
 ## Commands
@@ -99,9 +101,8 @@ Seed users after `db:seed`:
 Team assignment supports random and snake-draft at challenge creation.
 
 ### CI / Deploy
-- `.github/workflows/ci.yml` — server tests (prisma push + seed + vitest) and client (lint + test + build) on PR and push.
-- Client deploys to Vercel via the existing workflow.
-- Server deploy: `render.yaml` + `server/Dockerfile` — blueprint-ready; not yet provisioned. Postgres is the intended prod DB; `schema.postgresql.prisma` is the target schema.
+- `.github/workflows/ci.yml` — server tests (SQLite + Postgres parity), client lint/test/build, smoke health check, Playwright E2E (desktop Chrome) on PR and push to `master`.
+- **Single Vercel deploy** (SPA + API Function + hourly Vercel Cron). The build runs `scripts/vercel-build.mjs`: swap to Postgres schema → `prisma generate` + `migrate deploy` → `tsc` (server) → `vite build` (client). Postgres comes from the **Vercel Marketplace Neon** integration; the build script aliases `POSTGRES_PRISMA_URL` / `POSTGRES_URL_NON_POOLING` to `DATABASE_URL` / `DIRECT_URL`.
 
 ## Conventions
 
@@ -122,12 +123,11 @@ Team assignment supports random and snake-draft at challenge creation.
 - **No real SMTP provider**: Nodemailer wired, password reset emails no-op without SMTP env.
 - **i18n**: Most screens use `useTranslation` with `en.json`; Spanish lives in `es.json` — language switcher in `LegalFooter` (persists `stepsprint-locale` in `localStorage`).
 - **Health-sync integrations**: Apple Watch via Shortcuts + bearer token to `POST /api/integrations/apple-health`; Fitbit, Google Fit, and Garmin via OAuth when server env credentials are set (`routes/oauth.ts`, `routes/integrations.ts`). In-browser HealthKit/Health Connect pairing is not a PWA goal (see `docs/PRD.md` stretch decision).
-- **Push notifications**: Daily reminders can use Web Push when VAPID keys are configured; email when SMTP/Resend is configured; see notifications routes and `REMINDER_*` env.
+- **Push notifications**: Daily reminders can use Web Push when VAPID keys are configured; email when SMTP/Resend is configured. The hourly sweep runs via Vercel Cron (`vercel.json` → `GET /api/cron/reminder-sweep`); the in-process scheduler in `services/scheduler.ts` is a no-op when `VERCEL=1`. Bearer secret is `CRON_SECRET` (legacy `REMINDER_CRON_SECRET` still accepted).
 - **CSP**: API responses use helmet with pinned CSP (strict for API routes; relaxed only for `/api/docs` and `/api/openapi.json` when OpenAPI docs are enabled).
 - **CSRF**: Production uses double-submit cookie validation on `/api/*` (except Bearer-auth and specific auth endpoints); the SPA fetches `/api/csrf-token` and sends `x-csrf-token` (`server/src/app.ts`, `client/src/api.ts`).
 - **OpenAPI / Swagger**: Disabled by default when `NODE_ENV=production`. Set `OPENAPI_DOCS_ENABLED=true` on the server to expose `/api/docs` and `/api/openapi.json`.
-- **Deploy**: See `docs/DEPLOYMENT.md` and the production checklist in `docs/PRODUCTION.md`; `render.yaml` and `server/Dockerfile` run `prisma migrate deploy` before the process starts.
-- **Postgres cutover pending**: dev uses SQLite; `server/prisma/schema.postgresql.prisma` is kept in sync but not yet the live schema.
+- **Deploy**: See `docs/LAUNCH.md` (ordered runbook), `docs/DEPLOYMENT.md` (deep dive), and `docs/PRODUCTION.md` (security/compliance review). The Vercel build runs `prisma migrate deploy` against the Marketplace Neon Postgres direct URL before the Function ships.
 - **Dependency vulnerabilities**: Root `npm audit` clean after `npm audit fix`. In **client**, `vite-plugin-pwa` / `workbox-build` / `serialize-javascript` still report high until a non-breaking upgrade path exists (avoid `npm audit fix --force` without testing the PWA build). In **server**, moderate advisories in `@prisma/dev` → `@hono/node-server`; fixing cleanly may require a Prisma major alignment — verify before forcing.
 - **Bundle size**: `Admin`, `WeeklyLeaderboard`, `TeamStandings` are code-split; `Home`, `Login`, `Submit` stay eager (critical path). Initial bundle is ~97 KB gzipped — room for more splitting, image optimization, and response caching.
 

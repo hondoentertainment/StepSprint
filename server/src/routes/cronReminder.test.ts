@@ -33,7 +33,13 @@ describe("verifyReminderCronAuth", () => {
 });
 
 describe("POST /api/cron/reminder-sweep", () => {
-  it("returns 503 when REMINDER_CRON_SECRET is not set", async () => {
+  it("returns 503 when CRON_SECRET is not set", async () => {
     await request(app).post("/api/cron/reminder-sweep").expect(503);
+  });
+});
+
+describe("GET /api/cron/reminder-sweep (Vercel Cron)", () => {
+  it("returns 503 when CRON_SECRET is not set", async () => {
+    await request(app).get("/api/cron/reminder-sweep").expect(503);
   });
 });

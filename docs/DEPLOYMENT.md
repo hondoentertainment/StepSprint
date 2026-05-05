@@ -11,9 +11,7 @@ StepSprint runs as a single Vercel project (SPA + serverless API on the same ori
 | Postgres | Vercel Marketplace (Neon) | wired via `DATABASE_URL` + `DIRECT_URL` |
 | Hourly reminders | **Vercel Cron** → `GET /api/cron/reminder-sweep` | `vercel.json` `crons` |
 
-> **Legacy:** `render.yaml` and `server/Dockerfile` still build a containerized API for Render. They are no longer the primary deploy target; the Vercel Function (`api/[...all].js`) is. Keep them in the repo only if you want a fallback / parallel host.
-
-Same-origin means **no CORS** between the SPA and the API: drop `APP_ORIGIN` overrides and `API_PUBLIC_ORIGIN` from any process talking to your own SPA. OAuth callbacks (Fitbit/Google/Garmin) and Apple Health Shortcuts hit the same Vercel hostname under `/api/integrations/...`.
+Same-origin means **no CORS** between the SPA and the API: `APP_ORIGIN` is just your real Vercel hostname (used for cookie binding), and `API_PUBLIC_ORIGIN` defaults to the same value. OAuth callbacks (Fitbit/Google/Garmin) and Apple Health Shortcuts hit the same Vercel hostname under `/api/integrations/...`.
 
 ### Wearables and step ingest (Fitness sync)
 
@@ -56,9 +54,8 @@ In Vercel dashboard → project → **Settings** → **Environment Variables**:
 | `ADMIN_PASSWORD` | **Recommended (first deploy)** | Initial password for `admin@stepsprint.local`. If unset on first deploy, a random one is logged once. The seed runs at build time (see **Step 3**), so the admin lands in the new database before the function serves requests. |
 | `APP_ORIGIN` | **Yes** | Your real Vercel URL (e.g. `https://stepsprint.vercel.app`). Used for cookie + CORS even though the app is same-origin. |
 | `NODE_ENV` | **Yes** | `production`. |
-| `REMINDER_USE_EXTERNAL_CRON` | **Yes** | `true` — disables the in-process scheduler so only Vercel Cron triggers the sweep. |
-| `REMINDER_CRON_SECRET` | **Yes** | Min 16 chars. **Set it to the same value as `CRON_SECRET`** below — Vercel Cron sends `Authorization: Bearer <CRON_SECRET>`. |
-| `CRON_SECRET` | **Yes** | Vercel Cron's auto-injected bearer token; must match `REMINDER_CRON_SECRET`. |
+| `REMINDER_USE_EXTERNAL_CRON` | **Yes** | `true` — disables the in-process scheduler so only Vercel Cron triggers the sweep. (The scheduler is also auto-disabled when `VERCEL=1`, but setting this makes intent explicit and silences the startup warning.) |
+| `CRON_SECRET` | **Yes** | Min 16 chars. Vercel Cron auto-populates `Authorization: Bearer <CRON_SECRET>` on every scheduled call to `/api/cron/reminder-sweep`. The legacy `REMINDER_CRON_SECRET` env name is also accepted server-side. |
 | `SENTRY_DSN` / `VITE_SENTRY_DSN` | Optional | Server + browser Sentry. |
 | `VITE_POSTHOG_KEY` | Optional | PostHog (browser). |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | Optional | Web Push reminders. Generate with `npx web-push generate-vapid-keys`. |
@@ -103,13 +100,9 @@ Optional helper from the repo root:
 API_BASE_URL=https://<your-vercel-host> npm run check:api
 ```
 
-### Render (legacy)
-
-`render.yaml` and `server/Dockerfile` still describe a Render-hosted Postgres + Docker API deploy. They are kept for emergency fallback. If you split hosting again, set `APP_ORIGIN`, `APP_ORIGIN_ALLOWLIST`, and the SPA's `VITE_API_URL` so cookies and CSRF work across origins (cookie `sameSite: "none"` is already the production default for that case).
-
 ## Local development (Postgres parity)
 
-Default development uses SQLite (`DATABASE_URL` with a `file:` URL). For Postgres parity, point `DATABASE_URL` at managed Postgres (for example Render `stepsprint-db` or a Neon dev branch from the Marketplace) or at a local instance. From the repo root, **`docker-compose.yml`** can supply local Postgres (`docker compose up -d`); then run migrations from `server/` against **`server/prisma/schema.postgresql.prisma`** (production uses `migrations_postgres/` via `scripts/switch-to-postgres-schema.mjs` — mirror that workflow when validating Postgres locally).
+Default development uses SQLite (`DATABASE_URL` with a `file:` URL). For Postgres parity, point `DATABASE_URL` at a Neon dev branch from the Vercel Marketplace, or at a local instance. From the repo root, **`docker-compose.yml`** can supply local Postgres (`docker compose up -d`); then run migrations from `server/` against **`server/prisma/schema.postgresql.prisma`** (production uses `migrations_postgres/` via `scripts/switch-to-postgres-schema.mjs` — mirror that workflow when validating Postgres locally).
 
 ---
 
@@ -129,14 +122,12 @@ After the first successful deploy, complete these steps:
 
 Use a Vercel **Preview** deployment with its own Neon dev branch (Vercel Marketplace can attach one per preview). Same-origin means CSRF, cookies, and email flows mirror production without origin config. Run `npm test`, `npm run build`, and `npm run test:e2e` against the preview URL.
 
-| | Production (example) | Staging (you define) |
-|---|----------------------|----------------------|
-| SPA origin | `https://stepsprint.vercel.app` (or custom) | Preview URL or `staging.example.com` |
-| API public URL | Render service URL | Separate Render service or preview API |
-| `APP_ORIGIN` (API env) | SPA origin above | Staging SPA origin |
-| `API_PUBLIC_ORIGIN` (API env) | API public URL | Staging API URL |
-| `VITE_API_URL` (client build) | Same as production API | Staging API URL |
-| OAuth redirect URIs | Match `API_PUBLIC_ORIGIN` | Match staging API URL |
+| | Production (example) | Staging (Vercel Preview) |
+|---|----------------------|---------------------------|
+| Origin (SPA + API) | `https://stepsprint.vercel.app` (or custom) | Per-deploy preview URL (`https://*-<hash>.vercel.app`) |
+| `APP_ORIGIN` | Production hostname | Preview hostname (or set `APP_ALLOW_VERCEL_PREVIEW_ORIGINS=true` on a non-prod env) |
+| Database | Neon main branch | Per-preview Neon dev branch (Vercel Marketplace can attach automatically) |
+| OAuth redirect URIs | Match production hostname | Add the staging hostname in each provider console |
 
 ---
 
@@ -144,9 +135,7 @@ Use a Vercel **Preview** deployment with its own Neon dev branch (Vercel Marketp
 
 ### Sentry error tracking
 
-In the Render dashboard → `stepsprint-api` → **Environment** → set `SENTRY_DSN`.
-In the Vercel dashboard → **Settings → Environment Variables** → set `VITE_SENTRY_DSN`.
-To symbolicate browser stacks, set **`SENTRY_AUTH_TOKEN`**, **`SENTRY_ORG`**, and **`SENTRY_PROJECT`** on Vercel for **production builds** (same release as `VITE_SENTRY_RELEASE` / git SHA — see `client/vite.config.ts`).
+In the Vercel dashboard → **Settings → Environment Variables** → set `SENTRY_DSN` for the Function and `VITE_SENTRY_DSN` for the browser. To symbolicate browser stacks, also set **`SENTRY_AUTH_TOKEN`**, **`SENTRY_ORG`**, and **`SENTRY_PROJECT`** for **production builds** (`@sentry/vite-plugin` uploads hidden source maps tagged with `VITE_SENTRY_RELEASE` — see `client/vite.config.ts`; Vercel auto-injects `VERCEL_GIT_COMMIT_SHA` for the release name when you don't set it).
 
 ### PostHog analytics
 
@@ -158,7 +147,7 @@ In the Vercel dashboard → set `VITE_POSTHOG_KEY` (and optionally `VITE_POSTHOG
    ```bash
    npx web-push generate-vapid-keys
    ```
-2. In Render dashboard → `stepsprint-api` → **Environment**, set:
+2. In the Vercel dashboard → **Settings → Environment Variables**, set:
    - `VAPID_PUBLIC_KEY`
    - `VAPID_PRIVATE_KEY`
    - `VAPID_SUBJECT` (e.g. `mailto:admin@yourdomain.com`)
@@ -168,74 +157,76 @@ In the Vercel dashboard → set `VITE_POSTHOG_KEY` (and optionally `VITE_POSTHOG
 1. Register an app at [dev.fitbit.com](https://dev.fitbit.com/apps/new).
 2. Set the OAuth redirect URI to:
    ```
-   https://stepsprint-api.onrender.com/api/integrations/fitbit/callback
+   https://<your-vercel-host>/api/integrations/fitbit/callback
    ```
-3. In Render dashboard → set `FITBIT_CLIENT_ID` and `FITBIT_CLIENT_SECRET`.
+3. In Vercel → set `FITBIT_CLIENT_ID` and `FITBIT_CLIENT_SECRET`.
 
 ### Google Fit integration
 
 1. Create a project at [console.cloud.google.com](https://console.cloud.google.com) → enable the **Fitness API**.
 2. Create OAuth 2.0 credentials. Set the redirect URI to:
    ```
-   https://stepsprint-api.onrender.com/api/integrations/google-fit/callback
+   https://<your-vercel-host>/api/integrations/google-fit/callback
    ```
-3. In Render dashboard → set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
+3. In Vercel → set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
 
 ---
 
 ## Environment variables reference
 
-### Server (Render)
+All variables live in **Vercel → project → Settings → Environment Variables**.
 
-| Variable | Source | Required | Description |
-|----------|--------|----------|-------------|
-| `NODE_ENV` | `render.yaml` | Yes | `production` |
-| `PORT` | `render.yaml` | Yes | `3001` |
-| `DATABASE_URL` | Render (auto) | Yes | PostgreSQL connection string |
-| `JWT_SECRET` | Render (auto) | Yes | Random 64-char secret |
-| `APP_ORIGIN` | `render.yaml` | Yes | Vercel SPA origin (default `https://step-sprint.vercel.app`) — used for **CORS** and **browser redirects after OAuth**. |
-| `APP_ORIGIN_ALLOWLIST` | Manual | No | Comma-separated extra SPA origins (same rules as `APP_ORIGIN`) for **CORS** when you use a second hostname (e.g. `https://www.example.com`). |
-| `APP_ALLOW_VERCEL_PREVIEW_ORIGINS` | Manual | No | Set to `true` only on a **non-production** API to allow **Vercel preview** URLs (`https://*.vercel.app`). Do not enable on your primary production API. |
-| `API_PUBLIC_ORIGIN` | `render.yaml` | Yes (split hosting) | Public origin where **this** API is hosted (Render URL). OAuth `redirect_uri` must pin here (`https://stepsprint-api.onrender.com`). Omit only for same-origin / local Vite-proxy setups — then it mirrors `APP_ORIGIN`. |
-| `RESEND_API_KEY` | Manual | **Yes** | Resend API key for transactional email |
-| `SMTP_FROM` | Manual | **Yes** | Email sender address |
-| `ADMIN_PASSWORD` | Manual | First deploy | Seed admin password |
-| `SENTRY_DSN` | Manual | No | Sentry DSN |
-| `VAPID_PUBLIC_KEY` | Manual | No | Web Push public key |
-| `VAPID_PRIVATE_KEY` | Manual | No | Web Push private key |
-| `VAPID_SUBJECT` | Manual | No | Web Push contact URI |
-| `FITBIT_CLIENT_ID` | Manual | No | Fitbit OAuth app ID |
-| `FITBIT_CLIENT_SECRET` | Manual | No | Fitbit OAuth app secret |
-| `GOOGLE_CLIENT_ID` | Manual | No | Google OAuth client ID |
-| `GOOGLE_CLIENT_SECRET` | Manual | No | Google OAuth client secret |
-| `REMINDER_NOTIFICATION_HOUR_LOCAL` | Manual | No | Local hour per challenge TZ when opt-in reminders are evaluated (`0`-`23`; default `17`). Server runs checks hourly; see `scheduler` service |
-| `REMINDER_USE_EXTERNAL_CRON` | Manual | No | Set to `true` to **disable** the in-process hourly reminder loop (use when running multiple API instances so only one sweep runs). |
-| `REMINDER_CRON_SECRET` | Manual | With external cron | Min 16 characters. Required for `POST /api/cron/reminder-sweep` with header `Authorization: Bearer <secret>`. |
-| `OPENAPI_DOCS_ENABLED` | Manual | No | Set to `true` to expose `/api/docs` and `/api/openapi.json` in production. Omit or `false` to keep them disabled (default when `NODE_ENV=production`). |
+### Required
 
-Schedule the HTTP call from your host (for example Render **Cron Jobs**, GitHub Actions `schedule`, or Uptime Robot) at least once per hour. The sweep still only notifies users when their challenge timezone matches `REMINDER_NOTIFICATION_HOUR_LOCAL` and they are due for a reminder, so hourly pings are correct.
+| Variable | Description |
+|----------|-------------|
+| `NODE_ENV` | `production` (Vercel sets this automatically on prod deploys). |
+| `JWT_SECRET` | Min 32 chars. Generate `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"`. |
+| `DATABASE_URL` | Pooled Postgres connection string. Auto-aliased from `POSTGRES_PRISMA_URL` (Vercel Postgres / Neon Marketplace) at build and runtime. |
+| `DIRECT_URL` | Direct (non-pooled) connection used by `prisma migrate deploy`. Auto-aliased from `POSTGRES_URL_NON_POOLING`. |
+| `APP_ORIGIN` | Your production Vercel hostname (e.g. `https://stepsprint.vercel.app`). Used for cookie binding and (if you ever add a second hostname) CORS. |
+| `RESEND_API_KEY` | Required for production unless `ALLOW_PRODUCTION_WITHOUT_EMAIL=true`. |
+| `SMTP_FROM` | Verified sender address. Required when an email transport is set. |
+| `REMINDER_USE_EXTERNAL_CRON` | `true` — explicit flag that the in-process scheduler is disabled (Vercel Cron is the only scheduler). |
+| `CRON_SECRET` | Min 16 chars. Vercel Cron auto-attaches this as `Authorization: Bearer <CRON_SECRET>` to `/api/cron/reminder-sweep`. The legacy `REMINDER_CRON_SECRET` env name is also accepted. |
 
-Example (replace URL and secret):
+### Recommended
+
+| Variable | Description |
+|----------|-------------|
+| `ADMIN_PASSWORD` | Initial seed password for `admin@stepsprint.local`. If unset on the very first deploy, a random one is logged once. |
+| `SENTRY_DSN` | Server Sentry. |
+| `VITE_SENTRY_DSN` | Browser Sentry. |
+| `VITE_POSTHOG_KEY` | PostHog (loads only after the cookie banner is accepted in production). |
+| `VITE_LEGAL_CONTENT_REVIEWED` | `true` once Privacy/Terms copy is finalized — hides the draft banner. |
+| `SENTRY_AUTH_TOKEN` + `SENTRY_ORG` + `SENTRY_PROJECT` | Upload hidden browser source maps at build time. |
+
+### Optional
+
+| Variable | Description |
+|----------|-------------|
+| `APP_ORIGIN_ALLOWLIST` | Comma-separated extra SPA origins for CORS (e.g. `https://www.example.com`). Usually unneeded — same-origin Vercel does not require this. |
+| `APP_ALLOW_VERCEL_PREVIEW_ORIGINS` | `true` on **staging only** to allow `https://*.vercel.app` previews to call the API with credentials. Never enable on prod. |
+| `API_PUBLIC_ORIGIN` | Override the URL the server reports in OAuth callbacks and Apple Health Shortcuts. Defaults to `APP_ORIGIN`. |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Web Push reminders. Generate with `npx web-push generate-vapid-keys`. |
+| `FITBIT_CLIENT_ID`, `FITBIT_CLIENT_SECRET` | Fitbit OAuth. |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google Fit OAuth. |
+| `GARMIN_CLIENT_ID`, `GARMIN_CLIENT_SECRET`, `GARMIN_OAUTH_SCOPE` | Garmin OAuth. |
+| `REMINDER_NOTIFICATION_HOUR_LOCAL` | Local hour per challenge TZ when reminders fire (`0`-`23`; default `17`). |
+| `OPENAPI_DOCS_ENABLED` | `true` to expose `/api/docs` and `/api/openapi.json` in production (off by default). |
+| `LOG_LEVEL` | pino level (`info` default). |
+| `ALLOW_PRODUCTION_WITHOUT_EMAIL` | Escape hatch: allow `NODE_ENV=production` without Resend/SMTP. Email flows will silently no-op. |
+
+### External cron callers (rare on Vercel)
+
+If for some reason you don't use Vercel Cron, hit the same endpoint hourly from any scheduler:
 
 ```bash
-curl -fsS -X POST "https://stepsprint-api.onrender.com/api/cron/reminder-sweep" \
-  -H "Authorization: Bearer $REMINDER_CRON_SECRET"
+curl -fsS "https://<your-vercel-host>/api/cron/reminder-sweep" \
+  -H "Authorization: Bearer $CRON_SECRET"
 ```
 
-The repo includes **`scripts/curl-reminder-sweep.sh`**, which reads **`API_PUBLIC_ORIGIN`** and **`REMINDER_CRON_SECRET`** from the environment and performs the same request (useful in cron wrappers).
-
-### Client (Vercel)
-
-| Variable | Source | Required | Description |
-|----------|--------|----------|-------------|
-| `VITE_API_URL` | `vercel.json` | Yes | `https://stepsprint-api.onrender.com` |
-| `VITE_SENTRY_DSN` | Vercel dashboard | No | Sentry DSN for browser errors |
-| `SENTRY_AUTH_TOKEN` | Vercel dashboard | No | Upload **hidden** source maps at build (with `SENTRY_ORG` + `SENTRY_PROJECT`) |
-| `SENTRY_ORG` | Vercel dashboard | No | Sentry org slug for upload |
-| `SENTRY_PROJECT` | Vercel dashboard | No | Sentry project slug for browser / `stepsprint-client` |
-| `VITE_POSTHOG_KEY` | Vercel dashboard | No | PostHog project key |
-| `VITE_POSTHOG_HOST` | Vercel dashboard | No | PostHog host (defaults to `app.posthog.com`) |
-| `VITE_LEGAL_CONTENT_REVIEWED` | Vercel dashboard | No | Set to `true` after Privacy/Terms copy is reviewed to hide the draft banner on those pages |
+The repo's `scripts/curl-reminder-sweep.sh` does the same and reads `API_PUBLIC_ORIGIN` and `CRON_SECRET` (or legacy `REMINDER_CRON_SECRET`) from the environment.
 
 ---
 
@@ -316,48 +307,34 @@ Password for all seeded users: `password123`. All have `emailVerified: true` so 
 
 ## Architecture notes
 
-- **Dev DB**: SQLite via `@prisma/adapter-better-sqlite3` (auto-detected when `DATABASE_URL` starts with `file:`)
-- **Prod DB**: PostgreSQL. The Dockerfile copies `schema.postgresql.prisma` over `schema.prisma` and replaces `migrations/` with `migrations_postgres/` before running `prisma migrate deploy`. Safe on re-deploy — only pending migrations are applied.
+- **Dev DB**: SQLite via `@prisma/adapter-better-sqlite3` (auto-detected when `DATABASE_URL` starts with `file:`). The adapter is lazy-loaded so production Vercel bundles don't include the native `better-sqlite3` binding.
+- **Prod DB**: PostgreSQL. `scripts/vercel-build.mjs` swaps the Postgres schema and migrations into place, then runs `prisma migrate deploy`. Safe on re-deploy — only pending migrations are applied. A failed migration fails the deploy.
+- **API runtime**: A single Vercel Function (`api/[...all].js`) wraps the compiled Express app (`server/dist/app.js`). It cold-starts in ~1–2 s with the Prisma client and reuses the warm instance across requests (Fluid Compute).
+- **Reminders**: Vercel Cron pings `GET /api/cron/reminder-sweep` hourly. The in-process scheduler is a no-op when `VERCEL=1`, so duplicate sweeps are impossible across cold-started function instances.
 - **Email verification**: new self-registered users must verify their email before logging in. Admin-added participants and invite-accepted users are pre-verified (the invite itself is the trust signal).
 - **JWT revocation**: each user has a `tokenVersion` counter embedded in their JWT. Logout, password change, and password reset all increment it, immediately invalidating all outstanding tokens on other devices.
-- **HTTPS split hosting**: SPA and API live on **different origins**. Production session cookies and CSRF pairing use **`SameSite=None`** + **`Secure`** so authenticated `credentials: include` fetch calls succeed from `APP_ORIGIN` to `API_PUBLIC_ORIGIN`.
+- **Same-origin cookies**: SPA and API live on the same Vercel hostname. Session cookies and CSRF pairs ride a normal `SameSite=Lax`/`Secure` cookie. The cross-origin `SameSite=None` path is still implemented for the rare case you put the API behind a different hostname.
 - **CSRF protection**: double-submit cookie pattern (production only). Bearer token requests (iOS Shortcuts / OAuth flows) bypass CSRF.
 - **Rate limiting**: production-only for general/API limiters. Login endpoint is limited to 10 attempts / 15 min per IP.
 - **CSP**: strict policy on all API routes (`script-src 'self'`); relaxed only for `/api/docs` and `/api/openapi.json` to accommodate Swagger UI assets from cdn.jsdelivr.net.
 
 ---
 
-## PostgreSQL production cutover checklist
-
-Use this when moving the live API from SQLite (never in prod) or recovering from a misconfigured DB to the managed Postgres defined in `render.yaml`.
-
-1. **Provision or verify `stepsprint-db`** on Render (or your host): note connection limit, region, and that automated backups are on.
-2. **Set `DATABASE_URL`** on the web service to the Postgres URL (the Docker entrypoint runs `prisma migrate deploy` against `migrations_postgres/`).
-3. **Run a single-instance deploy first** so migrations finish without two processes racing; confirm logs for `migrate deploy` success.
-4. **Smoke test after cutover**: `GET /api/health` (`db: up`), sign-in, create or open a challenge, one step submission, admin analytics (including cohort).
-5. **Retain a snapshot** (Render backup or manual `pg_dump`) before major structural migrations or data fixes.
-6. **Connection hygiene**: if you scale to multiple web instances, ensure your Prisma/database pool settings match Postgres `max_connections`; avoid sharing one tiny instance across many workers without a pooler.
-7. **Rollback plan**: restore from the latest backup to a new DB, point `DATABASE_URL` at it, redeploy — document who can trigger this on your team.
-
-Local parity: `docker compose up -d` from the repo root and `DATABASE_URL=postgresql://…` (see comments in **Local development** above) exercise the same schema as production.
-
----
-
 ## Security checklist
 
-- [x] `JWT_SECRET` auto-generated (Render)
-- [x] HTTPS enforced (Render + Vercel handle TLS)
-- [x] CORS restricted to `APP_ORIGIN` + optional **`APP_ORIGIN_ALLOWLIST`** / preview flag (see [PRODUCTION.md](PRODUCTION.md))
+- [x] `JWT_SECRET` ≥32 chars (enforced at boot in production)
+- [x] HTTPS enforced (Vercel manages TLS)
+- [x] Same-origin SPA + API — no CORS surface; optional `APP_ORIGIN_ALLOWLIST` + `APP_ALLOW_VERCEL_PREVIEW_ORIGINS` for staging
 - [x] CSRF protection (double-submit cookie, production)
 - [x] Rate limiting — login: 10/15 min, auth: 30/15 min, API: 120/min
-- [x] Helmet security headers (server)
+- [x] Helmet security headers (server) + Vercel platform headers (`vercel.json`)
 - [x] CSP — no `unsafe-inline` for scripts on API or client
 - [x] HTTP-only session cookies
 - [x] Email verification required before first login
 - [x] JWT revocation on logout / password change / password reset
 - [x] Admin password from env var (or auto-generated random with warning)
 - [x] Cursor-based pagination on admin submissions list
-- [x] `prisma migrate deploy` (not `db push --accept-data-loss`) on container start
-- [ ] SMTP / Resend configured (`RESEND_API_KEY` + `SMTP_FROM`) — required
+- [x] `prisma migrate deploy` (not `db push --accept-data-loss`) on every Vercel build
+- [ ] Resend (or SMTP) configured (`RESEND_API_KEY` + `SMTP_FROM`) — required
 - [ ] Sentry DSN — optional
 - [ ] VAPID keys for Web Push — optional

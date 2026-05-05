@@ -97,17 +97,13 @@ jobs:
         working-directory: server
         run: npm run test:run
 
-  docker-api-image:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build API Docker image (Render blueprint)
-        run: docker build -f server/Dockerfile -t stepsprint-api:ci ./server
-
   client-test:
     runs-on: ubuntu-latest
     env:
-      VITE_API_URL: ${{ vars.VITE_API_URL || 'https://stepsprint-api.onrender.com' }}
+      # Same-origin Vercel: SPA defaults to relative /api at runtime. Set
+      # VITE_API_URL only if you intentionally split the API onto a different
+      # hostname (e.g. legacy fallback).
+      VITE_API_URL: ${{ vars.VITE_API_URL || '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -134,7 +130,7 @@ jobs:
         run: npm run build
 
   e2e:
-    needs: [server-test, client-test, docker-api-image]
+    needs: [server-test, client-test]
     runs-on: ubuntu-latest
     env:
       JWT_SECRET: test-jwt-secret-ci-stepsprint-minimum-32-chars
@@ -173,7 +169,7 @@ jobs:
         run: npx playwright test --project=desktop-chrome
 
   smoke-test:
-    needs: [server-test, client-test, docker-api-image]
+    needs: [server-test, client-test]
     runs-on: ubuntu-latest
     env:
       JWT_SECRET: test-jwt-secret-ci-stepsprint-minimum-32-chars

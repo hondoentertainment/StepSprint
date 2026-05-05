@@ -1,13 +1,18 @@
 # StepSprint
 
-StepSprint is a month-long step challenge platform with teams, leaderboards, and an admin console.
+StepSprint is a month-long step challenge platform with teams, leaderboards, and an admin console. It deploys as a single **Vercel** project: SPA + serverless Express API + Vercel Postgres (Neon) + Vercel Cron.
+
+See [docs/LAUNCH.md](docs/LAUNCH.md) for the ordered launch-day runbook, [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the deep dive, and [docs/PRODUCTION.md](docs/PRODUCTION.md) for the production-readiness review.
 
 ## Workspace layout
 
-- `client/` - Vite React + TypeScript frontend
+- `client/` - Vite React + TypeScript frontend (PWA)
 - `server/` - Express + TypeScript API (includes `server/prisma/` — the
   canonical Prisma schema, migrations, and the seed entry point at
   `server/src/seed.ts`)
+- `api/[...all].js` - Vercel Function shim that mounts the compiled Express
+  app (`server/dist/app.js`) at `/api/*`
+- `scripts/vercel-build.mjs` - build orchestrator used by Vercel
 
 ## Setup
 

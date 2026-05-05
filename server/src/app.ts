@@ -27,7 +27,8 @@ const app = express();
 const isProduction = config.nodeEnv === "production";
 
 if (isProduction) {
-  // Reverse-proxy (Render, etc.) — correct client IP for rate limits, cookies, CSRF session id.
+  // Reverse-proxy (Vercel, any proxy in front) — correct client IP for rate
+  // limits, cookies, and CSRF session id binding.
   app.set("trust proxy", 1);
 }
 

@@ -25,15 +25,17 @@ export function logProductionReadiness(): void {
     logger.warn("SENTRY_DSN is unset — server exceptions will not be sent to Sentry.");
   }
 
-  if (config.reminderUseExternalCron && !config.reminderCronSecret) {
+  if (config.reminderUseExternalCron && !config.cronSecret) {
     logger.warn(
-      "REMINDER_USE_EXTERNAL_CRON is true but REMINDER_CRON_SECRET is unset — POST /api/cron/reminder-sweep will return 503."
+      "REMINDER_USE_EXTERNAL_CRON is true but CRON_SECRET (or legacy REMINDER_CRON_SECRET) is unset — /api/cron/reminder-sweep will return 503."
     );
   }
 
-  if (!config.reminderUseExternalCron) {
+  // On Vercel the in-process scheduler is unconditionally disabled (see services/scheduler.ts);
+  // emit the warning only for long-running hosts where the operator might want to migrate to a platform cron.
+  if (!config.reminderUseExternalCron && process.env.VERCEL !== "1") {
     logger.warn(
-      "In-process hourly reminder scheduler is enabled. For multiple API instances set REMINDER_USE_EXTERNAL_CRON=true and run POST /api/cron/reminder-sweep from a platform cron (see docs/DEPLOYMENT.md)."
+      "In-process hourly reminder scheduler is enabled. For multiple API instances set REMINDER_USE_EXTERNAL_CRON=true and call /api/cron/reminder-sweep from a platform cron (see docs/DEPLOYMENT.md)."
     );
   }
 
