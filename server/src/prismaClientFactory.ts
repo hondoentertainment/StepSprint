@@ -1,22 +1,27 @@
 import { PrismaClient } from "@prisma/client";
 
 /**
- * SQLite (file:) uses a driver adapter; Postgres uses Prisma's default engine
- * with the URL pulled from `env("DATABASE_URL")` in `schema.prisma`.
+ * Build a PrismaClient with the right driver adapter for the active
+ * `DATABASE_URL`. Prisma 7 removed the `datasourceUrl` constructor option, so
+ * an adapter is mandatory.
  *
- * The SQLite adapter is required lazily so production bundles (Vercel
- * Functions, any serverless runtime targeting Postgres) do not pull in
- * `better-sqlite3`'s native binding, which is dev-only and would inflate the
- * bundle past Vercel's 50 MB unzipped limit.
+ * - SQLite (`file:` URL) -> `@prisma/adapter-better-sqlite3` (dev/test only).
+ * - Anything else -> `@prisma/adapter-pg` (Postgres; works with Vercel
+ *   Postgres / Neon over the standard TCP driver).
+ *
+ * Both adapters are loaded with CommonJS `require()` so the unused one stays
+ * out of the Vercel Function bundle: SQLite ships only in dev, and the
+ * `better-sqlite3` native binding would otherwise blow past Vercel's 50 MB
+ * unzipped Function limit.
  */
 export function createPrismaClient(databaseUrl: string): PrismaClient {
   if (databaseUrl.startsWith("file:")) {
-    // CommonJS require keeps this synchronous; the dependency only resolves
-    // when SQLite is actually requested.
-
     const adapterModule = require("@prisma/adapter-better-sqlite3") as typeof import("@prisma/adapter-better-sqlite3");
     const adapter = new adapterModule.PrismaBetterSqlite3({ url: databaseUrl });
     return new PrismaClient({ adapter } as never);
   }
-  return new PrismaClient();
+
+  const adapterModule = require("@prisma/adapter-pg") as typeof import("@prisma/adapter-pg");
+  const adapter = new adapterModule.PrismaPg({ connectionString: databaseUrl });
+  return new PrismaClient({ adapter } as never);
 }

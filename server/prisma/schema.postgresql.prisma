@@ -12,11 +12,14 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  // Used by `prisma migrate deploy` when DATABASE_URL points at a pooled URL
-  // (e.g. Neon / Vercel Postgres pgbouncer). Falls back to DATABASE_URL if unset.
-  directUrl = env("DIRECT_URL")
+  // Prisma 7 removed `url` and `directUrl` from the datasource block; the URL
+  // now lives in `prisma.config.ts` and is read from DATABASE_URL there. At
+  // runtime, PrismaClient gets a `@prisma/adapter-pg` instance constructed
+  // with the same URL (see `src/prismaClientFactory.ts`). For pooled Postgres
+  // (Vercel Postgres / Neon pgbouncer), point DATABASE_URL at the pooled URL
+  // for the runtime client and at POSTGRES_URL_NON_POOLING for `prisma
+  // migrate deploy` (handled by `scripts/vercel-build.mjs`).
+  provider = "postgresql"
 }
 
 enum Role {
