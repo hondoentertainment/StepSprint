@@ -21,6 +21,25 @@ test.describe("Desktop viewport", () => {
     await expect(page.getByRole("heading", { name: /Team/i })).toBeVisible();
   });
 
+  test("participant can submit steps and see success", async ({ page }) => {
+    await loginAsSeededParticipant(page);
+    await page.getByTestId("tab-submit").click();
+    const stepsInput = page.locator("form input[type='number']");
+    await expect(stepsInput).toBeVisible();
+    await stepsInput.fill("4321");
+    await page.getByRole("button", { name: /log steps|registrar pasos/i }).click();
+    await expect(
+      page.getByText(/Steps submitted successfully|Pasos registrados correctamente/i)
+    ).toBeVisible({ timeout: 15_000 });
+  });
+
+  test("privacy and terms pages render without signing in", async ({ page }) => {
+    await page.goto("/privacy");
+    await expect(page.getByRole("heading", { name: /Privacy|Privacidad/i })).toBeVisible();
+    await page.goto("/terms");
+    await expect(page.getByRole("heading", { name: /Terms of use|Términos de uso/i })).toBeVisible();
+  });
+
   test("logout returns to login", async ({ page }) => {
     await loginAsSeededParticipant(page);
     await page.getByRole("button", { name: /log out|cerrar sesión/i }).click();

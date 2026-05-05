@@ -61,46 +61,80 @@ router.get("/fitness", authRequired, async (req: AuthenticatedRequest, res) => {
     return;
   }
 
+  const challengeIdParam =
+    typeof req.query.challengeId === "string" && req.query.challengeId.length > 0
+      ? req.query.challengeId
+      : null;
+
   const fitbitAvail = Boolean(config.oauth.fitbitClientId && config.oauth.fitbitClientSecret);
   const googleAvail = Boolean(config.oauth.googleClientId && config.oauth.googleClientSecret);
   const garminAvail = Boolean(config.oauth.garminClientId && config.oauth.garminClientSecret);
 
-  const [tokenCount, oauthConnections] = await Promise.all([
+  const [tokenCount, latestToken, oauthConnections] = await Promise.all([
     prisma.integrationToken.count({ where: { userId: req.user.id } }),
+    prisma.integrationToken.findFirst({
+      where: { userId: req.user.id },
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true },
+    }),
     prisma.oAuthConnection.findMany({
       where: { userId: req.user.id },
-      select: { provider: true },
+      select: { provider: true, updatedAt: true },
     }),
   ]);
 
-  const oauthSet = new Set(oauthConnections.map((c) => c.provider));
+  let lastAppleHealthSync: Date | null = null;
+  if (challengeIdParam) {
+    const enrolled = await prisma.teamMember.findUnique({
+      where: { userId_challengeId: { userId: req.user.id, challengeId: challengeIdParam } },
+    });
+    if (enrolled) {
+      const row = await prisma.auditLog.findFirst({
+        where: {
+          action: "apple_health_sync",
+          actorId: req.user.id,
+          challengeId: challengeIdParam,
+        },
+        orderBy: { createdAt: "desc" },
+        select: { createdAt: true },
+      });
+      lastAppleHealthSync = row?.createdAt ?? null;
+    }
+  }
+
+  const oauthByProvider = new Map(oauthConnections.map((c) => [c.provider, c.updatedAt]));
 
   res.json({
     connected: tokenCount > 0 || oauthConnections.length > 0,
+    lastAppleHealthSyncAt: lastAppleHealthSync?.toISOString() ?? null,
     providers: [
       {
         id: "apple_health",
         name: "Apple Health / Apple Watch",
         available: true,
         connected: tokenCount > 0,
+        connectedAt: latestToken?.createdAt?.toISOString() ?? null,
       },
       {
         id: "google_fit",
         name: "Google Fit",
         available: googleAvail,
-        connected: oauthSet.has("google_fit"),
+        connected: oauthByProvider.has("google_fit"),
+        connectedAt: oauthByProvider.get("google_fit")?.toISOString() ?? null,
       },
       {
         id: "fitbit",
         name: "Fitbit",
         available: fitbitAvail,
-        connected: oauthSet.has("fitbit"),
+        connected: oauthByProvider.has("fitbit"),
+        connectedAt: oauthByProvider.get("fitbit")?.toISOString() ?? null,
       },
       {
         id: "garmin",
         name: "Garmin Connect",
         available: garminAvail,
-        connected: oauthSet.has("garmin"),
+        connected: oauthByProvider.has("garmin"),
+        connectedAt: oauthByProvider.get("garmin")?.toISOString() ?? null,
       },
     ],
     message:

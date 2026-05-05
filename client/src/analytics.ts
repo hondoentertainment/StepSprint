@@ -5,6 +5,14 @@ type Traits = Record<string, unknown>;
 export const ANALYTICS_EVENTS = {
   challengeViewed: "challenge_viewed",
   submissionCreated: "submission_created",
+  integrationTokenCreated: "integration_token_created",
+  integrationTokenRevoked: "integration_token_revoked",
+  integrationCsvImported: "integration_csv_imported",
+  integrationOauthReturned: "integration_oauth_returned",
+  integrationOauthSync: "integration_oauth_sync_clicked",
+  integrationOauthDisconnected: "integration_oauth_disconnect_clicked",
+  /** First time the UI observes a successful Apple Health (Shortcuts) sync for this challenge (localStorage deduped). */
+  integrationAppleHealthSyncObserved: "integration_apple_health_sync_observed",
 } as const;
 
 type PostHogLike = {
@@ -155,5 +163,20 @@ export function shouldPromptAnalyticsConsent(): boolean {
     return localStorage.getItem(CONSENT_KEY) === null;
   } catch {
     return false;
+  }
+}
+
+const APPLE_SYNC_SIGHTED_KEY = "stepsprint-apple-sync-sighted";
+
+/** Fire once per challenge when we learn Apple Health has synced (audit-backed). Uses localStorage so Submit + Devices do not double-count. */
+export function trackAppleHealthSyncFirstObserved(challengeId: string): void {
+  if (!challengeId) return;
+  const key = `${APPLE_SYNC_SIGHTED_KEY}-${challengeId}`;
+  try {
+    if (localStorage.getItem(key)) return;
+    localStorage.setItem(key, "1");
+    track(ANALYTICS_EVENTS.integrationAppleHealthSyncObserved, { challengeId });
+  } catch {
+    /* ignore quota / private mode */
   }
 }

@@ -57,4 +57,5 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD curl -fsS http://127.0.0.1:3001/api/health || exit 1
 
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
+# migrate deploy + idempotent admin seed, then start the API (see src/seed.ts production path).
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/seed.js && node dist/index.js"]

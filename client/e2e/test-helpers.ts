@@ -15,6 +15,10 @@ export async function loginAsSeededParticipant(page: Page): Promise<void> {
   await expect(page.getByRole("heading", { name: participantHomeHeading })).toBeVisible({
     timeout: 15_000,
   });
+  // Participant is only on the seeded demo challenge / teams; other challenges from prior E2E runs may exist.
+  await page
+    .getByRole("combobox", { name: /select challenge|seleccionar reto/i })
+    .selectOption({ label: "StepSprint Demo" });
 }
 
 export async function loginAsSeededAdmin(page: Page): Promise<void> {

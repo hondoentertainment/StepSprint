@@ -45,7 +45,7 @@ test.describe("Mobile viewport", () => {
     await page.getByTestId("tab-submit").click();
     await expect(page.getByRole("heading", { name: /Submit steps|Registrar pasos/i })).toBeVisible();
     await expect(page.getByLabel(/Date|Fecha/i)).toBeVisible();
-    await expect(page.getByLabel(/Steps|Pasos/i)).toBeVisible();
+    await expect(page.locator("form input[type='number']")).toBeVisible();
     await expect(page.getByRole("button", { name: /log steps|registrar pasos/i })).toBeVisible();
   });
 

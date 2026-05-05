@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api";
 import { getErrorMessage } from "../api";
 import { todayInTimezone, isFutureDate } from "../utils";
-import { ANALYTICS_EVENTS, track } from "../analytics";
+import { ANALYTICS_EVENTS, track, trackAppleHealthSyncFirstObserved } from "../analytics";
 import type { Challenge } from "../types";
 import type { Summary } from "../types";
 
@@ -33,24 +33,40 @@ export function Submit({
   const [isSubmitting, setIsSubmitting] = useState(false);
   /** null = unknown or skipped; false = no Apple/OAuth sync linked */
   const [fitnessConnected, setFitnessConnected] = useState<boolean | null>(null);
+  const [lastAppleHealthSyncAt, setLastAppleHealthSyncAt] = useState<string | null>(null);
 
   useEffect(() => {
     if (!challengeId) {
       setFitnessConnected(null);
+      setLastAppleHealthSyncAt(null);
       return;
     }
     let cancelled = false;
-    void api<{ connected: boolean }>("/api/integrations/fitness")
+    void api<{ connected: boolean; lastAppleHealthSyncAt: string | null }>(
+      `/api/integrations/fitness?challengeId=${encodeURIComponent(challengeId)}`
+    )
       .then((data) => {
-        if (!cancelled) setFitnessConnected(data.connected);
+        if (!cancelled) {
+          setFitnessConnected(data.connected);
+          setLastAppleHealthSyncAt(data.lastAppleHealthSyncAt ?? null);
+        }
       })
       .catch(() => {
-        if (!cancelled) setFitnessConnected(null);
+        if (!cancelled) {
+          setFitnessConnected(null);
+          setLastAppleHealthSyncAt(null);
+        }
       });
     return () => {
       cancelled = true;
     };
   }, [challengeId]);
+
+  useEffect(() => {
+    if (lastAppleHealthSyncAt && challengeId) {
+      trackAppleHealthSyncFirstObserved(challengeId);
+    }
+  }, [lastAppleHealthSyncAt, challengeId]);
 
   function resetDate() {
     setDate(todayInTimezone(selectedChallenge?.timezone));
@@ -113,6 +129,16 @@ export function Submit({
           {fitnessConnected === false && (
             <p className="hint" role="note">
               {t("submit.manualHintNoIntegration")}
+            </p>
+          )}
+          {lastAppleHealthSyncAt && (
+            <p className="hint" role="status">
+              {t("submit.lastAppleHealthSync", {
+                datetime: new Date(lastAppleHealthSyncAt).toLocaleString(undefined, {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                }),
+              })}
             </p>
           )}
         </>

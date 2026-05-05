@@ -31,10 +31,24 @@ export function getApiUrl(path: string): string {
 
 let _csrfToken: string | null = null;
 
+const APIUnreachableHint =
+  "Cannot reach the StepSprint API. If this is the hosted site, the server may be stopped or not deployed — check Render (or your host) and that VITE_API_URL points at the live API.";
+
 async function getCsrfToken(): Promise<string> {
   if (_csrfToken) return _csrfToken;
-  const res = await fetch(getApiUrl("/api/csrf-token"), { credentials: "include" });
-  if (!res.ok) throw new ApiError("Failed to fetch CSRF token", res.status);
+  let res: Response;
+  try {
+    res = await fetch(getApiUrl("/api/csrf-token"), { credentials: "include" });
+  } catch {
+    throw new ApiError(`Network error — ${APIUnreachableHint}`, 503);
+  }
+  if (!res.ok) {
+    const detail =
+      res.status === 404
+        ? `API returned 404 — ${APIUnreachableHint}`
+        : "Failed to fetch CSRF token";
+    throw new ApiError(detail, res.status);
+  }
   const data = (await res.json()) as { token: string };
   _csrfToken = data.token;
   return _csrfToken;
@@ -53,17 +67,24 @@ export async function api<T>(path: string, options: RequestInit = {}) {
   if (MUTATING.has(method)) {
     try {
       baseHeaders["x-csrf-token"] = await getCsrfToken();
-    } catch {
-      // If the CSRF endpoint is unreachable (dev without server), proceed
-      // without the header so dev workflow is unaffected.
+    } catch (e) {
+      // Production needs a valid CSRF pair; dev may run the SPA without the API.
+      if (import.meta.env.PROD) {
+        throw e;
+      }
     }
   }
 
-  const response = await fetch(getApiUrl(path), {
-    credentials: "include",
-    ...options,
-    headers: baseHeaders,
-  });
+  let response: Response;
+  try {
+    response = await fetch(getApiUrl(path), {
+      credentials: "include",
+      ...options,
+      headers: baseHeaders,
+    });
+  } catch {
+    throw new ApiError(`Network error — ${APIUnreachableHint}`, 503);
+  }
 
   const reqId = response.headers.get("x-request-id");
   noteApiRequestId(reqId && reqId.length > 0 ? reqId : null);

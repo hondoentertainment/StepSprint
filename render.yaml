@@ -2,6 +2,10 @@
 # Deploy: render.com → New → Blueprint → select this repo.
 # Provisions stepsprint-api (Docker web service) + stepsprint-db (Postgres 16).
 #
+# dockerfilePath is relative to the REPO ROOT (Render blueprint spec): use ./server/Dockerfile
+# with dockerContext ./server so the image in server/Dockerfile is built. The image runs
+# migrations, idempotent admin seed (dist/seed.js), then the API — see server/Dockerfile CMD.
+#
 # Required manual steps after first deploy:
 #   1. Set RESEND_API_KEY  (get from resend.com — required for email verification)
 #   2. Set SMTP_FROM       (e.g. "StepSprint <noreply@yourdomain.com>")
@@ -19,7 +23,8 @@ services:
     runtime: docker
     plan: starter
     region: oregon
-    dockerfilePath: ./Dockerfile
+    # Paths are relative to the repository root (see Render blueprint spec).
+    dockerfilePath: ./server/Dockerfile
     dockerContext: ./server
     healthCheckPath: /api/health
     autoDeploy: true
@@ -38,7 +43,8 @@ services:
       # Update this value if you use a custom domain on Vercel.
       - key: APP_ORIGIN
         value: https://step-sprint.vercel.app
-      # Public URL of this Render service — required for OAuth redirect_uri (Fitbit / Google Fit).
+      # Public URL of this API — OAuth callback host and Apple Health Shortcuts POST base.
+      # Vercel: set VITE_API_URL at build time to this same origin (no trailing slash). Update vercel.json CSP connect-src if the hostname changes.
       - key: API_PUBLIC_ORIGIN
         value: https://stepsprint-api.onrender.com
       # Email (transactional — required for password reset and email verification).
@@ -60,10 +66,12 @@ services:
       # Optional: overrides auto-derived release from git (see docs/PRODUCTION.md)
       - key: SENTRY_RELEASE
         sync: false
-      # OAuth integrations (optional — server starts and runs without these).
+      # Startup in production requires RESEND_API_KEY or SMTP_HOST unless ALLOW_PRODUCTION_WITHOUT_EMAIL=true (escape hatch only).
+      # OAuth integrations (optional — API runs without Fitbit/Google/Garmin credentials).
       # Register apps in each provider's developer console, then paste the values here.
       # Fitbit redirect URI:     https://stepsprint-api.onrender.com/api/integrations/fitbit/callback
       # Google Fit redirect URI: https://stepsprint-api.onrender.com/api/integrations/google-fit/callback
+      # Garmin redirect URI:    https://stepsprint-api.onrender.com/api/integrations/garmin/callback
       - key: FITBIT_CLIENT_ID
         sync: false
       - key: FITBIT_CLIENT_SECRET
@@ -72,5 +80,15 @@ services:
         sync: false
       - key: GOOGLE_CLIENT_SECRET
         sync: false
+      - key: GARMIN_CLIENT_ID
+        sync: false
+      - key: GARMIN_CLIENT_SECRET
+        sync: false
+      # Optional Garmin authorize scope when your Garmin app registration requires it.
+      # - key: GARMIN_OAUTH_SCOPE
+      #   sync: false
       # Optional (multi-instance): REMINDER_USE_EXTERNAL_CRON=true + REMINDER_CRON_SECRET (min 16 chars).
       # Schedule hourly POST to /api/cron/reminder-sweep with Authorization: Bearer <secret>.
+      # Optional CORS: APP_ORIGIN_ALLOWLIST="https://www.example.com" (comma-separated SPA origins).
+      # Staging-only previews: APP_ALLOW_VERCEL_PREVIEW_ORIGINS=true (allows https://*.vercel.app — do not use on prod).
+      # Never set VITEST on the server — it is test-only and would weaken production env validation.

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import request from "supertest";
 import { DateTime } from "luxon";
 import app from "../app";
+import { prisma } from "../prisma";
+import { getIsoWeekRange } from "../utils/dates";
 
 describe("Admin activity grid", () => {
   async function adminCookie(): Promise<string[]> {
@@ -46,12 +48,43 @@ describe("Admin activity grid", () => {
   });
 
   it("returns grid aligned with challenge participants for current ISO week", async () => {
-    const cookie = await adminCookie();
-    const tz = "America/Chicago";
+    const challenge = await prisma.challenge.findUnique({ where: { id: "demo-challenge" } });
+    expect(challenge).not.toBeNull();
+    const ch = challenge!;
+    const tz = ch.timezone;
     const now = DateTime.now().setZone(tz);
     const weekYear = now.weekYear;
     const weekNumber = now.weekNumber;
+    const challengeStart = DateTime.fromJSDate(ch.startDate, { zone: tz }).startOf("day");
+    const challengeEnd = DateTime.fromJSDate(ch.endDate, { zone: tz }).startOf("day");
+    const { start: weekMonday } = getIsoWeekRange(weekYear, weekNumber, tz);
+    const weekSunday = weekMonday.plus({ days: 6 }).startOf("day");
+    const gridStart = weekMonday > challengeStart ? weekMonday : challengeStart;
+    const gridEnd = weekSunday < challengeEnd ? weekSunday : challengeEnd;
+    if (gridStart <= gridEnd) {
+      const user1 = await prisma.user.findUnique({ where: { email: "user1@stepsprint.local" } });
+      expect(user1).not.toBeNull();
+      const day = gridStart.toJSDate();
+      await prisma.stepSubmission.upsert({
+        where: {
+          userId_challengeId_date: {
+            userId: user1!.id,
+            challengeId: "demo-challenge",
+            date: day,
+          },
+        },
+        update: { steps: 9000, isFlagged: false },
+        create: {
+          userId: user1!.id,
+          challengeId: "demo-challenge",
+          date: day,
+          steps: 9000,
+          isFlagged: false,
+        },
+      });
+    }
 
+    const cookie = await adminCookie();
     const res = await request(app)
       .get(`/api/admin/challenges/demo-challenge/activity-grid?weekYear=${weekYear}&weekNumber=${weekNumber}`)
       .set("Cookie", cookie)
@@ -67,8 +100,15 @@ describe("Admin activity grid", () => {
 
     const row = res.body.rows.find((r: { email: string }) => r.email === "user1@stepsprint.local");
     expect(row).toBeDefined();
-    expect(row.cells.length).toBe(res.body.days.length);
-    const submitted = row.cells.filter((c: { steps: number | null }) => c.steps !== null);
+
+    if (gridStart > gridEnd) {
+      expect(res.body.days.length).toBe(0);
+      expect(row!.cells.length).toBe(0);
+      return;
+    }
+
+    expect(row!.cells.length).toBe(res.body.days.length);
+    const submitted = row!.cells.filter((c: { steps: number | null }) => c.steps !== null);
     expect(submitted.length).toBeGreaterThan(0);
   });
 });

@@ -512,6 +512,57 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
     .object({ tokens: z.array(IntegrationTokenSchema) })
     .openapi("ListTokensResponse");
 
+  const FitnessProviderStatusSchema = z
+    .object({
+      id: z.string(),
+      name: z.string(),
+      available: z.boolean(),
+      connected: z.boolean(),
+      connectedAt: z.string().datetime().nullable().openapi({
+        description: "Approximate \"linked since\" time: latest token creation for Apple; OAuth token refresh row for Fitbit/Google/Garmin.",
+      }),
+    })
+    .openapi("FitnessProviderStatus");
+
+  const FitnessStatusResponse = z
+    .object({
+      connected: z.boolean(),
+      lastAppleHealthSyncAt: z.string().datetime().nullable().openapi({
+        description:
+          "Latest Apple Health (Shortcuts) sync for this user and challenge. Null if challengeId is omitted, the user is not enrolled, or no sync has occurred.",
+      }),
+      providers: z.array(FitnessProviderStatusSchema),
+      message: z.string(),
+    })
+    .openapi("FitnessStatusResponse");
+
+  registry.register("FitnessStatusResponse", FitnessStatusResponse);
+
+  registry.registerPath({
+    method: "get",
+    path: "/api/integrations/fitness",
+    summary: "Fitness sync status",
+    description:
+      "OAuth and Apple Health token summary. Optional query `challengeId` adds `lastAppleHealthSyncAt` when the user is enrolled in that challenge.",
+    tags: ["Integrations"],
+    security: [{ [bearerAuth.name]: [] }],
+    request: {
+      query: z.object({
+        challengeId: z
+          .string()
+          .optional()
+          .openapi({ description: "Challenge id; when provided, includes last Apple Health sync time for that challenge." }),
+      }),
+    },
+    responses: {
+      200: {
+        description: "Connection status and provider list.",
+        content: { "application/json": { schema: FitnessStatusResponse } },
+      },
+      401: { description: "Not authenticated.", content: { "application/json": { schema: ErrorSchema } } },
+    },
+  });
+
   registry.registerPath({
     method: "post",
     path: "/api/integrations/tokens",

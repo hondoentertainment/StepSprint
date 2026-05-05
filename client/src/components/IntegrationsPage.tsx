@@ -12,9 +12,9 @@ export function IntegrationsPage({ challengeId, challengeTimezone, challengesLoa
   const { t } = useTranslation();
 
   return (
-    <section className="panel">
+    <section className="panel panel--integrations">
       <h2>{t("integrations.title")}</h2>
-      <p className="hint">{t("integrations.subtitle")}</p>
+      <p className="hint integrations-page-lead">{t("integrations.subtitle")}</p>
       {!challengeId && !challengesLoading && (
         <p className="status status-error" role="alert">
           {t("integrations.noChallenge")}

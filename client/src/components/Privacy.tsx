@@ -3,12 +3,16 @@ import { useTranslation } from "react-i18next";
 
 export function Privacy() {
   const { t } = useTranslation();
+  const showDraftNotice =
+    import.meta.env.VITE_LEGAL_CONTENT_REVIEWED !== "true";
   return (
     <div className="app">
       <main id="main-content" className="panel legal-page" tabIndex={-1}>
-        <p className="hint legal-production-notice" role="note">
-          {t("legal.productionNotice")}
-        </p>
+        {showDraftNotice ? (
+          <p className="hint legal-production-notice" role="note">
+            {t("legal.productionNotice")}
+          </p>
+        ) : null}
         <h1>{t("legal.privacyTitle")}</h1>
         <p className="hint">{t("legal.privacyIntro")}</p>
         <h2>{t("legal.privacyCollected")}</h2>

@@ -64,7 +64,7 @@ export default defineConfig({
       timeout: 180_000,
       env: {
         ...process.env,
-        JWT_SECRET: process.env.JWT_SECRET || "test-jwt-secret-min-16-chars",
+        JWT_SECRET: process.env.JWT_SECRET || "test-jwt-secret-ci-stepsprint-minimum-32-chars",
         DATABASE_URL: process.env.DATABASE_URL || "file:./e2e.db",
         NODE_ENV: process.env.NODE_ENV || "development",
       },

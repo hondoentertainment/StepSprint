@@ -1,6 +1,6 @@
 import express, { type Request, type Response, type NextFunction } from "express";
 import helmet from "helmet";
-import cors from "cors";
+import cors, { type CorsOptions } from "cors";
 import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
 import { doubleCsrf } from "csrf-csrf";
@@ -25,6 +25,38 @@ import cronRoutes from "./routes/cron";
 
 const app = express();
 const isProduction = config.nodeEnv === "production";
+
+if (isProduction) {
+  // Reverse-proxy (Render, etc.) — correct client IP for rate limits, cookies, CSRF session id.
+  app.set("trust proxy", 1);
+}
+
+/** Matches Vercel preview / project URLs (`https://<slug>.vercel.app`). */
+const VERCEL_PREVIEW_ORIGIN = /^https:\/\/[a-z0-9-]+\.vercel\.app$/i;
+
+function isAllowedCorsOrigin(origin: string | undefined): boolean {
+  if (!origin) return true;
+  if (origin === config.appOrigin) return true;
+  if (config.appOriginAllowlist.includes(origin)) return true;
+  if (
+    config.allowVercelPreviewOrigins &&
+    VERCEL_PREVIEW_ORIGIN.test(origin)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+const corsOptions: CorsOptions = {
+  credentials: true,
+  origin(origin, callback) {
+    if (isAllowedCorsOrigin(origin)) {
+      callback(null, true);
+      return;
+    }
+    callback(null, false);
+  },
+};
 
 // ---------------------------------------------------------------------------
 // Security headers (helmet + pinned CSP)
@@ -107,12 +139,7 @@ if (isProduction) {
 // ---------------------------------------------------------------------------
 // CORS + body parsing
 // ---------------------------------------------------------------------------
-app.use(
-  cors({
-    origin: config.appOrigin,
-    credentials: true,
-  })
-);
+app.use(cors(corsOptions));
 app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
 
@@ -175,6 +202,13 @@ if (isProduction) {
 // Health check
 // ---------------------------------------------------------------------------
 app.get("/api/health", async (_req, res) => {
+  const transactionalEmailProd =
+    config.nodeEnv === "production"
+      ? config.emailTransportConfigured
+        ? ("configured" as const)
+        : ("allow_without_flag" as const)
+      : undefined;
+
   try {
     await prisma.$queryRaw`SELECT 1`;
     const body: {
@@ -182,6 +216,7 @@ app.get("/api/health", async (_req, res) => {
       db: "up";
       service: string;
       release?: string;
+      transactionalEmail?: "configured" | "allow_without_flag";
     } = {
       ok: true,
       db: "up",
@@ -190,6 +225,9 @@ app.get("/api/health", async (_req, res) => {
     if (config.deploymentRelease) {
       body.release = config.deploymentRelease;
     }
+    if (transactionalEmailProd !== undefined) {
+      body.transactionalEmail = transactionalEmailProd;
+    }
     res.json(body);
   } catch {
     res.status(503).json({
@@ -197,6 +235,9 @@ app.get("/api/health", async (_req, res) => {
       db: "down" as const,
       service: "stepsprint-api",
       ...(config.deploymentRelease ? { release: config.deploymentRelease } : {}),
+      ...(transactionalEmailProd !== undefined
+        ? { transactionalEmail: transactionalEmailProd }
+        : {}),
     });
   }
 });

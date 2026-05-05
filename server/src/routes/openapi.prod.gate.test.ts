@@ -15,7 +15,11 @@ describe("OpenAPI docs in production", () => {
 
   it("returns 404 for OpenAPI JSON when NODE_ENV is production and flag unset", async () => {
     vi.resetModules();
-    process.env = { ...baseEnv, NODE_ENV: "production" };
+    process.env = {
+      ...baseEnv,
+      NODE_ENV: "production",
+      VITEST: "true",
+    };
     delete process.env.OPENAPI_DOCS_ENABLED;
 
     const { default: app } = await import("../app");
@@ -25,7 +29,12 @@ describe("OpenAPI docs in production", () => {
 
   it("serves OpenAPI JSON when OPENAPI_DOCS_ENABLED=true in production", async () => {
     vi.resetModules();
-    process.env = { ...baseEnv, NODE_ENV: "production", OPENAPI_DOCS_ENABLED: "true" };
+    process.env = {
+      ...baseEnv,
+      NODE_ENV: "production",
+      OPENAPI_DOCS_ENABLED: "true",
+      VITEST: "true",
+    };
 
     const { default: app } = await import("../app");
     const res = await request(app).get("/api/openapi.json").expect(200);

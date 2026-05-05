@@ -36,6 +36,8 @@ npm run test:coverage   # both with coverage
 npm run test:e2e        # Playwright (desktop + Pixel 5 + iPhone 13)
 npm run lint            # client eslint
 npm run build           # client + server build
+npm run check:api       # GET /api/health (uses VITE_API_URL or URL arg; see scripts/check-api-health.mjs)
+npm run postgres:parity # swap Prisma to Postgres files for local parity (see docs/DEPLOYMENT.md)
 ```
 
 Per-workspace:
@@ -51,7 +53,7 @@ cd client && npm run test:e2e:ui  # Playwright UI mode
 ```
 
 Required env (see `.env.example`):
-- `JWT_SECRET` — min 16 chars
+- `JWT_SECRET` — min 16 characters in development; **min 32 in production** (enforced at startup; Vitest uses a longer CI test secret)
 - `DATABASE_URL` — defaults to `file:./dev.db` (SQLite)
 - `APP_ORIGIN` — CORS origin for the client
 - Optional: `SENTRY_DSN`, `VITE_SENTRY_DSN`, `VITE_POSTHOG_KEY`, `LOG_LEVEL`, SMTP vars
@@ -71,7 +73,7 @@ Seed users after `db:seed`:
 - `logger.ts` — pino (pretty in dev, JSON in prod), level from `LOG_LEVEL`
 - `sentry.ts` — `initSentry()`; no-op without `SENTRY_DSN`
 - `openapi.ts` + `routes/openapi.ts` — OpenAPI 3 spec at `/api/openapi.json`, Swagger UI at `/api/docs`
-- `config.ts` — Zod-validated env loader (`JWT_SECRET`, `DATABASE_URL`, `APP_ORIGIN`, `SENTRY_DSN`, `NODE_ENV`)
+- `config.ts` — Zod-validated env loader (`JWT_SECRET`, `DATABASE_URL`, `APP_ORIGIN`, email `RESEND_API_KEY`/`SMTP_*`, optional `ALLOW_PRODUCTION_WITHOUT_EMAIL` for non-public prod)
 - `services/` — email (Nodemailer; no real SMTP provider configured)
 - `utils/` — Luxon date helpers, bcrypt, reset tokens
 - `prisma.ts` — Prisma client via `@prisma/adapter-better-sqlite3`, reads `DATABASE_URL`

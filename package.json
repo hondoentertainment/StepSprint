@@ -8,12 +8,15 @@
     "lint": "cd client && npm run lint",
     "build": "cd client && npm run build && cd ../server && npm run build",
     "test": "npm run test:client && npm run test:server",
+    "test:all": "npm run test && npm run test:e2e",
     "test:client": "cd client && npm run test:run",
     "test:server": "cd server && npm run test:run",
     "test:coverage": "npm run test:coverage:client && npm run test:coverage:server",
     "test:coverage:client": "cd client && npm run test:coverage",
     "test:coverage:server": "cd server && npm run test:coverage",
-    "test:e2e": "cd client && npm run test:e2e"
+    "test:e2e": "cd client && npm run test:e2e",
+    "check:api": "node scripts/check-api-health.mjs",
+    "postgres:parity": "node scripts/switch-to-postgres-schema.mjs"
   },
   "devDependencies": {
     "prisma": "^6.19.2"

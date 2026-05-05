@@ -13,14 +13,14 @@ jobs:
   server-test:
     runs-on: ubuntu-latest
     env:
-      JWT_SECRET: test-jwt-secret-min-16-chars
+      JWT_SECRET: test-jwt-secret-ci-stepsprint-minimum-32-chars
       DATABASE_URL: "file:./test.db"
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version-file: ".nvmrc"
           cache: "npm"
           cache-dependency-path: server/package-lock.json
 
@@ -47,7 +47,7 @@ jobs:
   server-test-postgres:
     runs-on: ubuntu-latest
     env:
-      JWT_SECRET: test-jwt-secret-min-16-chars
+      JWT_SECRET: test-jwt-secret-ci-stepsprint-minimum-32-chars
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/stepsprint?schema=public
     services:
       postgres:
@@ -68,7 +68,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version-file: ".nvmrc"
           cache: "npm"
           cache-dependency-path: server/package-lock.json
 
@@ -97,6 +97,13 @@ jobs:
         working-directory: server
         run: npm run test:run
 
+  docker-api-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build API Docker image (Render blueprint)
+        run: docker build -f server/Dockerfile -t stepsprint-api:ci ./server
+
   client-test:
     runs-on: ubuntu-latest
     env:
@@ -106,7 +113,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version-file: ".nvmrc"
           cache: "npm"
           cache-dependency-path: client/package-lock.json
 
@@ -127,10 +134,10 @@ jobs:
         run: npm run build
 
   e2e:
-    needs: [server-test, client-test]
+    needs: [server-test, client-test, docker-api-image]
     runs-on: ubuntu-latest
     env:
-      JWT_SECRET: test-jwt-secret-min-16-chars
+      JWT_SECRET: test-jwt-secret-ci-stepsprint-minimum-32-chars
       DATABASE_URL: "file:./e2e.db"
       NODE_ENV: test
     steps:
@@ -138,7 +145,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version-file: ".nvmrc"
           cache: "npm"
           cache-dependency-path: |
             server/package-lock.json
@@ -161,15 +168,15 @@ jobs:
       - name: Run Playwright E2E (desktop Chrome)
         working-directory: client
         env:
-          JWT_SECRET: test-jwt-secret-min-16-chars
+          JWT_SECRET: test-jwt-secret-ci-stepsprint-minimum-32-chars
           DATABASE_URL: "file:./e2e.db"
         run: npx playwright test --project=desktop-chrome
 
   smoke-test:
-    needs: server-test
+    needs: [server-test, client-test, docker-api-image]
     runs-on: ubuntu-latest
     env:
-      JWT_SECRET: test-jwt-secret-min-16-chars
+      JWT_SECRET: test-jwt-secret-ci-stepsprint-minimum-32-chars
       DATABASE_URL: "file:./smoke.db"
       NODE_ENV: test
     steps:
@@ -177,9 +184,11 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version-file: ".nvmrc"
           cache: "npm"
-          cache-dependency-path: server/package-lock.json
+          cache-dependency-path: |
+            server/package-lock.json
+            client/package-lock.json
 
       - name: Install server deps
         working-directory: server
@@ -196,6 +205,12 @@ jobs:
       - name: Build server
         working-directory: server
         run: npm run build
+
+      - name: Build client (smoke path for Vercel dist layout)
+        working-directory: client
+        run: |
+          npm ci
+          npm run build
 
       - name: Start server and verify health
         working-directory: server

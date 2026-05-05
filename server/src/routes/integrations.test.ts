@@ -311,6 +311,42 @@ describe("Integrations routes", () => {
       expect(createRes.body.token).toBeDefined();
     });
 
+    it("GET /fitness maps apple_health.connectedAt to the newest token's createdAt", async () => {
+      const listRes = await request(app)
+        .get("/api/integrations/tokens")
+        .set("Cookie", cookie)
+        .expect(200);
+      const tokenRows = listRes.body.tokens as Array<{ createdAt: string }>;
+      const newest = [...tokenRows].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      )[0];
+
+      const fit = await request(app).get("/api/integrations/fitness").set("Cookie", cookie).expect(200);
+      const apple = fit.body.providers.find((p: { id: string }) => p.id === "apple_health");
+      expect(apple.connected).toBe(true);
+      expect(apple.connectedAt).not.toBeNull();
+      expect(new Date(apple.connectedAt as string).getTime()).toBe(new Date(newest.createdAt).getTime());
+    });
+
+    it("GET /fitness reports Fitbit OAuth connectedAt when an OAuthConnection row exists", async () => {
+      await prisma.oAuthConnection.create({
+        data: {
+          userId,
+          provider: "fitbit",
+          accessToken: "test-access-token",
+          refreshToken: "test-refresh-token",
+        },
+      });
+      try {
+        const fit = await request(app).get("/api/integrations/fitness").set("Cookie", cookie).expect(200);
+        const fitbit = fit.body.providers.find((p: { id: string }) => p.id === "fitbit");
+        expect(fitbit.connected).toBe(true);
+        expect(typeof fitbit.connectedAt).toBe("string");
+      } finally {
+        await prisma.oAuthConnection.deleteMany({ where: { userId, provider: "fitbit" } });
+      }
+    });
+
     it("404 when revoking another user's token", async () => {
       // Create a second user to own a token
       const email2 = `token-other-${suffix}@stepsprint.local`;
@@ -349,6 +385,7 @@ describe("Integrations routes", () => {
     let outsiderUserId: string;
     let bearerToken: string;
     let outsiderToken: string;
+    let memberEmail: string;
 
     beforeAll(async () => {
       const start = DateTime.fromISO(startISO, { zone: tz }).startOf("day").toJSDate();
@@ -371,10 +408,11 @@ describe("Integrations routes", () => {
       });
       lockedChallengeId = locked.id;
 
-      const memberEmail = `ah-member-${suffix}@stepsprint.local`;
+      const memberAddr = `ah-member-${suffix}@stepsprint.local`;
+      memberEmail = memberAddr;
       const outsiderEmail = `ah-outsider-${suffix}@stepsprint.local`;
 
-      const memberUser = await createVerifiedUser(memberEmail, "AH Member");
+      const memberUser = await createVerifiedUser(memberAddr, "AH Member");
       const outsiderUser = await createVerifiedUser(outsiderEmail, "AH Outsider");
       userId = memberUser.id;
       outsiderUserId = outsiderUser.id;
@@ -466,6 +504,41 @@ describe("Integrations routes", () => {
         where: { action: "apple_health_sync", actorId: userId, challengeId },
       });
       expect(audit).not.toBeNull();
+    });
+
+    it("GET /fitness returns lastAppleHealthSyncAt when challengeId is provided", async () => {
+      const login = await request(app)
+        .post("/api/auth/login")
+        .send({ email: memberEmail, password: "password123" })
+        .expect(200);
+      const setCookie = login.headers["set-cookie"];
+      const cookie = Array.isArray(setCookie) ? setCookie : [setCookie];
+      const res = await request(app)
+        .get(`/api/integrations/fitness?challengeId=${encodeURIComponent(challengeId)}`)
+        .set("Cookie", cookie)
+        .expect(200);
+      expect(res.body.connected).toBe(true);
+      expect(typeof res.body.lastAppleHealthSyncAt).toBe("string");
+      expect((res.body.lastAppleHealthSyncAt as string).length).toBeGreaterThan(10);
+      const providers = res.body.providers as Array<{ connectedAt: string | null }>;
+      expect(Array.isArray(providers)).toBe(true);
+      for (const p of providers) {
+        expect(p).toHaveProperty("connectedAt");
+      }
+    });
+
+    it("GET /fitness returns null lastAppleHealthSyncAt without challengeId", async () => {
+      const login = await request(app)
+        .post("/api/auth/login")
+        .send({ email: memberEmail, password: "password123" })
+        .expect(200);
+      const setCookie = login.headers["set-cookie"];
+      const cookie = Array.isArray(setCookie) ? setCookie : [setCookie];
+      const res = await request(app)
+        .get("/api/integrations/fitness")
+        .set("Cookie", cookie)
+        .expect(200);
+      expect(res.body.lastAppleHealthSyncAt).toBeNull();
     });
 
     it("updates an existing submission on re-sync", async () => {

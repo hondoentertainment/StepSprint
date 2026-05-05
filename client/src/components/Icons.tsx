@@ -91,3 +91,21 @@ export function IconArrowUp({ size = 16, className }: IconProps) {
     </svg>
   );
 }
+
+/** Simple wearable / watch silhouette for integration cards (generic, not vendor artwork). */
+export function IconWearable({ size = 28, className }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      className={className}
+    >
+      <rect x="8" y="5" width="8" height="14" rx="2" stroke="currentColor" strokeWidth="1.75" />
+      <path d="M8 9H6.5c-.8 0-1.5.7-1.5 1.5v3c0 .8.7 1.5 1.5 1.5H8M16 15h1.5c.8 0 1.5-.7 1.5-1.5v-3c0-.8-.7-1.5-1.5-1.5H16" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+      <circle cx="12" cy="12.5" r="1.85" fill="currentColor" opacity="0.45" />
+    </svg>
+  );
+}

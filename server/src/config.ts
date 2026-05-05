@@ -10,6 +10,13 @@ const envSchema = z.object({
   DATABASE_URL: z.string().min(1).default("file:./dev.db"),
   JWT_SECRET: z.string().min(16),
   APP_ORIGIN: z.string().default("http://localhost:5173"),
+  /** Comma-separated extra browser origins allowed for CORS (custom domains, staging). Must match the full Origin header (e.g. https://www.example.com). */
+  APP_ORIGIN_ALLOWLIST: z.string().optional(),
+  /**
+   * When `true`, allows `https://*.vercel.app` origins for CORS (Vercel preview deployments).
+   * Use on staging/preview API instances; avoid on production unless you accept any Vercel preview talking to this API.
+   */
+  APP_ALLOW_VERCEL_PREVIEW_ORIGINS: z.enum(["true", "false"]).optional(),
   DEFAULT_CHALLENGE_TZ: z.string().default("America/Chicago"),
   // Resend transactional email (preferred). Falls back to raw SMTP when absent.
   RESEND_API_KEY: z.string().optional(),
@@ -43,9 +50,82 @@ const envSchema = z.object({
   OPENAPI_DOCS_ENABLED: z.enum(["true", "false"]).optional(),
   /** Optional release string for Sentry and /api/health (e.g. stepsprint-api@abc1234). */
   SENTRY_RELEASE: z.string().optional(),
+  /**
+   * When `true`, allow `NODE_ENV=production` without RESEND_API_KEY or SMTP_HOST.
+   * Use only for non-user-facing or emergency bring-up; registration and password reset need email.
+   */
+  ALLOW_PRODUCTION_WITHOUT_EMAIL: z.enum(["true", "false"]).optional(),
 });
 
-const parsed = envSchema.safeParse(process.env);
+const envSchemaWithRefinements = envSchema.superRefine((data, ctx) => {
+  const nodeEnv = data.NODE_ENV ?? "development";
+  /** Vitest sets `VITEST` so production-like tests can load SQLite + short secrets. Real deploys must not set this. */
+  const skipStrictProduction = process.env.VITEST === "true";
+
+  if (
+    nodeEnv === "production" &&
+    data.REMINDER_USE_EXTERNAL_CRON === "true" &&
+    (!data.REMINDER_CRON_SECRET || data.REMINDER_CRON_SECRET.length < 16)
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["REMINDER_CRON_SECRET"],
+      message:
+        "REMINDER_CRON_SECRET (min 16 chars) is required when REMINDER_USE_EXTERNAL_CRON=true in production",
+    });
+  }
+
+  if (nodeEnv === "production" && !skipStrictProduction) {
+    if (data.DATABASE_URL.startsWith("file:")) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["DATABASE_URL"],
+        message:
+          "DATABASE_URL must be a PostgreSQL URL in production (SQLite file: URLs are not supported)",
+      });
+    }
+    const origin = data.APP_ORIGIN.trim().replace(/\/$/, "");
+    const isLoopbackOrigin =
+      /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(origin);
+    if (isLoopbackOrigin) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["APP_ORIGIN"],
+        message:
+          "APP_ORIGIN must be your real SPA URL in production, not localhost or loopback",
+      });
+    }
+    if (data.JWT_SECRET.length < 32) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["JWT_SECRET"],
+        message:
+          "JWT_SECRET must be at least 32 characters in production (generate with strong random bytes)",
+      });
+    }
+
+    const hasEmailTransport = Boolean(data.RESEND_API_KEY?.trim() || data.SMTP_HOST?.trim());
+    const allowNoEmail = data.ALLOW_PRODUCTION_WITHOUT_EMAIL === "true";
+    if (!hasEmailTransport && !allowNoEmail) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["RESEND_API_KEY"],
+        message:
+          "Production requires RESEND_API_KEY or SMTP_HOST (transactional email). Set ALLOW_PRODUCTION_WITHOUT_EMAIL=true only for non-public or temporary APIs.",
+      });
+    }
+    if (hasEmailTransport && !data.SMTP_FROM?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["SMTP_FROM"],
+        message:
+          "SMTP_FROM is required in production when RESEND_API_KEY or SMTP_HOST is set (use a verified sender domain).",
+      });
+    }
+  }
+});
+
+const parsed = envSchemaWithRefinements.safeParse(process.env);
 if (!parsed.success) {
   const message = parsed.error.issues.map((issue) => issue.message).join(", ");
   throw new Error(`Invalid environment: ${message}`);
@@ -74,6 +154,17 @@ function resolveDeploymentRelease(explicit?: string): string | undefined {
 
 const deploymentRelease = resolveDeploymentRelease(parsed.data.SENTRY_RELEASE);
 
+function parseCommaOrigins(raw: string | undefined): string[] {
+  if (!raw?.trim()) return [];
+  return raw
+    .split(",")
+    .map((s) => s.trim().replace(/\/$/, ""))
+    .filter((s) => s.length > 0);
+}
+
+const appOriginAllowlist = parseCommaOrigins(parsed.data.APP_ORIGIN_ALLOWLIST);
+const allowVercelPreviewOrigins = parsed.data.APP_ALLOW_VERCEL_PREVIEW_ORIGINS === "true";
+
 const openApiDocsEnabled =
   parsed.data.OPENAPI_DOCS_ENABLED === "true"
     ? true
@@ -86,6 +177,10 @@ export const config = {
   databaseUrl: parsed.data.DATABASE_URL,
   jwtSecret: parsed.data.JWT_SECRET,
   appOrigin: parsed.data.APP_ORIGIN.replace(/\/$/, ""),
+  /** Extra allowed CORS origins (full scheme + host, no trailing slash). */
+  appOriginAllowlist,
+  /** When true, allow any `https://<subdomain>.vercel.app` Origin for CORS. */
+  allowVercelPreviewOrigins,
   /** Canonical base URL where this Express app is reachable (trailing slashes stripped). OAuth callbacks must use this in production split-hosting. */
   apiPublicOrigin:
     (parsed.data.API_PUBLIC_ORIGIN ?? parsed.data.APP_ORIGIN).replace(/\/$/, ""),
@@ -124,6 +219,8 @@ export const config = {
   reminderUseExternalCron: parsed.data.REMINDER_USE_EXTERNAL_CRON === "true",
   reminderCronSecret: parsed.data.REMINDER_CRON_SECRET,
   emailTransportConfigured: Boolean(parsed.data.RESEND_API_KEY || parsed.data.SMTP_HOST),
+  /** Escape hatch: production boot without Resend/SMTP (not for public launches). */
+  allowProductionWithoutEmail: parsed.data.ALLOW_PRODUCTION_WITHOUT_EMAIL === "true",
   /** Release string for Sentry and optional health payload */
   deploymentRelease,
 };

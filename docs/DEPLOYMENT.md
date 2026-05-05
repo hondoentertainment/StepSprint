@@ -11,13 +11,27 @@ StepSprint runs as two services:
 
 URLs are pinned in `vercel.json`, `render.yaml`, and **`API_PUBLIC_ORIGIN`** — update **both** `APP_ORIGIN` and `API_PUBLIC_ORIGIN` if you put the SPA or API behind custom domains, and rewrite OAuth callbacks in Fitbit/Google consoles to match **`API_PUBLIC_ORIGIN`** (not the SPA hostname).
 
+### Wearables and step ingest (Fitness sync)
+
+Participants connect devices from the SPA **Devices** page:
+
+- **Apple Watch / Apple Health**: no cloud OAuth env vars — users mint an **`POST /api/integrations/tokens`** token and send steps with **`POST /api/integrations/apple-health`** (typical automation: **iOS Shortcuts** calling the API host with **`Authorization: Bearer ssp_*`** body includes `challengeId`).
+- **Fitbit**, **Google Fit**, **Garmin Connect**: optional **OAuth** credentials on the API:
+  `FITBIT_CLIENT_ID`, `FITBIT_CLIENT_SECRET`,
+  `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
+  `GARMIN_CLIENT_ID`, `GARMIN_CLIENT_SECRET`, and optionally `GARMIN_OAUTH_SCOPE`.
+  Redirect URLs must align with **`API_PUBLIC_ORIGIN`** (see OAuth route callbacks under **`/api/integrations/...`**).
+- **Bulk JSON import**: **`POST /api/integrations/csv`** (participant session or cookie auth) mirrors the spreadsheet-style import in **`server/src/routes/integrations.ts`**.
+
 ---
 
 ## Quick deploy (two steps)
 
 ### 1 — API on Render
 
-1. Go to [render.com](https://render.com) → **New** → **Blueprint** → select this repo.
+The Blueprint file is [`render.yaml`](../render.yaml) at the **repository root**. **`dockerfilePath` is relative to that root** — it must be `./server/Dockerfile` (not `./Dockerfile`), with **`dockerContext: ./server`**, so Render builds the image defined under `server/`. An incorrect path caused failed or empty builds and a live site that never serves the API.
+
+1. Go to [render.com](https://render.com) → **New** → **Blueprint** → select this repo (branch `master`).
 2. Render reads `render.yaml` and provisions:
    - `stepsprint-api` — Docker web service (Express API) — **Starter plan**
    - `stepsprint-db` — managed Postgres 16 — **Starter plan**
@@ -27,17 +41,40 @@ URLs are pinned in `vercel.json`, `render.yaml`, and **`API_PUBLIC_ORIGIN`** —
    - `API_PUBLIC_ORIGIN` — public URL of **this Render web service**
    - `PORT=3001`, `NODE_ENV=production`
 
+   The Docker image starts the API with **`prisma migrate deploy`**, then **`node dist/seed.js`** (production seeds only the admin user; safe to run on every deploy), then **`node dist/index.js`**. You do not need a separate manual seed on Render for that admin account.
+
 3. After the blueprint provisions, set the required env vars in **Render dashboard → stepsprint-api → Environment**:
 
    | Variable | Required | Description |
    |----------|----------|-------------|
-   | `RESEND_API_KEY` | **Yes** | API key from [resend.com](https://resend.com) — needed for email verification and password reset |
-   | `SMTP_FROM` | **Yes** | Sender address, e.g. `StepSprint <noreply@yourdomain.com>` |
-   | `ADMIN_PASSWORD` | **Yes (first deploy)** | Initial admin password. If omitted a random one is printed in the deploy logs — change it immediately after first login. |
+   | `RESEND_API_KEY` | **Yes** (public prod) | API key from [resend.com](https://resend.com) — needed for email verification and password reset. Without it, the API **exits on boot** unless you set **`ALLOW_PRODUCTION_WITHOUT_EMAIL=true`** (private/temporary use only). |
+   | `SMTP_FROM` | **Yes** (with Resend/SMTP) | Sender address, e.g. `StepSprint <noreply@yourdomain.com>` |
+   | `ADMIN_PASSWORD` | **Recommended (first deploy)** | Initial admin password for `admin@stepsprint.local`. If omitted on the **first** deploy, a random password is logged once — save it and change it after login. If the admin already exists, omitting this on later deploys **does not** rotate the password. |
 
 4. Trigger a deploy (or wait for auto-deploy on push to master).
 
-The API will be live at `https://stepsprint-api.onrender.com`.
+The API will be live at `https://stepsprint-api.onrender.com` **only after** Render shows the service running (not “Blueprint pending” or suspended).
+
+#### Verify the API is reachable
+
+From your machine (replace the URL if you use a custom Render hostname):
+
+```bash
+curl -sS "https://stepsprint-api.onrender.com/api/health"
+```
+
+You should see JSON like `{ "ok": true, "db": "up", ... }`. If you get **404** with no JSON, Render is not routing to a web service (`x-render-routing: no-server` in response headers): create/start the **`stepsprint-api`** service from this repo’s blueprint or Docker image.
+
+**Hostname must match the frontend:** In Vercel, `VITE_API_URL` (see [`vercel.json`](../vercel.json) `build.env`) must be the **exact** public API URL from Render (**Dashboard → your web service → URL**), including `https` and no trailing slash. If Render gives you a different subdomain (e.g. `stepsprint-api-xxxx.onrender.com` because the short name was taken), set **`API_PUBLIC_ORIGIN`** on the service to that URL, update **`vercel.json`** `VITE_API_URL` and the **CSP** `connect-src` host, push, and redeploy the client.
+
+Optional script from the repo root (uses Node’s built-in `fetch`):
+
+```bash
+npm run check:api
+# or: API_BASE_URL=https://your-api.example.com npm run check:api
+```
+
+**Sign-in / register fail from the SPA** usually means: (1) API URL wrong or not deployed, (2) **`APP_ORIGIN`** on Render does not **exactly** match the Vercel URL you open (scheme + host, no trailing slash), or (3) you need **`APP_ORIGIN_ALLOWLIST`** for an extra domain (e.g. `https://www.`). For Vercel **preview** builds only, a dedicated API can set **`APP_ALLOW_VERCEL_PREVIEW_ORIGINS=true`** (staging — not for production).
 
 > **Note on plans**: `render.yaml` uses the `starter` plan ($7/mo each) to avoid cold starts and get automatic database backups. The free tier sleeps after 15 minutes of inactivity and has a 90-day database retention limit — not suitable for production.
 
@@ -66,7 +103,7 @@ After the first successful deploy, complete these steps:
 - [ ] **Change the admin password** — log in with the password from `ADMIN_PASSWORD` (or from Render logs if auto-generated), then change it via the profile page.
 - [ ] **Verify email delivery** — register a test account and confirm the verification email arrives.
 - [ ] **Create a challenge** — log in as admin, create the first challenge, generate an invite code, and test the invite flow.
-- [ ] **Confirm database backups** — check the Render dashboard that daily backups are enabled for `stepsprint-db`.
+- [ ] **Confirm database backups** — check the Render dashboard that daily backups are enabled for `stepsprint-db`, and schedule a [backup restore drill](BACKUP_DRILL.md) before a major launch.
 - [ ] **Health check monitoring** — point an external monitor at `GET /api/health` on the API URL. A `200` body includes `{ "ok": true, "db": "up" }`; `503` means the app cannot reach the database.
 - [ ] **OpenAPI / Swagger** — `/api/docs` is **off** in production by default. Set `OPENAPI_DOCS_ENABLED=true` on the API only if you need the interactive spec in prod.
 
@@ -139,6 +176,8 @@ In the Vercel dashboard → set `VITE_POSTHOG_KEY` (and optionally `VITE_POSTHOG
 | `DATABASE_URL` | Render (auto) | Yes | PostgreSQL connection string |
 | `JWT_SECRET` | Render (auto) | Yes | Random 64-char secret |
 | `APP_ORIGIN` | `render.yaml` | Yes | Vercel SPA origin (default `https://step-sprint.vercel.app`) — used for **CORS** and **browser redirects after OAuth**. |
+| `APP_ORIGIN_ALLOWLIST` | Manual | No | Comma-separated extra SPA origins (same rules as `APP_ORIGIN`) for **CORS** when you use a second hostname (e.g. `https://www.example.com`). |
+| `APP_ALLOW_VERCEL_PREVIEW_ORIGINS` | Manual | No | Set to `true` only on a **non-production** API to allow **Vercel preview** URLs (`https://*.vercel.app`). Do not enable on your primary production API. |
 | `API_PUBLIC_ORIGIN` | `render.yaml` | Yes (split hosting) | Public origin where **this** API is hosted (Render URL). OAuth `redirect_uri` must pin here (`https://stepsprint-api.onrender.com`). Omit only for same-origin / local Vite-proxy setups — then it mirrors `APP_ORIGIN`. |
 | `RESEND_API_KEY` | Manual | **Yes** | Resend API key for transactional email |
 | `SMTP_FROM` | Manual | **Yes** | Email sender address |
@@ -165,6 +204,8 @@ curl -fsS -X POST "https://stepsprint-api.onrender.com/api/cron/reminder-sweep" 
   -H "Authorization: Bearer $REMINDER_CRON_SECRET"
 ```
 
+The repo includes **`scripts/curl-reminder-sweep.sh`**, which reads **`API_PUBLIC_ORIGIN`** and **`REMINDER_CRON_SECRET`** from the environment and performs the same request (useful in cron wrappers).
+
 ### Client (Vercel)
 
 | Variable | Source | Required | Description |
@@ -176,6 +217,7 @@ curl -fsS -X POST "https://stepsprint-api.onrender.com/api/cron/reminder-sweep" 
 | `SENTRY_PROJECT` | Vercel dashboard | No | Sentry project slug for browser / `stepsprint-client` |
 | `VITE_POSTHOG_KEY` | Vercel dashboard | No | PostHog project key |
 | `VITE_POSTHOG_HOST` | Vercel dashboard | No | PostHog host (defaults to `app.posthog.com`) |
+| `VITE_LEGAL_CONTENT_REVIEWED` | Vercel dashboard | No | Set to `true` after Privacy/Terms copy is reviewed to hide the draft banner on those pages |
 
 ---
 
@@ -193,21 +235,64 @@ cp ../.env.example .env   # edit JWT_SECRET at minimum (+ API_PUBLIC_ORIGIN if t
 npm run db:migrate
 npm run db:seed
 
-# Optional Postgres parity (Docker) — repo root `docker-compose.yml`:
-# docker compose up -d
-# Then point DATABASE_URL at postgresql://stepsprint:stepsprint@localhost:5432/stepsprint
-# and follow `Dockerfile`/Postgres schema instructions for production parity.
-
 # Run both servers
 cd ..
 npm run dev          # server :3001, client :5173
 ```
 
-Seed accounts (dev only, password `password123` for all):
+### Postgres parity (recommended before risky migrations)
+
+Matches production (`schema.postgresql.prisma` + `migrations_postgres/`). From the **repo root**:
+
+1. Start local Postgres:
+
+   ```bash
+   docker compose up -d
+   ```
+
+2. Switch the Prisma layout to PostgreSQL files (cross-platform):
+
+   ```bash
+   npm run postgres:parity
+   ```
+
+3. In `server/.env` set:
+
+   ```bash
+   DATABASE_URL="postgresql://stepsprint:stepsprint@localhost:5432/stepsprint"
+   ```
+
+4. Apply migrations and seed:
+
+   ```bash
+   cd server
+   npx prisma generate
+   npx prisma migrate deploy
+   npx prisma db seed
+   ```
+
+To go back to SQLite for daily dev, restore `server/prisma/schema.prisma` and `server/prisma/migrations/` from Git (`git checkout -- server/prisma/schema.prisma server/prisma/migrations` — or re-clone a clean tree).
+
+---
+
+## Post-deploy email smoke (recommended)
+
+After `RESEND_API_KEY` and `SMTP_FROM` are set on the API:
+
+1. Open the production SPA and **create a new account** with a mailbox you control.
+2. Confirm the **verification email** arrives and the link works (`/verify-email`).
+3. **Sign out**, then **sign in** with the same account.
+4. Use **Forgot password**, confirm the **reset email** arrives and completes.
+5. (Optional) Trigger **resend verification** from the login messaging if you test a second address.
+
+Record success in your release notes or ops log.
+
+### Default seed users (local SQLite)
+
 - Admin: `admin@stepsprint.local`
 - Participants: `user1@stepsprint.local` … `user12@stepsprint.local`
 
-All seed users have `emailVerified: true` so the email verification gate doesn't block local development.
+Password for all seeded users: `password123`. All have `emailVerified: true` so the verification gate does not block local development.
 
 ---
 
@@ -244,7 +329,7 @@ Local parity: `docker compose up -d` from the repo root and `DATABASE_URL=postgr
 
 - [x] `JWT_SECRET` auto-generated (Render)
 - [x] HTTPS enforced (Render + Vercel handle TLS)
-- [x] CORS restricted to `https://step-sprint.vercel.app`
+- [x] CORS restricted to `APP_ORIGIN` + optional **`APP_ORIGIN_ALLOWLIST`** / preview flag (see [PRODUCTION.md](PRODUCTION.md))
 - [x] CSRF protection (double-submit cookie, production)
 - [x] Rate limiting — login: 10/15 min, auth: 30/15 min, API: 120/min
 - [x] Helmet security headers (server)

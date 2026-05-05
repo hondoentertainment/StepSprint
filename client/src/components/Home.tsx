@@ -153,6 +153,8 @@ export function Home({
   >(null);
   const [pushBusy, setPushBusy] = useState(false);
   const [streakMilestone, setStreakMilestone] = useState<number | null>(null);
+  const [fitnessConnected, setFitnessConnected] = useState<boolean | null>(null);
+  const [lastFitnessAppleSyncAt, setLastFitnessAppleSyncAt] = useState<string | null>(null);
 
   const pushSupported =
     typeof window !== "undefined" &&
@@ -184,6 +186,33 @@ export function Home({
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!challengeId) {
+      setFitnessConnected(null);
+      setLastFitnessAppleSyncAt(null);
+      return;
+    }
+    let cancelled = false;
+    void api<{ connected: boolean; lastAppleHealthSyncAt: string | null }>(
+      `/api/integrations/fitness?challengeId=${encodeURIComponent(challengeId)}`
+    )
+      .then((data) => {
+        if (!cancelled) {
+          setFitnessConnected(data.connected);
+          setLastFitnessAppleSyncAt(data.lastAppleHealthSyncAt ?? null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setFitnessConnected(null);
+          setLastFitnessAppleSyncAt(null);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [challengeId]);
 
   function toggleDailyReminder() {
     const prev = dailyReminder;
@@ -337,6 +366,23 @@ export function Home({
             </>
           )}
         </div>
+      )}
+      {selectedChallenge && challengeId && fitnessConnected !== null && (
+        <>
+          <p className="hint home-fitness-hint" role="note" aria-label={t("home.devicesFitnessAria")}>
+            {fitnessConnected ? t("home.devicesFitnessLinked") : t("home.devicesFitnessNotLinked")}
+          </p>
+          {lastFitnessAppleSyncAt && (
+            <p className="hint" role="status">
+              {t("submit.lastAppleHealthSync", {
+                datetime: new Date(lastFitnessAppleSyncAt).toLocaleString(undefined, {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                }),
+              })}
+            </p>
+          )}
+        </>
       )}
       {selectedChallenge && <ChallengeProgress challenge={selectedChallenge} now={now} />}
       {challengesLoading ? (

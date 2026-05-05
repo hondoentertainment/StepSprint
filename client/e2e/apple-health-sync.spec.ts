@@ -108,7 +108,7 @@ test.describe("Fitness sync (Devices)", () => {
     await expect(tokenRows).toHaveCount(countBefore - 1, { timeout: 15_000 });
   });
 
-  test("OAuth provider section hidden when Fitbit, Google Fit, and Garmin are not configured", async ({
+  test("other trackers section lists Fitbit, Google Fit, and Garmin with not-configured badges when OAuth is off", async ({
     page,
   }) => {
     await loginAsSeededParticipant(page);
@@ -119,7 +119,10 @@ test.describe("Fitness sync (Devices)", () => {
     ).toBeVisible();
 
     await expect(
-      page.getByRole("heading", { name: /OAuth services|Servicios OAuth/i })
-    ).not.toBeVisible();
+      page.getByRole("heading", {
+        name: /Fitbit, Google Fit, and Garmin|Fitbit, Google Fit y Garmin/i,
+      })
+    ).toBeVisible();
+    await expect(page.getByText(/Not configured|No configurado/i).first()).toBeVisible();
   });
 });

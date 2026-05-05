@@ -1,10 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 vi.mock("../prisma", () => ({
   prisma: {
     notificationPreference: {
       findMany: vi.fn(),
-      update: vi.fn().mockResolvedValue({}),
       update: vi.fn(),
     },
     stepSubmission: {
@@ -12,9 +11,6 @@ vi.mock("../prisma", () => ({
     },
     pushSubscription: {
       deleteMany: vi.fn(),
-    },
-    stepSubmission: {
-      findFirst: vi.fn().mockResolvedValue(null),
     },
   },
 }));
@@ -28,8 +24,6 @@ vi.mock("./push", () => ({
   sendPush: vi.fn(),
 }));
 
-vi.mock("./email", () => ({
-  sendEmail: vi.fn(),
 vi.mock("../config", () => ({
   config: {
     reminderNotificationHourLocal: 17,
@@ -39,6 +33,7 @@ vi.mock("../config", () => ({
 
 import { hourlyReminderSweep } from "./scheduler";
 import { prisma } from "../prisma";
+import { isPushEnabled, sendPush } from "./push";
 
 const mockFindMany = vi.mocked(prisma.notificationPreference.findMany);
 const mockDeleteMany = vi.mocked(prisma.pushSubscription.deleteMany);
@@ -46,11 +41,10 @@ const mockFindFirst = vi.mocked(prisma.stepSubmission.findFirst);
 const mockIsPushEnabled = vi.mocked(isPushEnabled);
 const mockSendPush = vi.mocked(sendPush);
 
-// Set system time to 17:00 UTC so hour matches the default reminderNotificationHourLocal (17)
-// and use UTC timezone in test challenges so the hour check passes.
 const FIXED_TIME = new Date("2025-01-15T17:00:00.000Z");
 
 beforeEach(() => {
+  vi.useFakeTimers();
   vi.setSystemTime(FIXED_TIME);
   vi.clearAllMocks();
   mockFindFirst.mockResolvedValue(null);
@@ -59,14 +53,23 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
-  vi.restoreAllMocks();
+  vi.clearAllMocks();
 });
 
 /** Build a minimal pref record for mocking. */
 function buildPref(overrides: {
   userId?: string;
-  pushSubscriptions?: { id: string; userId: string; endpoint: string; p256dh: string; auth: string; createdAt: Date }[];
-  memberships?: { challenge: { id: string; name: string; locked: boolean; timezone: string; startDate: Date; endDate: Date } }[];
+  pushSubscriptions?: {
+    id: string;
+    userId: string;
+    endpoint: string;
+    p256dh: string;
+    auth: string;
+    createdAt: Date;
+  }[];
+  memberships?: {
+    challenge: { id: string; name: string; locked: boolean; timezone: string; startDate: Date; endDate: Date };
+  }[];
   lastDailyReminderSentAt?: Date | null;
 }) {
   const userId = overrides.userId ?? "user-1";
@@ -90,7 +93,6 @@ function buildPref(overrides: {
   };
 }
 
-/** A challenge with UTC timezone active around the fixed time (2025-01-15). */
 const activeChallenge = {
   id: "challenge-1",
   name: "January Challenge",
@@ -110,6 +112,14 @@ const defaultSub = {
 };
 
 describe("hourlyReminderSweep", () => {
+  it("completes when no users opted into reminders", async () => {
+    mockFindMany.mockResolvedValue([]);
+
+    await expect(hourlyReminderSweep()).resolves.toBeUndefined();
+
+    expect(mockFindMany).toHaveBeenCalledOnce();
+  });
+
   it("does not send push when user has no actionable challenges", async () => {
     mockIsPushEnabled.mockReturnValue(true);
     mockFindMany.mockResolvedValue([buildPref({ memberships: [] })] as never);
@@ -143,13 +153,18 @@ describe("hourlyReminderSweep", () => {
     mockFindMany.mockResolvedValue([
       buildPref({
         userId: "user-2",
-        pushSubscriptions: [{ ...defaultSub, id: "sub-2", userId: "user-2", endpoint: "https://push.example.com/stale" }],
+        pushSubscriptions: [
+          {
+            ...defaultSub,
+            id: "sub-2",
+            userId: "user-2",
+            endpoint: "https://push.example.com/stale",
+          },
+        ],
         memberships: [{ challenge: activeChallenge }],
       }),
     ] as never);
-    mockSendPush.mockRejectedValue(
-      Object.assign(new Error("Gone"), { statusCode: 410 })
-    );
+    mockSendPush.mockRejectedValue(Object.assign(new Error("Gone"), { statusCode: 410 }));
     mockDeleteMany.mockResolvedValue({ count: 1 } as never);
 
     await hourlyReminderSweep();
@@ -170,14 +185,6 @@ describe("hourlyReminderSweep", () => {
 
     await hourlyReminderSweep();
 
-beforeEach(() => {
-  vi.clearAllMocks();
-  mockFindMany.mockResolvedValue([]);
-});
-
-describe("hourlyReminderSweep", () => {
-  it("completes when no users opted into reminders", async () => {
-    await expect(hourlyReminderSweep()).resolves.toBeUndefined();
-    expect(mockFindMany).toHaveBeenCalledOnce();
+    expect(mockSendPush).not.toHaveBeenCalled();
   });
 });

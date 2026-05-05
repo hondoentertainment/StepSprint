@@ -4,10 +4,11 @@ Companion to [DEPLOYMENT.md](DEPLOYMENT.md). Use this as an internal checklist b
 
 ## 1. Platform and operations
 
-- **Database**: Production must use **PostgreSQL** only (Render `stepsprint-db` or equivalent). Run a **backup restore drill** and document RTO/RPO (example: RPO = daily backup retention window; RTO = time to restore from backup plus redeploy — replace with your measured values).
+- **Startup validation**: With `NODE_ENV=production`, the process exits on invalid combinations: SQLite `file:` `DATABASE_URL`, loopback `APP_ORIGIN` (`localhost` / `127.0.0.1` / `::1`), `JWT_SECRET` shorter than 32 characters, **missing email transport** (`RESEND_API_KEY` / `SMTP_HOST`) unless **`ALLOW_PRODUCTION_WITHOUT_EMAIL=true`**, or **missing `SMTP_FROM`** when a transport is configured. The Vitest harness sets `VITEST=true` so tests can keep SQLite and short secrets; **never set `VITEST` on a deployed server** (Render, Docker, etc.).
+- **Database**: Production must use **PostgreSQL** only (Render `stepsprint-db` or equivalent). Run a **backup restore drill** (see [BACKUP_DRILL.md](BACKUP_DRILL.md)) and document RTO/RPO (example: RPO = daily backup retention window; RTO = time to restore from backup plus redeploy — replace with your measured values).
 - **Secrets**: `JWT_SECRET`, `REMINDER_CRON_SECRET`, OAuth secrets, Resend/SMTP, and VAPID keys belong in the host secret store—never in the repo. Rotate after any leak.
 - **Multi-instance API**: Set `REMINDER_USE_EXTERNAL_CRON=true` and schedule an hourly `POST /api/cron/reminder-sweep` with `Authorization: Bearer <REMINDER_CRON_SECRET>` so reminder sweeps are not duplicated per replica.
-- **Health**: Expose `GET /api/health`. Response includes `service: "stepsprint-api"`, `db: "up" | "down"`, and **`release`** when `SENTRY_RELEASE`, `RENDER_GIT_COMMIT`, `GITHUB_SHA`, or similar is set. Point an external monitor at this endpoint.
+- **Health**: Expose `GET /api/health`. Response includes `service: "stepsprint-api"`, `db: "up" | "down"`, **`release`** when `SENTRY_RELEASE`, `RENDER_GIT_COMMIT`, `GITHUB_SHA`, or similar is set, and in **`NODE_ENV=production`** a **`transactionalEmail`** field: `"configured"` (Resend/SMTP) or `"allow_without_flag"` (`ALLOW_PRODUCTION_WITHOUT_EMAIL`). Point an external monitor at this endpoint.
 - **Release identifiers**: Set `SENTRY_RELEASE` explicitly (e.g. `stepsprint-api@abc1234`) when the platform does not inject a git SHA into the container. The API also auto-derives a short release from `RENDER_GIT_COMMIT` / `GITHUB_SHA` / `VERCEL_GIT_COMMIT_SHA` / `COMMIT_REF` when unset.
 
 ## 2. Client build and Sentry
@@ -17,10 +18,10 @@ Companion to [DEPLOYMENT.md](DEPLOYMENT.md). Use this as an internal checklist b
 
 ## 3. Security
 
-- **Origins**: After any domain change, update `APP_ORIGIN`, `API_PUBLIC_ORIGIN`, Vercel `connect-src`, and all OAuth redirect URIs together.
+- **Origins**: After any domain change, update `APP_ORIGIN`, `API_PUBLIC_ORIGIN`, optional comma-separated **`APP_ORIGIN_ALLOWLIST`** on the API for extra SPA origins (www vs apex, staging), Vercel `connect-src`, and all OAuth redirect URIs together. **Vercel previews**: either set `APP_ORIGIN`/`APP_ORIGIN_ALLOWLIST` to each preview URL, or use a **staging** API with `APP_ALLOW_VERCEL_PREVIEW_ORIGINS=true` (not recommended for production APIs).
 - **CSRF**: Production enforces double-submit cookies on mutating `/api/*` routes (except Bearer and documented exceptions). Verify in **staging** with the real split origins.
-- **Rate limiting**: Production tier is enabled in `server/src/middleware/rateLimit.ts`; tune if you see abuse.
-- **Logs**: HTTP logs **redact** `Authorization`, `Cookie`, and `x-csrf-token` headers (see `server/src/logger.ts`).
+- **Reverse proxy**: `trust proxy` is enabled in production so `X-Forwarded-*` is honored for client IP (rate limits, CSRF session binding). Do not set the `VITEST` environment variable on a real server—it is only for automated tests and would weaken startup validation.
+- **Logs**: HTTP logs **redact** `Authorization`, `Cookie`, and `x-csrf-token` headers, plus common password and reset-token fields on `req.body` (see `server/src/logger.ts`).
 
 ## 4. Observability
 
@@ -29,11 +30,11 @@ Companion to [DEPLOYMENT.md](DEPLOYMENT.md). Use this as an internal checklist b
 
 ## 5. Email
 
-- **Resend**: `RESEND_API_KEY` and `SMTP_FROM` are required for verification and password reset in production (see [DEPLOYMENT.md](DEPLOYMENT.md)). Run an end-to-end registration + reset test after deploy.
+- **Transactional mail**: Set `RESEND_API_KEY` or `SMTP_*` plus **`SMTP_FROM`** (required in production whenever those transports are set — no implicit default). In **`NODE_ENV=production`**, the API **refuses to start** without an email transport unless **`ALLOW_PRODUCTION_WITHOUT_EMAIL=true`** (use only for non-public or emergency bring-up; verification and password reset will not send mail). Run registration + forgot-password smoke tests after deploy.
 
 ## 6. Legal and product
 
-- **Privacy / Terms**: Replace placeholder copy with counsel-reviewed text and real contact details. The app shows a **production notice** banner on `/privacy` and `/terms` until you remove or replace those strings in `client/src/i18n/*.json`.
+- **Privacy / Terms**: Replace placeholder copy with counsel-reviewed text and real contact details. The app shows a **production notice** banner on `/privacy` and `/terms` until you set **`VITE_LEGAL_CONTENT_REVIEWED=true`** at client build time (or remove the banner strings in `client/src/i18n/*.json`).
 - **Locale**: Default language uses `localStorage` (`stepsprint-locale`), then **browser** `navigator.language` for Spanish when no preference is stored, then English.
 
 ## 7. Quality gates
@@ -45,6 +46,21 @@ Companion to [DEPLOYMENT.md](DEPLOYMENT.md). Use this as an internal checklist b
 
 - Run `npm audit` in **client** and **server** (root audit may not include workspaces). High findings in `vite-plugin-pwa` / `serialize-javascript` and moderate findings in Prisma dev tooling may require **tested** major upgrades—avoid blind `npm audit fix --force`.
 
-## 9. Out of scope for default OSS deploy
+## 9. Wearables / fitness integrations
+
+**Production checklist (split hosting: Vercel SPA + Render API)**
+
+- **`APP_ORIGIN`** (API): exact HTTPS origin of the SPA (no path, no trailing slash). Used for CORS and post-OAuth redirects.
+- **`API_PUBLIC_ORIGIN`** (API): public HTTPS origin of **this** API. Must match what you register with Fitbit / Google / Garmin and what **`VITE_API_URL`** uses at **Vite build time** on Vercel.
+- **`VITE_API_URL`** (Vercel / `client` build): set to **`API_PUBLIC_ORIGIN`** (example: `https://your-api.onrender.com`). Wrong value breaks the Devices curl helper, Shortcut URL text, and all `fetch` calls to the API. After changing the API hostname, redeploy **both** services.
+- **Content-Security-Policy**: In `vercel.json`, `connect-src` must allow the same API host (and PostHog/Sentry hosts if used). Custom domains: update CSP when the API or analytics hosts change.
+
+**Per integration**
+
+- **Apple Watch / Apple Health**: No extra server secrets. Users create **`POST /api/integrations/tokens`** in the SPA, then Shortcuts **`POST`** to **`{API_PUBLIC_ORIGIN}/api/integrations/apple-health`** with `Authorization: Bearer ssp_…` and `Content-Type: application/json`. TLS on the API must be valid (Shortcuts reject bad certs).
+- **Fitbit, Google Fit, Garmin**: Set client id/secret env vars on the API; register redirect URLs on **`API_PUBLIC_ORIGIN`** only (see `render.yaml` comments). Do not set only half of an id/secret pair — the server logs a warning in production if misconfigured.
+- **Bulk days**: **`POST /api/integrations/csv`** is gated to enrolled participants; document internally if operators allow imports.
+
+## 10. Out of scope for default OSS deploy
 
 Multi-tenancy, realtime leaderboards, native apps beyond PWA, and advanced churn forecasting are not required for a first production cut—track separately if the product roadmap expands.
