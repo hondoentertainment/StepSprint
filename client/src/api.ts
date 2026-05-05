@@ -32,7 +32,7 @@ export function getApiUrl(path: string): string {
 let _csrfToken: string | null = null;
 
 const APIUnreachableHint =
-  "Cannot reach the StepSprint API. If this is the hosted site, the server may be stopped or not deployed — check Render (or your host) and that VITE_API_URL points at the live API.";
+  "Cannot reach the StepSprint API. If this is the hosted site, the API may be redeploying or unavailable — check the Vercel dashboard (Functions tab) and that the database is reachable.";
 
 async function getCsrfToken(): Promise<string> {
   if (_csrfToken) return _csrfToken;

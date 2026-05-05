@@ -1,15 +1,19 @@
 # StepSprint Deployment Guide
 
-For a **production-readiness checklist** (secrets, cron, Sentry releases, legal, monitoring), see [PRODUCTION.md](PRODUCTION.md).
+For the **ordered launch-day runbook** (apply this top-to-bottom on cutover), see [LAUNCH.md](LAUNCH.md). For a deeper **production-readiness checklist** (secrets, cron, Sentry releases, legal, monitoring), see [PRODUCTION.md](PRODUCTION.md).
 
-StepSprint runs as two services:
+StepSprint runs as a single Vercel project (SPA + serverless API on the same origin):
 
-| Service | Platform | URL |
-|---------|----------|-----|
-| React SPA (client) | Vercel | `https://step-sprint.vercel.app` |
-| Express API (server) | Render | `https://stepsprint-api.onrender.com` |
+| Component | Where | URL |
+|-----------|-------|-----|
+| React SPA (client) | Vercel static + PWA | `https://stepsprint.vercel.app` |
+| Express API (server) | Vercel Function (`api/[...all].js`) | `https://stepsprint.vercel.app/api/*` |
+| Postgres | Vercel Marketplace (Neon) | wired via `DATABASE_URL` + `DIRECT_URL` |
+| Hourly reminders | **Vercel Cron** → `GET /api/cron/reminder-sweep` | `vercel.json` `crons` |
 
-URLs are pinned in `vercel.json`, `render.yaml`, and **`API_PUBLIC_ORIGIN`** — update **both** `APP_ORIGIN` and `API_PUBLIC_ORIGIN` if you put the SPA or API behind custom domains, and rewrite OAuth callbacks in Fitbit/Google consoles to match **`API_PUBLIC_ORIGIN`** (not the SPA hostname).
+> **Legacy:** `render.yaml` and `server/Dockerfile` still build a containerized API for Render. They are no longer the primary deploy target; the Vercel Function (`api/[...all].js`) is. Keep them in the repo only if you want a fallback / parallel host.
+
+Same-origin means **no CORS** between the SPA and the API: drop `APP_ORIGIN` overrides and `API_PUBLIC_ORIGIN` from any process talking to your own SPA. OAuth callbacks (Fitbit/Google/Garmin) and Apple Health Shortcuts hit the same Vercel hostname under `/api/integrations/...`.
 
 ### Wearables and step ingest (Fitness sync)
 
@@ -25,74 +29,87 @@ Participants connect devices from the SPA **Devices** page:
 
 ---
 
-## Quick deploy (two steps)
+## Quick deploy (Vercel — one project)
 
-### 1 — API on Render
+The whole app deploys as one Vercel project: the SPA, the Express API as a Function (`api/[...all].js`), and the hourly reminder via Vercel Cron.
 
-The Blueprint file is [`render.yaml`](../render.yaml) at the **repository root**. **`dockerfilePath` is relative to that root** — it must be `./server/Dockerfile` (not `./Dockerfile`), with **`dockerContext: ./server`**, so Render builds the image defined under `server/`. An incorrect path caused failed or empty builds and a live site that never serves the API.
+### 1 — Provision Postgres (one-time)
 
-1. Go to [render.com](https://render.com) → **New** → **Blueprint** → select this repo (branch `master`).
-2. Render reads `render.yaml` and provisions:
-   - `stepsprint-api` — Docker web service (Express API) — **Starter plan**
-   - `stepsprint-db` — managed Postgres 16 — **Starter plan**
-   - `JWT_SECRET` — auto-generated
-   - `DATABASE_URL` — wired from `stepsprint-db`
-   - `APP_ORIGIN` — pre-filled as `https://step-sprint.vercel.app`
-   - `API_PUBLIC_ORIGIN` — public URL of **this Render web service**
-   - `PORT=3001`, `NODE_ENV=production`
+Use the **Vercel Marketplace** and add **Neon Postgres** to the project (Vercel dashboard → your project → **Storage** → **Create** → **Neon Postgres**). Vercel auto-injects environment variables; the only ones the app reads directly are:
 
-   The Docker image starts the API with **`prisma migrate deploy`**, then **`node dist/seed.js`** (production seeds only the admin user; safe to run on every deploy), then **`node dist/index.js`**. You do not need a separate manual seed on Render for that admin account.
+| Var | Source | Notes |
+|-----|--------|-------|
+| `DATABASE_URL` | Marketplace (pooled) | Used at runtime by Prisma client (PgBouncer-safe). |
+| `DIRECT_URL` | Marketplace (unpooled) | Used by `prisma migrate deploy` during build. Set it to the Marketplace `*_UNPOOLED` value (e.g. `DATABASE_URL_UNPOOLED` / `POSTGRES_URL_NON_POOLING`). |
 
-3. After the blueprint provisions, set the required env vars in **Render dashboard → stepsprint-api → Environment**:
+If your Marketplace integration only sets a single URL, point both at it; migrations will still run.
 
-   | Variable | Required | Description |
-   |----------|----------|-------------|
-   | `RESEND_API_KEY` | **Yes** (public prod) | API key from [resend.com](https://resend.com) — needed for email verification and password reset. Without it, the API **exits on boot** unless you set **`ALLOW_PRODUCTION_WITHOUT_EMAIL=true`** (private/temporary use only). |
-   | `SMTP_FROM` | **Yes** (with Resend/SMTP) | Sender address, e.g. `StepSprint <noreply@yourdomain.com>` |
-   | `ADMIN_PASSWORD` | **Recommended (first deploy)** | Initial admin password for `admin@stepsprint.local`. If omitted on the **first** deploy, a random password is logged once — save it and change it after login. If the admin already exists, omitting this on later deploys **does not** rotate the password. |
+### 2 — Set required environment variables
 
-4. Trigger a deploy (or wait for auto-deploy on push to master).
+In Vercel dashboard → project → **Settings** → **Environment Variables**:
 
-The API will be live at `https://stepsprint-api.onrender.com` **only after** Render shows the service running (not “Blueprint pending” or suspended).
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `JWT_SECRET` | **Yes** | Min **32 chars** in production. Generate `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"`. |
+| `RESEND_API_KEY` | **Yes** (public prod) | Resend API key. Without it (or `SMTP_HOST`), the function exits on boot unless `ALLOW_PRODUCTION_WITHOUT_EMAIL=true`. |
+| `SMTP_FROM` | **Yes** (with Resend/SMTP) | Sender address, e.g. `StepSprint <noreply@yourdomain.com>`. |
+| `ADMIN_PASSWORD` | **Recommended (first deploy)** | Initial password for `admin@stepsprint.local`. If unset on first deploy, a random one is logged once. The seed runs at build time (see **Step 3**), so the admin lands in the new database before the function serves requests. |
+| `APP_ORIGIN` | **Yes** | Your real Vercel URL (e.g. `https://stepsprint.vercel.app`). Used for cookie + CORS even though the app is same-origin. |
+| `NODE_ENV` | **Yes** | `production`. |
+| `REMINDER_USE_EXTERNAL_CRON` | **Yes** | `true` — disables the in-process scheduler so only Vercel Cron triggers the sweep. |
+| `REMINDER_CRON_SECRET` | **Yes** | Min 16 chars. **Set it to the same value as `CRON_SECRET`** below — Vercel Cron sends `Authorization: Bearer <CRON_SECRET>`. |
+| `CRON_SECRET` | **Yes** | Vercel Cron's auto-injected bearer token; must match `REMINDER_CRON_SECRET`. |
+| `SENTRY_DSN` / `VITE_SENTRY_DSN` | Optional | Server + browser Sentry. |
+| `VITE_POSTHOG_KEY` | Optional | PostHog (browser). |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | Optional | Web Push reminders. Generate with `npx web-push generate-vapid-keys`. |
+| `FITBIT_*` / `GOOGLE_*` / `GARMIN_*` | Optional | OAuth integrations. Redirect URIs are `https://<your-vercel-host>/api/integrations/<provider>/callback`. |
 
-#### Verify the API is reachable
+> The SPA does **not** need `VITE_API_URL` anymore — same-origin means relative `/api/*` paths just work.
 
-From your machine (replace the URL if you use a custom Render hostname):
+### 3 — Build pipeline (`vercel.json`)
+
+`vercel.json` chains:
+
+1. `installCommand` — `npm ci` at root + `server/` + `client/`.
+2. `buildCommand` —
+   1. `node scripts/switch-to-postgres-schema.mjs` (swap to `schema.postgresql.prisma` + `migrations_postgres/`).
+   2. `cd server && npx prisma generate && npx prisma migrate deploy && npm run build` (compile server TS → `server/dist`; this is what `api/[...all].js` requires).
+   3. `cd client && npm run build` (Vite + PWA service worker).
+3. `functions` — `api/[...all].js` runs as a Node serverless function (mem 1024MB, 30s timeout).
+4. `crons` — `GET /api/cron/reminder-sweep` every hour.
+5. `rewrites` — non-`/api/*` paths fall back to `index.html` (SPA).
+6. `headers` — CSP / X-Frame-Options / Referrer-Policy.
+
+> **Admin seed** is part of the build only via `migrate deploy` + the in-app first-login flow. To run the production admin seed once-off, run `node server/dist/seed.js` from the Vercel CLI (`vercel env pull .env.local && node server/dist/seed.js`) or a one-off CI step.
+
+### 4 — Deploy
+
+Push to `master` (Vercel auto-deploy) or run from the repo root:
 
 ```bash
-curl -sS "https://stepsprint-api.onrender.com/api/health"
+npx vercel deploy --prod --yes
 ```
 
-You should see JSON like `{ "ok": true, "db": "up", ... }`. If you get **404** with no JSON, Render is not routing to a web service (`x-render-routing: no-server` in response headers): create/start the **`stepsprint-api`** service from this repo’s blueprint or Docker image.
-
-**Hostname must match the frontend:** In Vercel, `VITE_API_URL` (see [`vercel.json`](../vercel.json) `build.env`) must be the **exact** public API URL from Render (**Dashboard → your web service → URL**), including `https` and no trailing slash. If Render gives you a different subdomain (e.g. `stepsprint-api-xxxx.onrender.com` because the short name was taken), set **`API_PUBLIC_ORIGIN`** on the service to that URL, update **`vercel.json`** `VITE_API_URL` and the **CSP** `connect-src` host, push, and redeploy the client.
-
-Optional script from the repo root (uses Node’s built-in `fetch`):
+### 5 — Smoke test
 
 ```bash
-npm run check:api
-# or: API_BASE_URL=https://your-api.example.com npm run check:api
+curl -sS "https://<your-vercel-host>/api/health"
+# {"ok":true,"db":"up","service":"stepsprint-api",...}
 ```
 
-**Sign-in / register fail from the SPA** usually means: (1) API URL wrong or not deployed, (2) **`APP_ORIGIN`** on Render does not **exactly** match the Vercel URL you open (scheme + host, no trailing slash), or (3) you need **`APP_ORIGIN_ALLOWLIST`** for an extra domain (e.g. `https://www.`). For Vercel **preview** builds only, a dedicated API can set **`APP_ALLOW_VERCEL_PREVIEW_ORIGINS=true`** (staging — not for production).
+Optional helper from the repo root:
 
-> **Note on plans**: `render.yaml` uses the `starter` plan ($7/mo each) to avoid cold starts and get automatic database backups. The free tier sleeps after 15 minutes of inactivity and has a 90-day database retention limit — not suitable for production.
+```bash
+API_BASE_URL=https://<your-vercel-host> npm run check:api
+```
 
-### 2 — Client on Vercel
+### Render (legacy)
 
-Vercel deployments run automatically on push to `master` via the GitHub integration.
-`vercel.json` is pre-configured:
-- Build: `cd client && npm run build`
-- `VITE_API_URL=https://stepsprint-api.onrender.com` injected at build time
-- SPA rewrites and security headers included
-- Vercel respects the root `package.json` **`engines.node`** (`20.x`), aligning deploy builds with the client workspace `engines` constraint.
-- Use **`.nvmrc`** at the repo root with nvm or fnm to match that Node version locally.
-
-The client will be live at `https://step-sprint.vercel.app`.
+`render.yaml` and `server/Dockerfile` still describe a Render-hosted Postgres + Docker API deploy. They are kept for emergency fallback. If you split hosting again, set `APP_ORIGIN`, `APP_ORIGIN_ALLOWLIST`, and the SPA's `VITE_API_URL` so cookies and CSRF work across origins (cookie `sameSite: "none"` is already the production default for that case).
 
 ## Local development (Postgres parity)
 
-Default development uses SQLite (`DATABASE_URL` with a `file:` URL). For Postgres parity, point `DATABASE_URL` at managed Postgres (for example Render `stepsprint-db` from the blueprint) or at a local instance. From the repo root, **`docker-compose.yml`** can supply local Postgres (`docker compose up -d`); then run migrations from `server/` against **`server/prisma/schema.postgresql.prisma`** (production uses `migrations_postgres/` via the Docker image—mirror that workflow when validating Postgres locally).
+Default development uses SQLite (`DATABASE_URL` with a `file:` URL). For Postgres parity, point `DATABASE_URL` at managed Postgres (for example Render `stepsprint-db` or a Neon dev branch from the Marketplace) or at a local instance. From the repo root, **`docker-compose.yml`** can supply local Postgres (`docker compose up -d`); then run migrations from `server/` against **`server/prisma/schema.postgresql.prisma`** (production uses `migrations_postgres/` via `scripts/switch-to-postgres-schema.mjs` — mirror that workflow when validating Postgres locally).
 
 ---
 
@@ -100,16 +117,17 @@ Default development uses SQLite (`DATABASE_URL` with a `file:` URL). For Postgre
 
 After the first successful deploy, complete these steps:
 
-- [ ] **Change the admin password** — log in with the password from `ADMIN_PASSWORD` (or from Render logs if auto-generated), then change it via the profile page.
+- [ ] **Change the admin password** — log in with the password from `ADMIN_PASSWORD` (or from the Vercel Function logs if auto-generated on first seed), then change it via the profile page.
 - [ ] **Verify email delivery** — register a test account and confirm the verification email arrives.
 - [ ] **Create a challenge** — log in as admin, create the first challenge, generate an invite code, and test the invite flow.
-- [ ] **Confirm database backups** — check the Render dashboard that daily backups are enabled for `stepsprint-db`, and schedule a [backup restore drill](BACKUP_DRILL.md) before a major launch.
-- [ ] **Health check monitoring** — point an external monitor at `GET /api/health` on the API URL. A `200` body includes `{ "ok": true, "db": "up" }`; `503` means the app cannot reach the database.
+- [ ] **Confirm database backups** — Neon (Vercel Marketplace) keeps point-in-time recovery; review retention on the Storage tab and schedule a [backup restore drill](BACKUP_DRILL.md) before a major launch.
+- [ ] **Health check monitoring** — point an external monitor at `GET https://<your-vercel-host>/api/health`. A `200` body includes `{ "ok": true, "db": "up" }`; `503` means the function cannot reach the database.
+- [ ] **Cron is firing** — Vercel dashboard → project → **Cron** tab shows the last run for `/api/cron/reminder-sweep` (one execution per hour). Check Function logs if you don't see runs.
 - [ ] **OpenAPI / Swagger** — `/api/docs` is **off** in production by default. Set `OPENAPI_DOCS_ENABLED=true` on the API only if you need the interactive spec in prod.
 
 ### Staging (recommended before a broad launch)
 
-Use a Vercel preview (or staging project) and a non-production API URL whose `APP_ORIGIN`, `API_PUBLIC_ORIGIN`, and client `VITE_API_URL` point at each other. Run `npm test`, `npm run build`, and `npm run test:e2e` against that stack so split-origin cookies, CSRF, and email flows match production.
+Use a Vercel **Preview** deployment with its own Neon dev branch (Vercel Marketplace can attach one per preview). Same-origin means CSRF, cookies, and email flows mirror production without origin config. Run `npm test`, `npm run build`, and `npm run test:e2e` against the preview URL.
 
 | | Production (example) | Staging (you define) |
 |---|----------------------|----------------------|

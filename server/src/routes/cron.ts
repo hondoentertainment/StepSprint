@@ -35,12 +35,7 @@ export function verifyReminderCronAuth(
   return { ok: true };
 }
 
-/**
- * Platform cron (Render, GitHub Actions, etc.): POST hourly with
- * `Authorization: Bearer <REMINDER_CRON_SECRET>`.
- * Prefer `REMINDER_USE_EXTERNAL_CRON=true` on multi-instance deploys so only this route runs the sweep.
- */
-router.post("/reminder-sweep", async (req: Request, res: Response) => {
+async function runReminderSweep(req: Request, res: Response): Promise<void> {
   const check = verifyReminderCronAuth(req, config.reminderCronSecret);
   if (!check.ok) {
     res.status(check.status).json({ error: check.error });
@@ -54,6 +49,15 @@ router.post("/reminder-sweep", async (req: Request, res: Response) => {
     logger.error({ err }, "Cron reminder sweep failed");
     res.status(500).json({ error: "Sweep failed" });
   }
-});
+}
+
+/**
+ * Platform cron: hourly sweep with `Authorization: Bearer <REMINDER_CRON_SECRET>`.
+ * - **Vercel Cron** sends GET requests; set `CRON_SECRET` to match `REMINDER_CRON_SECRET`.
+ * - **Render / GitHub Actions / curl**: either method works.
+ * Prefer `REMINDER_USE_EXTERNAL_CRON=true` on multi-instance deploys so only this route runs the sweep.
+ */
+router.post("/reminder-sweep", runReminderSweep);
+router.get("/reminder-sweep", runReminderSweep);
 
 export default router;

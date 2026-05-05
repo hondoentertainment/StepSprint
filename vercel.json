@@ -1,23 +1,31 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "vite",
-  "installCommand": "cd client && npm ci",
-  "buildCommand": "cd client && npm run build",
+  "installCommand": "npm ci && cd server && npm ci && cd ../client && npm ci",
+  "buildCommand": "node scripts/vercel-build.mjs",
   "outputDirectory": "client/dist",
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
-  "build": {
-    "env": {
-      "VITE_API_URL": "https://stepsprint-api.onrender.com"
+  "functions": {
+    "api/[...all].js": {
+      "maxDuration": 30,
+      "memory": 1024
     }
   },
+  "crons": [
+    {
+      "path": "/api/cron/reminder-sweep",
+      "schedule": "0 * * * *"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://stepsprint-api.onrender.com https://*.sentry.io https://*.ingest.sentry.io https://app.posthog.com https://eu.posthog.com; img-src 'self' data:; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none';"
+          "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.sentry.io https://*.ingest.sentry.io https://app.posthog.com https://eu.posthog.com; img-src 'self' data:; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none';"
         },
         {
           "key": "X-Frame-Options",

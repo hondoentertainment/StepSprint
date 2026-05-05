@@ -1,15 +1,15 @@
 # StepSprint production readiness
 
-Companion to [DEPLOYMENT.md](DEPLOYMENT.md). Use this as an internal checklist before a broad launch or security review.
+Companion to [DEPLOYMENT.md](DEPLOYMENT.md). Use this as an internal checklist before a broad launch or security review. For the **ordered, do-it-in-order launch-day runbook**, see [LAUNCH.md](LAUNCH.md).
 
 ## 1. Platform and operations
 
-- **Startup validation**: With `NODE_ENV=production`, the process exits on invalid combinations: SQLite `file:` `DATABASE_URL`, loopback `APP_ORIGIN` (`localhost` / `127.0.0.1` / `::1`), `JWT_SECRET` shorter than 32 characters, **missing email transport** (`RESEND_API_KEY` / `SMTP_HOST`) unless **`ALLOW_PRODUCTION_WITHOUT_EMAIL=true`**, or **missing `SMTP_FROM`** when a transport is configured. The Vitest harness sets `VITEST=true` so tests can keep SQLite and short secrets; **never set `VITEST` on a deployed server** (Render, Docker, etc.).
-- **Database**: Production must use **PostgreSQL** only (Render `stepsprint-db` or equivalent). Run a **backup restore drill** (see [BACKUP_DRILL.md](BACKUP_DRILL.md)) and document RTO/RPO (example: RPO = daily backup retention window; RTO = time to restore from backup plus redeploy — replace with your measured values).
-- **Secrets**: `JWT_SECRET`, `REMINDER_CRON_SECRET`, OAuth secrets, Resend/SMTP, and VAPID keys belong in the host secret store—never in the repo. Rotate after any leak.
-- **Multi-instance API**: Set `REMINDER_USE_EXTERNAL_CRON=true` and schedule an hourly `POST /api/cron/reminder-sweep` with `Authorization: Bearer <REMINDER_CRON_SECRET>` so reminder sweeps are not duplicated per replica.
-- **Health**: Expose `GET /api/health`. Response includes `service: "stepsprint-api"`, `db: "up" | "down"`, **`release`** when `SENTRY_RELEASE`, `RENDER_GIT_COMMIT`, `GITHUB_SHA`, or similar is set, and in **`NODE_ENV=production`** a **`transactionalEmail`** field: `"configured"` (Resend/SMTP) or `"allow_without_flag"` (`ALLOW_PRODUCTION_WITHOUT_EMAIL`). Point an external monitor at this endpoint.
-- **Release identifiers**: Set `SENTRY_RELEASE` explicitly (e.g. `stepsprint-api@abc1234`) when the platform does not inject a git SHA into the container. The API also auto-derives a short release from `RENDER_GIT_COMMIT` / `GITHUB_SHA` / `VERCEL_GIT_COMMIT_SHA` / `COMMIT_REF` when unset.
+- **Startup validation**: With `NODE_ENV=production`, the function exits on invalid combinations: SQLite `file:` `DATABASE_URL`, loopback `APP_ORIGIN` (`localhost` / `127.0.0.1` / `::1`), `JWT_SECRET` shorter than 32 characters, **missing email transport** (`RESEND_API_KEY` / `SMTP_HOST`) unless **`ALLOW_PRODUCTION_WITHOUT_EMAIL=true`**, or **missing `SMTP_FROM`** when a transport is configured. The Vitest harness sets `VITEST=true` so tests can keep SQLite and short secrets; **never set `VITEST` on a deployed environment** (Vercel, Render, Docker, etc.).
+- **Database**: Production must use **PostgreSQL** (Vercel Marketplace Neon Postgres is the default). Set `DATABASE_URL` to the **pooled** Marketplace URL and `DIRECT_URL` to the **unpooled** URL — `prisma migrate deploy` (build step) needs the direct URL to avoid PgBouncer prepared-statement issues. Run a **backup restore drill** (see [BACKUP_DRILL.md](BACKUP_DRILL.md)) and document RTO/RPO.
+- **Secrets**: `JWT_SECRET`, `REMINDER_CRON_SECRET`, `CRON_SECRET`, OAuth secrets, Resend/SMTP, and VAPID keys belong in the Vercel Environment Variables UI — never in the repo. Rotate after any leak.
+- **Cron**: `vercel.json` schedules `GET /api/cron/reminder-sweep` hourly. Vercel Cron auto-injects `Authorization: Bearer <CRON_SECRET>`; **set `REMINDER_CRON_SECRET = CRON_SECRET`** so the route accepts the request. Always run with `REMINDER_USE_EXTERNAL_CRON=true` (the in-process scheduler is irrelevant in serverless and would not run anyway).
+- **Health**: Expose `GET /api/health`. Response includes `service: "stepsprint-api"`, `db: "up" | "down"`, **`release`** when `VERCEL_GIT_COMMIT_SHA` (auto-injected by Vercel), `SENTRY_RELEASE`, `GITHUB_SHA`, or similar is set, and in **`NODE_ENV=production`** a **`transactionalEmail`** field. Point an external monitor at this endpoint.
+- **Release identifiers**: The API auto-derives a short release from `VERCEL_GIT_COMMIT_SHA` (Vercel build), `RENDER_GIT_COMMIT`, `GITHUB_SHA`, or `COMMIT_REF`. Override with `SENTRY_RELEASE` if needed.
 
 ## 2. Client build and Sentry
 
@@ -48,17 +48,16 @@ Companion to [DEPLOYMENT.md](DEPLOYMENT.md). Use this as an internal checklist b
 
 ## 9. Wearables / fitness integrations
 
-**Production checklist (split hosting: Vercel SPA + Render API)**
+**Production checklist (single Vercel project)**
 
-- **`APP_ORIGIN`** (API): exact HTTPS origin of the SPA (no path, no trailing slash). Used for CORS and post-OAuth redirects.
-- **`API_PUBLIC_ORIGIN`** (API): public HTTPS origin of **this** API. Must match what you register with Fitbit / Google / Garmin and what **`VITE_API_URL`** uses at **Vite build time** on Vercel.
-- **`VITE_API_URL`** (Vercel / `client` build): set to **`API_PUBLIC_ORIGIN`** (example: `https://your-api.onrender.com`). Wrong value breaks the Devices curl helper, Shortcut URL text, and all `fetch` calls to the API. After changing the API hostname, redeploy **both** services.
-- **Content-Security-Policy**: In `vercel.json`, `connect-src` must allow the same API host (and PostHog/Sentry hosts if used). Custom domains: update CSP when the API or analytics hosts change.
+- **`APP_ORIGIN`** (API): the same Vercel HTTPS origin (e.g. `https://stepsprint.vercel.app`). Same-origin means CORS is effectively a no-op, but the value is still used for cookie scope and post-OAuth redirects.
+- **OAuth redirect URLs**: Register `https://<your-vercel-host>/api/integrations/<provider>/callback` for Fitbit / Google / Garmin. After changing the Vercel domain (custom domain, etc.), update each provider's console.
+- **Content-Security-Policy**: `vercel.json` `connect-src` is `'self'` plus PostHog / Sentry. Same-origin = no extra hosts to add for the API.
 
 **Per integration**
 
-- **Apple Watch / Apple Health**: No extra server secrets. Users create **`POST /api/integrations/tokens`** in the SPA, then Shortcuts **`POST`** to **`{API_PUBLIC_ORIGIN}/api/integrations/apple-health`** with `Authorization: Bearer ssp_…` and `Content-Type: application/json`. TLS on the API must be valid (Shortcuts reject bad certs).
-- **Fitbit, Google Fit, Garmin**: Set client id/secret env vars on the API; register redirect URLs on **`API_PUBLIC_ORIGIN`** only (see `render.yaml` comments). Do not set only half of an id/secret pair — the server logs a warning in production if misconfigured.
+- **Apple Watch / Apple Health**: No extra server secrets. Users create **`POST /api/integrations/tokens`** in the SPA, then Shortcuts **`POST`** to `https://<your-vercel-host>/api/integrations/apple-health` with `Authorization: Bearer ssp_…` and `Content-Type: application/json`. TLS on `*.vercel.app` (and any custom domain) is automatic.
+- **Fitbit, Google Fit, Garmin**: Set client id/secret env vars on the project. Don't set only half of an id/secret pair — the server logs a warning in production if misconfigured.
 - **Bulk days**: **`POST /api/integrations/csv`** is gated to enrolled participants; document internally if operators allow imports.
 
 ## 10. Out of scope for default OSS deploy
