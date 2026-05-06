@@ -5,10 +5,11 @@
   "buildCommand": "node scripts/vercel-build.mjs",
   "outputDirectory": "client/dist",
   "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
   "functions": {
-    "api/[...all].js": {
+    "api/index.js": {
       "maxDuration": 30,
       "memory": 1024
     }
