@@ -16,3 +16,4 @@ pnpm-debug.log*
 .env.prod.verify
 .env.production.check
 .deploy-launch.log
+.vercel-*.env
