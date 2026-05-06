@@ -82,7 +82,14 @@ test.describe("Fitness sync (Devices)", () => {
     await expect(
       page.getByText(/Get Contents of URL|Obtener contenidos de URL/i)
     ).toBeVisible();
-    await expect(page.getByText(/Authorization|Bearer/)).toBeVisible();
+    // Target the leaf `<li>` (inside the nested `<ul>` under "Add Get Contents of URL:") that
+    // shows the Bearer header. Scoping to `ul li` skips the parent `<ol>`/`<li>` whose recursive
+    // textContent also matches "Header: Authorization", and avoids the curl `<pre>` in a sibling
+    // collapsible.
+    await expect(
+      page.locator(".token-reveal details.shortcut-guide ul li")
+        .filter({ hasText: /Header:\s*Authorization\s*=/i })
+    ).toBeVisible();
   });
 
   test("revoke a token removes it from the list", async ({ page }) => {
