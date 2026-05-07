@@ -125,6 +125,9 @@
     "backToSubmit": "Back to Submit steps",
     "oauthError": "OAuth error: {{error}}",
     "syncResult": "{{name}}: {{imported}} new, {{updated}} updated, {{skipped}} skipped.",
+    "syncResultNoData": "{{name}} returned no step data for this range — make sure your watch synced to the provider for those days, then try again.",
+    "syncResultOutOfWindow": "{{name}} returned {{skipped}} day(s), but they all fell outside this challenge's window — pick a date inside the challenge or wait until those days fall inside it.",
+    "syncResultUpToDate": "{{name}}: already up to date — refreshed {{updated}} day(s) with the latest totals.",
     "notEnrolledInChallenge": "You are not enrolled in this challenge yet, so bulk CSV import is disabled. Ask an admin for an invite or use Apple token setup if you only need to prepare a Shortcut first.",
     "csv": {
       "sectionTitle": "Bulk paste (JSON)",

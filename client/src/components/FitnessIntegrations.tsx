@@ -5,6 +5,7 @@ import { api, ApiError, getErrorMessage, getApiUrl } from "../api";
 import { ANALYTICS_EVENTS, track, trackAppleHealthSyncFirstObserved } from "../analytics";
 import { IconFootstep, IconWearable } from "./Icons";
 import { todayInTimezone } from "../utils";
+import { formatSyncOutcome } from "./syncOutcome";
 
 function buildAppleHealthCurlCommand(
   postUrl: string,
@@ -398,15 +399,7 @@ export function FitnessIntegrations({
       });
 
       const days = daysBetween(cappedStart, endDate) + 1;
-      setSyncResult(
-        t("integrations.syncResultRange", {
-          name: provider.name,
-          days,
-          imported: result.imported,
-          updated: result.updated,
-          skipped: result.skipped,
-        })
-      );
+      setSyncResult(formatSyncOutcome(t, provider.name, result, days));
       track(ANALYTICS_EVENTS.integrationOauthSync, {
         provider: provider.id,
         challengeId,
@@ -450,20 +443,12 @@ export function FitnessIntegrations({
         body: JSON.stringify(body),
       });
       setSyncResult(
-        isRange && window
-          ? t("integrations.syncResultRange", {
-              name: provider.name,
-              days: window.days,
-              imported: result.imported,
-              updated: result.updated,
-              skipped: result.skipped,
-            })
-          : t("integrations.syncResult", {
-              name: provider.name,
-              imported: result.imported,
-              updated: result.updated,
-              skipped: result.skipped,
-            })
+        formatSyncOutcome(
+          t,
+          provider.name,
+          result,
+          isRange && window ? window.days : null,
+        ),
       );
       track(ANALYTICS_EVENTS.integrationOauthSync, {
         provider: provider.id,

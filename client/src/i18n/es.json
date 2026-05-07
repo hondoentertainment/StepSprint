@@ -125,6 +125,9 @@
     "backToSubmit": "Volver a registrar pasos",
     "oauthError": "Error de OAuth: {{error}}",
     "syncResult": "{{name}}: {{imported}} nuevos, {{updated}} actualizados, {{skipped}} omitidos.",
+    "syncResultNoData": "{{name}} no devolvió pasos para este rango — comprueba que tu reloj se haya sincronizado con el proveedor para esos días e inténtalo de nuevo.",
+    "syncResultOutOfWindow": "{{name}} devolvió {{skipped}} día(s), pero todos quedaron fuera del periodo de este reto — elige una fecha dentro del reto o espera a que esos días entren en el periodo.",
+    "syncResultUpToDate": "{{name}}: ya estaba al día — se actualizaron {{updated}} día(s) con los totales más recientes.",
     "notEnrolledInChallenge": "Aún no estás inscrito en este reto; la importación CSV en bloque está desactivada. Pide una invitación a un administrador o configura el token de Apple si solo preparas un Atajo.",
     "csv": {
       "sectionTitle": "Pegado masivo (JSON)",
