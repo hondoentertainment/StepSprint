@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { Router, type Request, type Response } from "express";
 import { config } from "../config";
 import { logger } from "../logger";
+import { Sentry, flushSentry } from "../sentry";
 import { hourlyReminderSweep } from "../services/scheduler";
 
 const router = Router();
@@ -47,7 +48,16 @@ async function runReminderSweep(req: Request, res: Response): Promise<void> {
     res.json({ ok: true });
   } catch (err: unknown) {
     logger.error({ err }, "Cron reminder sweep failed");
+    // Capture explicitly because Vercel may freeze the function before
+    // Sentry.setupExpressErrorHandler's auto-capture can flush.
+    Sentry.captureException(err, { tags: { route: "cron.reminder-sweep" } });
     res.status(500).json({ error: "Sweep failed" });
+  } finally {
+    // On Vercel, calling flush before the handler returns guarantees the
+    // captured event is delivered before the lambda is frozen.
+    if (process.env.VERCEL) {
+      await flushSentry();
+    }
   }
 }
 

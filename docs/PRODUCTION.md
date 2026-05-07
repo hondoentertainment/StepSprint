@@ -25,12 +25,19 @@ Companion to [DEPLOYMENT.md](DEPLOYMENT.md). Use this as an internal checklist b
 
 ## 4. Observability
 
-- **Server Sentry**: `SENTRY_DSN` + optional `SENTRY_RELEASE` / auto SHA (see above).
+- **Server Sentry**: `SENTRY_DSN` + optional `SENTRY_RELEASE` / auto SHA (see above). On Vercel, `api/index.js` calls `initSentry()` **before** loading the Express app so `@sentry/node` v8+ auto-instrumentation can attach to Express. The `/api/cron/reminder-sweep` handler additionally calls `Sentry.flush()` before returning so events captured inside the lambda are delivered before the function is frozen.
 - **Request IDs**: The API sets `x-request-id` on responses. The SPA records the last id from API responses and attaches it to Sentry events as `lastRequestId` when reporting errors (`client/src/api.ts`, `client/src/requestContext.ts`).
+- **Header redaction**: Sentry breadcrumbs filter `Authorization`, `Cookie`, `Set-Cookie`, and `x-csrf-token` (`server/src/sentry.ts`) on top of the existing pino-http redactions.
 
 ## 5. Email
 
-- **Transactional mail**: Set `RESEND_API_KEY` or `SMTP_*` plus **`SMTP_FROM`** (required in production whenever those transports are set — no implicit default). In **`NODE_ENV=production`**, the API **refuses to start** without an email transport unless **`ALLOW_PRODUCTION_WITHOUT_EMAIL=true`** (use only for non-public or emergency bring-up; verification and password reset will not send mail). Run registration + forgot-password smoke tests after deploy.
+- **Transactional mail**: Set `RESEND_API_KEY` or `SMTP_*` plus **`SMTP_FROM`** (required in production whenever those transports are set — no implicit default). In **`NODE_ENV=production`**, the API **refuses to start** without an email transport unless **`ALLOW_PRODUCTION_WITHOUT_EMAIL=true`** (use only for non-public or emergency bring-up; verification and password reset will not send mail).
+- **Resend uses the HTTP API** (`POST https://api.resend.com/emails`), not the SMTP bridge. This avoids Vercel's outbound-SMTP throttling and surfaces structured error codes (e.g. `validation_error: From is not verified`) in the server log when sending fails.
+- **Setup checklist**:
+  1. Create an API key at <https://resend.com/api-keys> with **Sending access** to the relevant domain.
+  2. Verify your sending domain at <https://resend.com/domains> and add the SPF + DKIM TXT records in your DNS host. DMARC is recommended but not required.
+  3. Set `RESEND_API_KEY` and `SMTP_FROM` in Vercel → Settings → Environment Variables. `SMTP_FROM` must match the verified domain.
+  4. Run registration + forgot-password smoke tests after deploy.
 
 ## 6. Legal and product
 

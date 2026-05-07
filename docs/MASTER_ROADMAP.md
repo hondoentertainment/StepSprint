@@ -30,7 +30,7 @@ The PRD **core product** is implemented: auth, challenges, teams, submissions, l
 | Reminder cron contract | `GET/POST /api/cron/reminder-sweep`, Vercel Cron entry in `vercel.json`; in-process scheduler auto-disabled when `VERCEL=1`; legacy `scripts/curl-reminder-sweep.sh` kept for non-Vercel hosts |
 | Local Postgres DX | `docker-compose.yml`, `npm run postgres:parity` |
 | Backup drill doc | [BACKUP_DRILL.md](BACKUP_DRILL.md) |
-| CI gates | server-test (SQLite), server-test-postgres, client lint/test/build, smoke health, Playwright E2E (desktop Chrome) |
+| CI gates | server-test (SQLite), server-test-postgres, client lint/test/build, smoke (server + **`node scripts/check-api-health.mjs`**), Playwright E2E (desktop Chrome) |
 | Prod env validation | Strict startup (Postgres, origins, JWT length, email + `SMTP_FROM`); `/api/health` exposes `transactionalEmail` in production |
 
 ### Operator actions (hosting / secrets / legal)

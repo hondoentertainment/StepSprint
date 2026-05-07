@@ -18,6 +18,14 @@
 // into server/node_modules so Express, Prisma client, Sentry, etc. are
 // bundled with the function.
 
+// CRITICAL: Sentry.init() must run BEFORE any module that imports Express
+// (per @sentry/node v8+ auto-instrumentation requirements). When this entry
+// loaded the compiled app first, Sentry.setupExpressErrorHandler attached to
+// an uninitialized client and silently swallowed every error. Initialise
+// Sentry first, then load the app.
+const { initSentry } = require("../server/dist/sentry");
+initSentry();
+
 const mod = require("../server/dist/app");
 const app = mod && mod.default ? mod.default : mod;
 

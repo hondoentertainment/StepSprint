@@ -108,7 +108,7 @@ async function main() {
   if (strict) {
     if (!release) {
       fail(
-        "release missing. Set SENTRY_RELEASE on the API (or rely on RENDER_GIT_COMMIT/GITHUB_SHA being injected) so Sentry events can be grouped by build."
+        "release missing. Set SENTRY_RELEASE on Vercel, or rely on VERCEL_GIT_COMMIT_SHA / GITHUB_SHA so /api/health exposes release and Sentry can group builds."
       );
     }
     if (transactionalEmail === null) {

@@ -38,7 +38,7 @@ npm run test:coverage   # both with coverage
 npm run test:e2e        # Playwright (desktop + Pixel 5 + iPhone 13)
 npm run lint            # client eslint
 npm run build           # client + server build
-npm run check:api       # GET /api/health (uses VITE_API_URL or URL arg; see scripts/check-api-health.mjs)
+npm run check:api       # npm run check:api -- https://your-host [ --strict ]; launch gate validates release + transactionalEmail + CORS when --strict
 npm run postgres:parity # swap Prisma to Postgres files for local parity (see docs/DEPLOYMENT.md)
 ```
 

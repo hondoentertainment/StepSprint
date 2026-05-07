@@ -209,21 +209,29 @@ jobs:
           npm run build
 
       - name: Start server and verify health
-        working-directory: server
+        shell: bash
         run: |
+          set -euo pipefail
+          cd server
           node dist/index.js &
           SERVER_PID=$!
-          for i in $(seq 1 30); do
-            if curl -fsS http://localhost:3001/api/health > /dev/null 2>&1; then
-              echo "Health check passed"
-              kill $SERVER_PID
-              exit 0
+          cd "${GITHUB_WORKSPACE}"
+          ready=0
+          for _ in $(seq 1 30); do
+            if curl -fsS "http://127.0.0.1:3001/api/health" >/dev/null 2>&1; then
+              ready=1
+              break
             fi
             sleep 1
           done
-          kill $SERVER_PID
-          echo "Server failed to become healthy within 30 seconds"
-          exit 1
+          if [[ "$ready" -ne 1 ]]; then
+            kill "$SERVER_PID" 2>/dev/null || true
+            echo "Server failed to become healthy within 30 seconds"
+            exit 1
+          fi
+          node scripts/check-api-health.mjs "http://127.0.0.1:3001"
+          kill "$SERVER_PID"
+          wait "$SERVER_PID" 2>/dev/null || true
       - name: Verify Vercel output path
         run: |
           test -f client/dist/index.html
