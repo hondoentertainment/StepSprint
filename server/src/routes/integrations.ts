@@ -84,25 +84,45 @@ router.get("/fitness", authRequired, async (req: AuthenticatedRequest, res) => {
   ]);
 
   let lastAppleHealthSync: Date | null = null;
+  const lastSyncByProvider = new Map<string, Date>();
   if (challengeIdParam) {
     const enrolled = await prisma.teamMember.findUnique({
       where: { userId_challengeId: { userId: req.user.id, challengeId: challengeIdParam } },
     });
     if (enrolled) {
-      const row = await prisma.auditLog.findFirst({
+      const trackedActions = [
+        "apple_health_sync",
+        "fitbit_sync",
+        "google_fit_sync",
+        "garmin_sync",
+      ];
+      // Pull latest sync row per action in a single query, then fold into the
+      // provider map. Faster than four separate findFirst calls.
+      const rows = await prisma.auditLog.findMany({
         where: {
-          action: "apple_health_sync",
           actorId: req.user.id,
           challengeId: challengeIdParam,
+          action: { in: trackedActions },
         },
         orderBy: { createdAt: "desc" },
-        select: { createdAt: true },
+        select: { action: true, createdAt: true },
       });
-      lastAppleHealthSync = row?.createdAt ?? null;
+      for (const row of rows) {
+        if (row.action === "apple_health_sync") {
+          if (!lastAppleHealthSync) lastAppleHealthSync = row.createdAt;
+          continue;
+        }
+        const providerId = row.action.replace(/_sync$/u, "");
+        if (!lastSyncByProvider.has(providerId)) {
+          lastSyncByProvider.set(providerId, row.createdAt);
+        }
+      }
     }
   }
 
   const oauthByProvider = new Map(oauthConnections.map((c) => [c.provider, c.updatedAt]));
+  const lastSyncIso = (id: string): string | null =>
+    lastSyncByProvider.get(id)?.toISOString() ?? null;
 
   res.json({
     connected: tokenCount > 0 || oauthConnections.length > 0,
@@ -114,6 +134,7 @@ router.get("/fitness", authRequired, async (req: AuthenticatedRequest, res) => {
         available: true,
         connected: tokenCount > 0,
         connectedAt: latestToken?.createdAt?.toISOString() ?? null,
+        lastSyncedAt: lastAppleHealthSync?.toISOString() ?? null,
       },
       {
         id: "google_fit",
@@ -121,6 +142,7 @@ router.get("/fitness", authRequired, async (req: AuthenticatedRequest, res) => {
         available: googleAvail,
         connected: oauthByProvider.has("google_fit"),
         connectedAt: oauthByProvider.get("google_fit")?.toISOString() ?? null,
+        lastSyncedAt: lastSyncIso("google_fit"),
       },
       {
         id: "fitbit",
@@ -128,6 +150,7 @@ router.get("/fitness", authRequired, async (req: AuthenticatedRequest, res) => {
         available: fitbitAvail,
         connected: oauthByProvider.has("fitbit"),
         connectedAt: oauthByProvider.get("fitbit")?.toISOString() ?? null,
+        lastSyncedAt: lastSyncIso("fitbit"),
       },
       {
         id: "garmin",
@@ -135,6 +158,7 @@ router.get("/fitness", authRequired, async (req: AuthenticatedRequest, res) => {
         available: garminAvail,
         connected: oauthByProvider.has("garmin"),
         connectedAt: oauthByProvider.get("garmin")?.toISOString() ?? null,
+        lastSyncedAt: lastSyncIso("garmin"),
       },
     ],
     message:

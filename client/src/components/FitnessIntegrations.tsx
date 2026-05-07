@@ -40,18 +40,50 @@ type FitnessProviderRow = {
   available: boolean;
   connected: boolean;
   connectedAt: string | null;
+  lastSyncedAt: string | null;
 };
 
 type Props = {
   challengeId: string;
   challengeTimezone?: string;
+  challengeStart?: string;
+  challengeEnd?: string;
 };
 
 function providerUrlSlug(id: string): string {
   return id.replace(/_/g, "-");
 }
 
-export function FitnessIntegrations({ challengeId, challengeTimezone }: Props) {
+/** Coerce ISO date or datetime to a YYYY-MM-DD string for `<input type="date" />`. */
+function toDateInputValue(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  return value.length >= 10 ? value.slice(0, 10) : value;
+}
+
+/** Whole calendar days between two YYYY-MM-DD strings (UTC). Negative if a > b. */
+function daysBetween(aISO: string, bISO: string): number {
+  const a = Date.UTC(
+    Number(aISO.slice(0, 4)),
+    Number(aISO.slice(5, 7)) - 1,
+    Number(aISO.slice(8, 10))
+  );
+  const b = Date.UTC(
+    Number(bISO.slice(0, 4)),
+    Number(bISO.slice(5, 7)) - 1,
+    Number(bISO.slice(8, 10))
+  );
+  return Math.round((b - a) / 86_400_000);
+}
+
+/** Mirrors MAX_SYNC_RANGE_DAYS on the server. */
+const MAX_BACKFILL_DAYS = 31;
+
+export function FitnessIntegrations({
+  challengeId,
+  challengeTimezone,
+  challengeStart,
+  challengeEnd,
+}: Props) {
   const { t } = useTranslation();
   const [tokens, setTokens] = useState<IntegrationToken[]>([]);
   const [providers, setProviders] = useState<FitnessProviderRow[]>([]);
@@ -72,6 +104,90 @@ export function FitnessIntegrations({ challengeId, challengeTimezone }: Props) {
   const [curlCopied, setCurlCopied] = useState(false);
 
   const syncUrl = getApiUrl("/api/integrations/apple-health");
+
+  const todayISO = useMemo(() => todayInTimezone(challengeTimezone), [challengeTimezone]);
+  const challengeMinISO = useMemo(() => toDateInputValue(challengeStart), [challengeStart]);
+  const challengeEndISO = useMemo(() => toDateInputValue(challengeEnd), [challengeEnd]);
+  const maxSyncDateISO = useMemo(() => {
+    if (challengeEndISO && challengeEndISO < todayISO) return challengeEndISO;
+    return todayISO;
+  }, [challengeEndISO, todayISO]);
+
+  const [syncDate, setSyncDate] = useState<string>(todayISO);
+  type SyncMode = "single" | "last7" | "last30";
+  const [syncMode, setSyncMode] = useState<SyncMode>("single");
+
+  useEffect(() => {
+    setSyncDate((current) => {
+      if (current && challengeMinISO && current < challengeMinISO) return challengeMinISO;
+      if (current && current > maxSyncDateISO) return maxSyncDateISO;
+      if (!current) return todayISO;
+      return current;
+    });
+  }, [challengeId, challengeMinISO, maxSyncDateISO, todayISO]);
+
+  const isSyncDateValid =
+    !!syncDate &&
+    syncDate <= maxSyncDateISO &&
+    (!challengeMinISO || syncDate >= challengeMinISO);
+
+  const isToday = syncDate === todayISO;
+  const formattedSyncDate = useMemo(() => {
+    if (!syncDate) return "";
+    const parts = syncDate.split("-");
+    if (parts.length !== 3) return syncDate;
+    const [y, m, d] = parts;
+    const dt = new Date(Number(y), Number(m) - 1, Number(d));
+    return dt.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  }, [syncDate]);
+
+  /** Drop N days from a YYYY-MM-DD string. */
+  function shiftDays(iso: string, deltaDays: number): string {
+    const parts = iso.split("-");
+    if (parts.length !== 3) return iso;
+    const [y, m, d] = parts;
+    const dt = new Date(Date.UTC(Number(y), Number(m) - 1, Number(d)));
+    dt.setUTCDate(dt.getUTCDate() + deltaDays);
+    const yyyy = dt.getUTCFullYear();
+    const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
+    const dd = String(dt.getUTCDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  /**
+   * Compute the inclusive [start, end] window for the current mode,
+   * clamped to the challenge bounds. Returns null when no valid window.
+   */
+  const syncWindow = useMemo<{ startDate: string; endDate: string; days: number } | null>(() => {
+    let endISO: string;
+    let startISO: string;
+    if (syncMode === "single") {
+      if (!isSyncDateValid) return null;
+      endISO = syncDate;
+      startISO = syncDate;
+    } else {
+      const span = syncMode === "last7" ? 7 : 30;
+      endISO = maxSyncDateISO;
+      startISO = shiftDays(endISO, -(span - 1));
+      if (challengeMinISO && startISO < challengeMinISO) startISO = challengeMinISO;
+    }
+    if (startISO > endISO) return null;
+    const days =
+      Math.round(
+        (Date.UTC(
+          Number(endISO.slice(0, 4)),
+          Number(endISO.slice(5, 7)) - 1,
+          Number(endISO.slice(8, 10))
+        ) -
+          Date.UTC(
+            Number(startISO.slice(0, 4)),
+            Number(startISO.slice(5, 7)) - 1,
+            Number(startISO.slice(8, 10))
+          )) /
+          86_400_000
+      ) + 1;
+    return { startDate: startISO, endDate: endISO, days };
+  }, [syncMode, syncDate, isSyncDateValid, maxSyncDateISO, challengeMinISO]);
 
   const appleProvider = useMemo(
     () => providers.find((p) => p.id === "apple_health"),
@@ -97,9 +213,9 @@ export function FitnessIntegrations({ challengeId, challengeTimezone }: Props) {
 
   const appleHealthCurlCommand = useMemo(() => {
     const token = newToken ?? t("integrations.appleHealth.curlPlaceholderToken");
-    const dateISO = todayInTimezone(challengeTimezone);
+    const dateISO = syncDate || todayISO;
     return buildAppleHealthCurlCommand(syncUrl, token, challengeId, dateISO, 1000);
-  }, [newToken, syncUrl, challengeId, challengeTimezone, t]);
+  }, [newToken, syncUrl, challengeId, syncDate, todayISO, t]);
 
   useEffect(() => {
     setCsvDraft(csvPlaceholder);
@@ -119,6 +235,7 @@ export function FitnessIntegrations({ challengeId, challengeTimezone }: Props) {
       const rows = fitnessData.providers.map((p) => ({
         ...p,
         connectedAt: p.connectedAt ?? null,
+        lastSyncedAt: p.lastSyncedAt ?? null,
       }));
       setProviders(rows);
       setOverallLinked(Boolean(fitnessData.connected));
@@ -232,21 +349,59 @@ export function FitnessIntegrations({ challengeId, challengeTimezone }: Props) {
     }
   }
 
-  async function syncProvider(provider: FitnessProviderRow) {
+  /**
+   * Backfill from the day after the provider's last successful sync up to
+   * today, capped at MAX_BACKFILL_DAYS. Bypasses the mode pills so it works
+   * regardless of what the user currently has selected.
+   */
+  async function backfillSince(provider: FitnessProviderRow, lastIso: string) {
     try {
       setSyncing(provider.id);
       setError("");
       setSyncResult(null);
-      const result = await api<{ imported: number; updated: number; skipped: number }>(
-        `/api/integrations/${providerUrlSlug(provider.id)}/sync`,
-        {
-          method: "POST",
-          body: JSON.stringify({ challengeId }),
-        }
-      );
+
+      const dayAfterLast = (() => {
+        const next = daysBetween("1970-01-01", lastIso) + 1;
+        const ms = next * 86_400_000;
+        const d = new Date(ms);
+        const yyyy = d.getUTCFullYear();
+        const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+        const dd = String(d.getUTCDate()).padStart(2, "0");
+        return `${yyyy}-${mm}-${dd}`;
+      })();
+
+      let startDate = dayAfterLast;
+      if (challengeMinISO && startDate < challengeMinISO) startDate = challengeMinISO;
+      const endDate = maxSyncDateISO;
+      if (startDate > endDate) {
+        setSyncResult(t("integrations.oauth.backfillNothingToDo", { name: provider.name }));
+        return;
+      }
+      // Cap the window so we never exceed the server-side limit.
+      const cappedStart = (() => {
+        const span = daysBetween(startDate, endDate) + 1;
+        if (span <= MAX_BACKFILL_DAYS) return startDate;
+        return shiftDays(endDate, -(MAX_BACKFILL_DAYS - 1));
+      })();
+
+      const result = await api<{
+        imported: number;
+        updated: number;
+        skipped: number;
+      }>(`/api/integrations/${providerUrlSlug(provider.id)}/sync`, {
+        method: "POST",
+        body: JSON.stringify({
+          challengeId,
+          startDate: cappedStart,
+          endDate,
+        }),
+      });
+
+      const days = daysBetween(cappedStart, endDate) + 1;
       setSyncResult(
-        t("integrations.syncResult", {
+        t("integrations.syncResultRange", {
           name: provider.name,
+          days,
           imported: result.imported,
           updated: result.updated,
           skipped: result.skipped,
@@ -255,10 +410,74 @@ export function FitnessIntegrations({ challengeId, challengeTimezone }: Props) {
       track(ANALYTICS_EVENTS.integrationOauthSync, {
         provider: provider.id,
         challengeId,
+        mode: "backfillSinceLast",
+        startDate: cappedStart,
+        endDate,
+        days,
+        backfill: true,
         imported: result.imported,
         updated: result.updated,
         skipped: result.skipped,
       });
+      await loadData();
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setSyncing(null);
+    }
+  }
+
+  async function syncProvider(provider: FitnessProviderRow) {
+    try {
+      setSyncing(provider.id);
+      setError("");
+      setSyncResult(null);
+      const window = syncWindow;
+      const isRange = syncMode !== "single";
+      const body: Record<string, unknown> = { challengeId };
+      if (isRange && window) {
+        body.startDate = window.startDate;
+        body.endDate = window.endDate;
+      } else {
+        body.date = isSyncDateValid ? syncDate : todayISO;
+      }
+      const result = await api<{
+        imported: number;
+        updated: number;
+        skipped: number;
+      }>(`/api/integrations/${providerUrlSlug(provider.id)}/sync`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+      setSyncResult(
+        isRange && window
+          ? t("integrations.syncResultRange", {
+              name: provider.name,
+              days: window.days,
+              imported: result.imported,
+              updated: result.updated,
+              skipped: result.skipped,
+            })
+          : t("integrations.syncResult", {
+              name: provider.name,
+              imported: result.imported,
+              updated: result.updated,
+              skipped: result.skipped,
+            })
+      );
+      track(ANALYTICS_EVENTS.integrationOauthSync, {
+        provider: provider.id,
+        challengeId,
+        mode: syncMode,
+        ...(isRange && window
+          ? { startDate: window.startDate, endDate: window.endDate, days: window.days }
+          : { date: body.date }),
+        backfill: isRange || body.date !== todayISO,
+        imported: result.imported,
+        updated: result.updated,
+        skipped: result.skipped,
+      });
+      await loadData();
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -553,6 +772,86 @@ export function FitnessIntegrations({ challengeId, challengeTimezone }: Props) {
         <h3 id="integrations-trackers-heading">{t("integrations.trackersSectionTitle")}</h3>
         <p className="hint">{t("integrations.trackersSectionHint")}</p>
 
+        <div className="integration-sync-date">
+          <span className="integration-sync-date__label" id="integration-sync-mode-label">
+            {t("integrations.syncDate.modeLabel")}
+          </span>
+          <div
+            className="integration-sync-date__pills"
+            role="radiogroup"
+            aria-labelledby="integration-sync-mode-label"
+          >
+            <button
+              type="button"
+              role="radio"
+              aria-checked={syncMode === "single"}
+              className={`integration-sync-pill${syncMode === "single" ? " integration-sync-pill--active" : ""}`}
+              onClick={() => setSyncMode("single")}
+            >
+              {t("integrations.syncDate.modeSingle")}
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={syncMode === "last7"}
+              className={`integration-sync-pill${syncMode === "last7" ? " integration-sync-pill--active" : ""}`}
+              onClick={() => setSyncMode("last7")}
+            >
+              {t("integrations.syncDate.modeLast7")}
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={syncMode === "last30"}
+              className={`integration-sync-pill${syncMode === "last30" ? " integration-sync-pill--active" : ""}`}
+              onClick={() => setSyncMode("last30")}
+            >
+              {t("integrations.syncDate.modeLast30")}
+            </button>
+          </div>
+
+          {syncMode === "single" ? (
+            <>
+              <label htmlFor="integration-sync-date-input" className="integration-sync-date__label">
+                {t("integrations.syncDate.label")}
+              </label>
+              <div className="integration-sync-date__controls">
+                <input
+                  id="integration-sync-date-input"
+                  type="date"
+                  value={syncDate}
+                  min={challengeMinISO}
+                  max={maxSyncDateISO}
+                  onChange={(e) => setSyncDate(e.target.value)}
+                  aria-describedby="integration-sync-date-hint"
+                />
+                {!isToday && (
+                  <button
+                    type="button"
+                    className="link-button"
+                    onClick={() => setSyncDate(todayISO)}
+                  >
+                    {t("integrations.syncDate.resetToToday")}
+                  </button>
+                )}
+              </div>
+              <p className="hint" id="integration-sync-date-hint">
+                {t("integrations.syncDate.hint")}
+              </p>
+            </>
+          ) : (
+            <p className="hint" id="integration-sync-date-hint">
+              {syncWindow
+                ? t("integrations.syncDate.rangeHint", {
+                    start: syncWindow.startDate,
+                    end: syncWindow.endDate,
+                    days: syncWindow.days,
+                  })
+                : t("integrations.syncDate.rangeHintEmpty")}
+            </p>
+          )}
+        </div>
+
         <ul className="integration-trackers__grid">
           {oauthProviders.map((p) => (
             <li key={p.id}>
@@ -581,6 +880,33 @@ export function FitnessIntegrations({ challengeId, challengeTimezone }: Props) {
                   </p>
                 )}
 
+                {p.connected && p.lastSyncedAt && (() => {
+                  const lastIso = (p.lastSyncedAt as string).slice(0, 10);
+                  const gap = daysBetween(lastIso, todayISO);
+                  return (
+                    <p className="hint integration-card__meta">
+                      {t("integrations.oauth.lastSyncedOn", {
+                        date: new Date(p.lastSyncedAt as string).toLocaleDateString(),
+                      })}
+                      {gap >= 1 && (
+                        <>
+                          {" \u00b7 "}
+                          <button
+                            type="button"
+                            className="link-button"
+                            onClick={() => void backfillSince(p, lastIso)}
+                            disabled={syncing === p.id}
+                          >
+                            {t("integrations.oauth.backfillSinceLast", {
+                              days: Math.min(gap, MAX_BACKFILL_DAYS),
+                            })}
+                          </button>
+                        </>
+                      )}
+                    </p>
+                  );
+                })()}
+
                 <div className="integration-card__actions">
                   {!p.available ? (
                     <p className="hint integration-card__admin-hint">{t("integrations.oauthAdminHint")}</p>
@@ -590,9 +916,25 @@ export function FitnessIntegrations({ challengeId, challengeTimezone }: Props) {
                         type="button"
                         className="secondary"
                         onClick={() => void syncProvider(p)}
-                        disabled={syncing === p.id}
+                        disabled={
+                          syncing === p.id ||
+                          (syncMode === "single" && !isSyncDateValid) ||
+                          (syncMode !== "single" && !syncWindow)
+                        }
                       >
-                        {syncing === p.id ? t("integrations.oauth.syncing") : t("integrations.oauth.syncToday")}
+                        {syncing === p.id
+                          ? t("integrations.oauth.syncing")
+                          : syncMode === "last7"
+                            ? t("integrations.oauth.syncLastDays", {
+                                days: syncWindow?.days ?? 7,
+                              })
+                            : syncMode === "last30"
+                              ? t("integrations.oauth.syncLastDays", {
+                                  days: syncWindow?.days ?? 30,
+                                })
+                              : isToday
+                                ? t("integrations.oauth.syncToday")
+                                : t("integrations.oauth.syncDateButton", { date: formattedSyncDate })}
                       </button>
                       <button
                         type="button"

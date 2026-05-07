@@ -24,6 +24,62 @@ import { logger } from "../logger";
 
 const router = Router();
 
+/** Hard cap so a single sync click can't fetch arbitrary historical data. */
+const MAX_SYNC_RANGE_DAYS = 31;
+
+const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/u;
+
+/**
+ * Shared sync request body. Accepts either a single `date` (back-compat) OR
+ * an inclusive `startDate` + `endDate` window. Mixing is rejected.
+ */
+const syncRequestSchema = z
+  .object({
+    challengeId: z.string().min(1),
+    date: z.string().regex(ISO_DATE_REGEX, "date must be YYYY-MM-DD").optional(),
+    startDate: z.string().regex(ISO_DATE_REGEX, "startDate must be YYYY-MM-DD").optional(),
+    endDate: z.string().regex(ISO_DATE_REGEX, "endDate must be YYYY-MM-DD").optional(),
+  })
+  .refine((d) => !(d.date && (d.startDate || d.endDate)), {
+    message: "Provide either date OR (startDate, endDate), not both",
+  })
+  .refine((d) => Boolean(d.startDate) === Boolean(d.endDate), {
+    message: "startDate and endDate must be supplied together",
+  })
+  .refine((d) => !d.startDate || !d.endDate || d.startDate <= d.endDate, {
+    message: "startDate must be on or before endDate",
+  });
+
+type SyncRequestInput = z.infer<typeof syncRequestSchema>;
+
+/** Inclusive day count between two ISO dates. */
+function dayRangeCount(startISO: string, endISO: string): number {
+  const s = DateTime.fromISO(startISO);
+  const e = DateTime.fromISO(endISO);
+  if (!s.isValid || !e.isValid) return 0;
+  return Math.max(1, Math.floor(e.diff(s, "days").days) + 1);
+}
+
+/**
+ * Convert a sync request into a concrete `[startISO, endISO]` window in the
+ * challenge timezone. Returns `null` when the requested range exceeds
+ * `MAX_SYNC_RANGE_DAYS`. Defaults to "today" in the challenge timezone when
+ * neither `date` nor a range is supplied.
+ */
+function resolveSyncRange(
+  input: Pick<SyncRequestInput, "date" | "startDate" | "endDate">,
+  tz: string
+): { startISO: string; endISO: string } | null {
+  if (input.startDate && input.endDate) {
+    const days = dayRangeCount(input.startDate, input.endDate);
+    if (days > MAX_SYNC_RANGE_DAYS) return null;
+    return { startISO: input.startDate, endISO: input.endDate };
+  }
+  const single =
+    input.date ?? DateTime.now().setZone(tz).toISODate() ?? "";
+  return { startISO: single, endISO: single };
+}
+
 // ---------------------------------------------------------------------------
 // Provider definitions
 // ---------------------------------------------------------------------------
@@ -236,6 +292,36 @@ async function fetchGarminSteps(accessToken: string, dateISO: string, tz: string
   return sameDay.length > 0 ? sameDay : out;
 }
 
+/** Garmin's wellness API recommends ≤ 24h windows per call, so we loop day-by-day. */
+async function fetchGarminStepsRange(
+  accessToken: string,
+  startISO: string,
+  endISO: string,
+  tz: string
+): Promise<DaySteps[]> {
+  const start = DateTime.fromISO(startISO, { zone: tz });
+  const end = DateTime.fromISO(endISO, { zone: tz });
+  if (!start.isValid || !end.isValid || end < start) return [];
+
+  const out: DaySteps[] = [];
+  const seen = new Set<string>();
+  for (let cursor = start; cursor <= end; cursor = cursor.plus({ days: 1 })) {
+    const dayISO = cursor.toISODate();
+    if (!dayISO) continue;
+    try {
+      const rows = await fetchGarminSteps(accessToken, dayISO, tz);
+      for (const r of rows) {
+        if (seen.has(r.date)) continue;
+        seen.add(r.date);
+        out.push(r);
+      }
+    } catch (err) {
+      logger.warn({ err, dayISO }, "Garmin range fetch: day failed, continuing");
+    }
+  }
+  return out;
+}
+
 function callbackUrl(provider: ProviderConfig): string {
   return `${config.apiPublicOrigin}/api/integrations/${provider.id.replace("_", "-")}/callback`;
 }
@@ -356,8 +442,13 @@ async function ensureFreshToken(
 // Step-fetch helpers (provider-specific)
 // ---------------------------------------------------------------------------
 
-async function fetchFitbitSteps(accessToken: string, dateISO: string): Promise<DaySteps[]> {
-  const url = `https://api.fitbit.com/1/user/-/activities/steps/date/${dateISO}/1d.json`;
+/** Fitbit supports YYYY-MM-DD/YYYY-MM-DD range requests (max ~31 days per call). */
+async function fetchFitbitStepsRange(
+  accessToken: string,
+  startISO: string,
+  endISO: string
+): Promise<DaySteps[]> {
+  const url = `https://api.fitbit.com/1/user/-/activities/steps/date/${startISO}/${endISO}.json`;
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
@@ -371,9 +462,15 @@ async function fetchFitbitSteps(accessToken: string, dateISO: string): Promise<D
   }));
 }
 
-async function fetchGoogleFitSteps(accessToken: string, dateISO: string): Promise<DaySteps[]> {
-  const startMs = DateTime.fromISO(dateISO).startOf("day").toMillis();
-  const endMs = DateTime.fromISO(dateISO).endOf("day").toMillis();
+/** Google Fit aggregate emits one daily bucket per day in the requested window. */
+async function fetchGoogleFitStepsRange(
+  accessToken: string,
+  startISO: string,
+  endISO: string,
+  tz: string
+): Promise<DaySteps[]> {
+  const startMs = DateTime.fromISO(startISO, { zone: tz }).startOf("day").toMillis();
+  const endMs = DateTime.fromISO(endISO, { zone: tz }).endOf("day").toMillis();
 
   const res = await fetch("https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate", {
     method: "POST",
@@ -399,11 +496,13 @@ async function fetchGoogleFitSteps(accessToken: string, dateISO: string): Promis
       0
     ) ?? 0;
     return {
-      date: DateTime.fromMillis(Number(bucket.startTimeMillis)).toISODate() ?? dateISO,
+      date:
+        DateTime.fromMillis(Number(bucket.startTimeMillis), { zone: tz }).toISODate() ?? startISO,
       steps,
     };
   });
 }
+
 
 // ---------------------------------------------------------------------------
 // Shared connect / callback / sync builder
@@ -508,10 +607,7 @@ function mountProviderRoutes(provider: ProviderConfig) {
   });
 
   /** POST /api/integrations/{provider}/sync — fetch steps and upsert */
-  const syncBodySchema = z.object({
-    challengeId: z.string().min(1),
-    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u, "date must be YYYY-MM-DD").optional(),
-  });
+  const syncBodySchema = syncRequestSchema;
 
   router.post(`${base}/sync`, authRequired, integrationSyncLimiter, async (req: AuthenticatedRequest, res) => {
     if (!isAvailable(provider)) {
@@ -525,7 +621,7 @@ function mountProviderRoutes(provider: ProviderConfig) {
 
     const parsed = syncBodySchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: "Invalid request body" });
+      res.status(400).json({ error: "Invalid request body", details: parsed.error.flatten() });
       return;
     }
 
@@ -560,7 +656,13 @@ function mountProviderRoutes(provider: ProviderConfig) {
     }
 
     const tz = challenge.timezone;
-    const dateISO = parsed.data.date ?? DateTime.now().setZone(tz).toISODate() ?? "";
+    const range = resolveSyncRange(parsed.data, tz);
+    if (!range) {
+      res.status(400).json({ error: `Range exceeds the ${MAX_SYNC_RANGE_DAYS}-day limit.` });
+      return;
+    }
+    const { startISO, endISO } = range;
+
     let accessToken: string;
     try {
       accessToken = await ensureFreshToken(connection, provider);
@@ -572,9 +674,9 @@ function mountProviderRoutes(provider: ProviderConfig) {
     let dayRows: DaySteps[];
     try {
       if (provider.id === "fitbit") {
-        dayRows = await fetchFitbitSteps(accessToken, dateISO);
+        dayRows = await fetchFitbitStepsRange(accessToken, startISO, endISO);
       } else {
-        dayRows = await fetchGoogleFitSteps(accessToken, dateISO);
+        dayRows = await fetchGoogleFitStepsRange(accessToken, startISO, endISO, tz);
       }
     } catch (err) {
       logger.warn({ err, provider: provider.id }, "Step fetch failed");
@@ -638,11 +740,18 @@ function mountProviderRoutes(provider: ProviderConfig) {
         action: `${provider.id}_sync`,
         actorId: req.user!.id,
         challengeId,
-        metadata: { imported, updated, skipped },
+        metadata: {
+          imported,
+          updated,
+          skipped,
+          startDate: startISO,
+          endDate: endISO,
+          rangeDays: dayRangeCount(startISO, endISO),
+        },
       },
     });
 
-    res.json({ imported, updated, skipped });
+    res.json({ imported, updated, skipped, startDate: startISO, endDate: endISO });
   });
 
   /** DELETE /api/integrations/{provider}/disconnect — revoke the OAuth connection */
@@ -805,10 +914,7 @@ function mountGarminRoutes(): void {
     }
   });
 
-  const garminSyncBodySchema = z.object({
-    challengeId: z.string().min(1),
-    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u).optional(),
-  });
+  const garminSyncBodySchema = syncRequestSchema;
 
   router.post(`${base}/sync`, authRequired, integrationSyncLimiter, async (req: AuthenticatedRequest, res) => {
     if (!isGarminAvailable()) {
@@ -825,7 +931,7 @@ function mountGarminRoutes(): void {
 
     const parsed = garminSyncBodySchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: "Invalid request body" });
+      res.status(400).json({ error: "Invalid request body", details: parsed.error.flatten() });
       return;
     }
 
@@ -860,8 +966,12 @@ function mountGarminRoutes(): void {
     }
 
     const tz = challenge.timezone;
-    const dateISO =
-      parsed.data.date ?? DateTime.now().setZone(tz).toISODate() ?? "";
+    const range = resolveSyncRange(parsed.data, tz);
+    if (!range) {
+      res.status(400).json({ error: `Range exceeds the ${MAX_SYNC_RANGE_DAYS}-day limit.` });
+      return;
+    }
+    const { startISO, endISO } = range;
 
     let accessToken: string;
     try {
@@ -873,7 +983,7 @@ function mountGarminRoutes(): void {
 
     let dayRows: DaySteps[];
     try {
-      dayRows = await fetchGarminSteps(accessToken, dateISO, tz);
+      dayRows = await fetchGarminStepsRange(accessToken, startISO, endISO, tz);
     } catch (err) {
       logger.warn({ err }, "Garmin step fetch failed");
       res.status(502).json({
@@ -947,11 +1057,18 @@ function mountGarminRoutes(): void {
         action: "garmin_sync",
         actorId: user.id,
         challengeId,
-        metadata: { imported, updated, skipped },
+        metadata: {
+          imported,
+          updated,
+          skipped,
+          startDate: startISO,
+          endDate: endISO,
+          rangeDays: dayRangeCount(startISO, endISO),
+        },
       },
     });
 
-    res.json({ imported, updated, skipped });
+    res.json({ imported, updated, skipped, startDate: startISO, endDate: endISO });
   });
 
   router.delete(`${base}/disconnect`, authRequired, async (req: AuthenticatedRequest, res) => {

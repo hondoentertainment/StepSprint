@@ -183,11 +183,28 @@
       "curlCopied": "¡curl copiado!",
       "tokenLabelDefault": "Sincronización Apple Watch"
     },
+    "syncDate": {
+      "modeLabel": "Cuánto traer del reloj",
+      "modeSingle": "Un día",
+      "modeLast7": "Últimos 7 días",
+      "modeLast30": "Últimos 30 días",
+      "label": "Fecha que quieres traer del reloj",
+      "hint": "Hoy por defecto. Elige un día anterior para rellenar pasos desde tu reloj — la fecha debe estar dentro de este reto.",
+      "rangeHint": "Traerá {{days}} día(s): {{start}} a {{end}} (limitado a este reto).",
+      "rangeHintEmpty": "Ningún día cae dentro de este reto todavía — prueba con un día único.",
+      "resetToToday": "Volver a hoy"
+    },
+    "syncResultRange": "{{name}}: trajo {{days}} día(s) — {{imported}} nuevos, {{updated}} actualizados, {{skipped}} omitidos.",
     "oauth": {
       "notConfigured": "No configurado",
       "connectedOn": "Conectado {{date}}",
+      "lastSyncedOn": "Sincronizado por última vez {{date}}",
+      "backfillSinceLast": "Rellenar {{days}} día(s) desde entonces",
+      "backfillNothingToDo": "{{name}} ya está al día.",
       "syncing": "Sincronizando…",
       "syncToday": "Sincronizar hoy",
+      "syncDateButton": "Sincronizar {{date}}",
+      "syncLastDays": "Sincronizar últimos {{days}} días",
       "disconnecting": "Desconectando…",
       "disconnect": "Desconectar",
       "connectProvider": "Conectar {{name}}"

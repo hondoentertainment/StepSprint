@@ -6,6 +6,35 @@ A single ordered checklist for taking StepSprint from a green CI to a public pro
 
 ---
 
+## Launch state snapshot
+
+Last verified **2026-05-06** against `https://stepsprint.vercel.app` (alias of `stepsprint-kwk4l3slq-hondo4185-5820s-projects.vercel.app`, release `stepsprint-api@b93b018`).
+
+**Green:**
+
+- Production deploy live; `/api/health` returns `{ ok: true, db: "up", release: "stepsprint-api@b93b018" }`.
+- Postgres on Marketplace Neon (pooled + non-pooled URLs auto-injected; aliased to `DATABASE_URL` / `DIRECT_URL` at build).
+- HTTP security posture (verified live): strict CSP (`default-src 'self'`, `frame-ancestors 'none'`, `object-src 'none'`), HSTS `max-age=31536000; includeSubDomains`, `Cross-Origin-Resource-Policy: same-origin`, `X-Content-Type-Options: nosniff`, `Permissions-Policy: camera=() microphone=() geolocation=()`, `Referrer-Policy: no-referrer`. Rate limits active (`Ratelimit-Policy: 300;w=900` global, plus an inner 120-window).
+- OpenAPI surface gated: `/api/docs` and `/api/openapi.json` both 404 in production.
+- CSRF: `/api/csrf-token` returns 200 with `Set-Cookie: stepsprint.csrf=…; Path=/; HttpOnly; Secure; SameSite=None` — double-submit pattern wired correctly.
+- Tests: server **107/107**, client **23/23** passing locally (Vitest).
+- Audit: client production deps clean; server moderate findings remain in `@prisma/dev` (build-time only; not in the Function runtime) and a transitive `ip-address` XSS in `Address6` HTML methods we never call. Fixes are breaking and not safe to force without a tested major upgrade — defer.
+- Production env set on Vercel: `JWT_SECRET`, `APP_ORIGIN`, `ADMIN_PASSWORD`, `CRON_SECRET`, `REMINDER_USE_EXTERNAL_CRON`, all `VAPID_*`, full Neon `POSTGRES_*` cluster.
+
+**Yellow / pending — needs operator input (cannot be done by an automated agent):**
+
+- **Email transport not configured.** `transactionalEmail: "allow_without_flag"` on `/api/health` (i.e. `ALLOW_PRODUCTION_WITHOUT_EMAIL=true` is set as the escape hatch). Registration verification and password reset will not deliver mail. Closed-beta only until a `RESEND_API_KEY` (or SMTP) + `SMTP_FROM` is added and the escape-hatch flag is removed.
+- **Observability disabled.** No `SENTRY_DSN`, `VITE_SENTRY_DSN`, or `VITE_POSTHOG_KEY`. Errors and analytics are silent.
+- **Source-map upload off.** No `SENTRY_AUTH_TOKEN` / `SENTRY_ORG` / `SENTRY_PROJECT`. Vite emits hidden source maps locally but does not upload — Sentry traces will be minified once a DSN is configured.
+- **Wearables OAuth disabled.** Apple Health via Shortcuts works (no server secrets needed). Fitbit, Google Fit, and Garmin OAuth are off — no `*_CLIENT_ID` / `*_CLIENT_SECRET` pairs configured.
+- **Legal copy not reviewed.** `VITE_LEGAL_CONTENT_REVIEWED` unset → the draft banner renders on `/privacy` and `/terms`. Replace placeholder copy in `client/src/i18n/{en,es}.json` and flip the flag.
+- **Cron live-fire untested.** Hourly schedule registered via `vercel.json`. The `Authorization: Bearer <CRON_SECRET>` handshake cannot be verified from outside the Vercel dashboard because `vercel env pull` correctly redacts sensitive values. Run from the dashboard: project → **Cron** tab → **Run** on `/api/cron/reminder-sweep`, expect 200.
+- **Manual smoke walkthrough.** §5 below requires a real inbox + browser session — not automatable.
+
+When picking up from this snapshot, see §3 for the env-var operator checklist, §5 for the manual smokes, §6 for OAuth, §7 for legal copy + backup drill.
+
+---
+
 ## 0. Pre-flight (local, ~5 min)
 
 ```bash

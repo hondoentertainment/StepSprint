@@ -183,11 +183,28 @@
       "curlCopied": "Curl copied!",
       "tokenLabelDefault": "Apple Watch Sync"
     },
+    "syncDate": {
+      "modeLabel": "How much to pull from your watch",
+      "modeSingle": "One day",
+      "modeLast7": "Last 7 days",
+      "modeLast30": "Last 30 days",
+      "label": "Date to pull from your watch",
+      "hint": "Defaults to today. Pick an earlier day to backfill steps from your watch — the date must fall inside this challenge.",
+      "rangeHint": "Will pull {{days}} day(s): {{start}} to {{end}} (clamped to this challenge).",
+      "rangeHintEmpty": "No days fall inside this challenge yet — try a single day instead.",
+      "resetToToday": "Reset to today"
+    },
+    "syncResultRange": "{{name}}: pulled {{days}} day(s) — {{imported}} new, {{updated}} updated, {{skipped}} skipped.",
     "oauth": {
       "notConfigured": "Not configured",
       "connectedOn": "Connected {{date}}",
+      "lastSyncedOn": "Last synced {{date}}",
+      "backfillSinceLast": "Backfill {{days}} day(s) since",
+      "backfillNothingToDo": "{{name}} is already up to date.",
       "syncing": "Syncing…",
       "syncToday": "Sync today",
+      "syncDateButton": "Sync {{date}}",
+      "syncLastDays": "Sync last {{days}} days",
       "disconnecting": "Disconnecting…",
       "disconnect": "Disconnect",
       "connectProvider": "Connect {{name}}"

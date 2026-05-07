@@ -347,6 +347,85 @@ describe("Integrations routes", () => {
       }
     });
 
+    it("GET /fitness reports lastSyncedAt per provider from auditLog rows when enrolled", async () => {
+      const tz = "America/Chicago";
+      const challenge = await prisma.challenge.create({
+        data: {
+          name: `Fitness LastSync ${suffix}`,
+          startDate: DateTime.fromISO("2026-04-01", { zone: tz }).startOf("day").toJSDate(),
+          endDate: DateTime.fromISO("2026-04-30", { zone: tz }).endOf("day").toJSDate(),
+          timezone: tz,
+          teamSize: 4,
+        },
+      });
+      await prisma.teamMember.create({ data: { userId, challengeId: challenge.id } });
+      await prisma.oAuthConnection.create({
+        data: {
+          userId,
+          provider: "fitbit",
+          accessToken: "test-access-token",
+          refreshToken: "test-refresh-token",
+        },
+      });
+
+      const earlier = new Date(Date.now() - 86_400_000);
+      const later = new Date();
+      // Two rows so we can verify "latest wins" ordering.
+      await prisma.auditLog.createMany({
+        data: [
+          {
+            action: "fitbit_sync",
+            actorId: userId,
+            challengeId: challenge.id,
+            createdAt: earlier,
+          },
+          {
+            action: "fitbit_sync",
+            actorId: userId,
+            challengeId: challenge.id,
+            createdAt: later,
+          },
+        ],
+      });
+
+      try {
+        const withChallenge = await request(app)
+          .get(`/api/integrations/fitness?challengeId=${challenge.id}`)
+          .set("Cookie", cookie)
+          .expect(200);
+        const fitbit = withChallenge.body.providers.find(
+          (p: { id: string }) => p.id === "fitbit"
+        );
+        expect(fitbit.connected).toBe(true);
+        expect(fitbit.lastSyncedAt).not.toBeNull();
+        // Within 2s of `later` to allow for clock drift across the request boundary.
+        expect(
+          Math.abs(new Date(fitbit.lastSyncedAt as string).getTime() - later.getTime())
+        ).toBeLessThan(2000);
+
+        // Other providers in the same response should still be null since they
+        // have no audit rows.
+        const garmin = withChallenge.body.providers.find(
+          (p: { id: string }) => p.id === "garmin"
+        );
+        expect(garmin.lastSyncedAt).toBeNull();
+
+        // Without challengeId, lastSyncedAt is omitted (returned as null) for every provider.
+        const noChallenge = await request(app)
+          .get("/api/integrations/fitness")
+          .set("Cookie", cookie)
+          .expect(200);
+        for (const p of noChallenge.body.providers as Array<{ lastSyncedAt: string | null }>) {
+          expect(p.lastSyncedAt).toBeNull();
+        }
+      } finally {
+        await prisma.auditLog.deleteMany({ where: { challengeId: challenge.id } });
+        await prisma.oAuthConnection.deleteMany({ where: { userId, provider: "fitbit" } });
+        await prisma.teamMember.deleteMany({ where: { challengeId: challenge.id } });
+        await prisma.challenge.delete({ where: { id: challenge.id } });
+      }
+    });
+
     it("404 when revoking another user's token", async () => {
       // Create a second user to own a token
       const email2 = `token-other-${suffix}@stepsprint.local`;

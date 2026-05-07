@@ -7,6 +7,8 @@ import { z } from "zod";
 
 extendZodWithOpenApi(z);
 
+const MAX_SYNC_RANGE_DAYS_OPENAPI = 31;
+
 /* ------------------------------------------------------------------ */
 /*  Shared schemas                                                    */
 /* ------------------------------------------------------------------ */
@@ -521,6 +523,10 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
       connectedAt: z.string().datetime().nullable().openapi({
         description: "Approximate \"linked since\" time: latest token creation for Apple; OAuth token refresh row for Fitbit/Google/Garmin.",
       }),
+      lastSyncedAt: z.string().datetime().nullable().openapi({
+        description:
+          "Most recent successful sync of this provider for the current user + challenge. Only populated when challengeId is supplied and the user is enrolled. Null if no sync has occurred.",
+      }),
     })
     .openapi("FitnessProviderStatus");
 
@@ -640,6 +646,12 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
       imported: z.number().int(),
       updated: z.number().int(),
       skipped: z.number().int(),
+      startDate: z.string().optional().openapi({
+        description: "Inclusive start of the synced range (echoed for OAuth provider syncs).",
+      }),
+      endDate: z.string().optional().openapi({
+        description: "Inclusive end of the synced range (echoed for OAuth provider syncs).",
+      }),
     })
     .openapi("SyncResponse");
 
@@ -720,7 +732,16 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
     const OAuthSyncRequest = z
       .object({
         challengeId: z.string(),
-        date: z.string().optional().openapi({ description: "YYYY-MM-DD. Defaults to today in challenge timezone." }),
+        date: z.string().optional().openapi({
+          description:
+            "YYYY-MM-DD. Single-day sync. Defaults to today in challenge timezone. Mutually exclusive with startDate/endDate.",
+        }),
+        startDate: z.string().optional().openapi({
+          description: "YYYY-MM-DD inclusive start of a multi-day sync window. Required with endDate.",
+        }),
+        endDate: z.string().optional().openapi({
+          description: "YYYY-MM-DD inclusive end of a multi-day sync window. Required with startDate. Window is capped at 31 days.",
+        }),
       })
       .openapi(`${providerName.replace(" ", "")}SyncRequest`);
 
@@ -728,7 +749,7 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
       method: "post",
       path: `/api/integrations/${providerSlug}/sync`,
       summary: `Sync ${providerName} steps`,
-      description: `Fetch step data from ${providerName} for the given date and upsert into the challenge. Requires an active OAuth connection.`,
+      description: `Fetch step data from ${providerName} for a given date or inclusive ${MAX_SYNC_RANGE_DAYS_OPENAPI}-day window and upsert into the challenge. Requires an active OAuth connection.`,
       tags: ["Integrations"],
       security: [{ [bearerAuth.name]: [] }],
       request: { body: { content: { "application/json": { schema: OAuthSyncRequest } } } },
