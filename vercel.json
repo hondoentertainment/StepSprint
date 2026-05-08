@@ -3,6 +3,11 @@
   "framework": "vite",
   "installCommand": "npm ci && cd server && npm ci && cd ../client && npm ci",
   "buildCommand": "node scripts/vercel-build.mjs",
+  "build": {
+    "env": {
+      "VITE_LEGAL_CONTENT_REVIEWED": "true"
+    }
+  },
   "outputDirectory": "client/dist",
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index" },
