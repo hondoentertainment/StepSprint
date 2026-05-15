@@ -35,6 +35,21 @@ export function Submit({
   const [fitnessConnected, setFitnessConnected] = useState<boolean | null>(null);
   const [lastAppleHealthSyncAt, setLastAppleHealthSyncAt] = useState<string | null>(null);
 
+  // Sync the default date to the challenge's timezone so the future-date
+  // validation uses the same calendar day as the initialised value.
+  // Without this, CI runners in UTC can initialise to "tomorrow" relative
+  // to a US-timezone challenge, keeping the submit button permanently
+  // disabled.
+  useEffect(() => {
+    setDate((prev) => {
+      const corrected = todayInTimezone(selectedChallenge?.timezone);
+      // Only auto-correct when the current value equals "today" in the
+      // browser's default timezone (i.e. the user hasn't manually picked
+      // a different date).
+      return prev === todayInTimezone() ? corrected : prev;
+    });
+  }, [selectedChallenge?.timezone]);
+
   useEffect(() => {
     if (!challengeId) {
       setFitnessConnected(null);
