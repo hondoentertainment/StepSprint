@@ -136,7 +136,7 @@ function AuthenticatedApp() {
 }
 
 function App() {
-  const { user, setUser, isLoading, login } = useAuth();
+  const { user, setUser, isLoading, login, register } = useAuth();
 
   if (isLoading) {
     return (
@@ -153,7 +153,7 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/invite" element={<InvitePage onAccepted={(u) => setUser(u)} />} />
-          <Route path="*" element={<Login onLogin={login} />} />
+          <Route path="*" element={<Login onLogin={login} onRegister={register} />} />
         </Routes>
       </BrowserRouter>
     );

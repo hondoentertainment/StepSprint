@@ -6,7 +6,7 @@ import { getErrorMessage } from "../api";
 import type { WeeklyEntry } from "../types";
 import { WeekPicker } from "./WeekPicker";
 import type { Challenge } from "../types";
-import { useWeek } from "../contexts/useWeek";
+import { useWeek } from "../contexts/WeekContext";
 
 type Props = {
   challengeId: string;
