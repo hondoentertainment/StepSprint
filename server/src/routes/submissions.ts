@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { DateTime } from "luxon";
+import { StepSubmissionSource } from "@prisma/client";
 import { prisma } from "../prisma";
 import { authRequired, AuthenticatedRequest } from "../middleware/auth";
 import { toDateOnly, toJsDate } from "../utils/dates";
@@ -76,6 +77,7 @@ router.post("/", authRequired, async (req: AuthenticatedRequest, res) => {
     update: {
       steps: parsed.data.steps,
       isFlagged: parsed.data.steps > 100000,
+      source: StepSubmissionSource.MANUAL,
     },
     create: {
       userId: req.user.id,
@@ -83,6 +85,7 @@ router.post("/", authRequired, async (req: AuthenticatedRequest, res) => {
       date: toJsDate(date),
       steps: parsed.data.steps,
       isFlagged: parsed.data.steps > 100000,
+      source: StepSubmissionSource.MANUAL,
     },
   });
 

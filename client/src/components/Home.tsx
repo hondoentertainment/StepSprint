@@ -1,21 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { useTranslation } from "react-i18next";
 import { api } from "../api";
 import { ApiError, getErrorMessage } from "../api";
-import { ANALYTICS_EVENTS, track } from "../analytics";
 import type { Challenge } from "../types";
 import type { Summary } from "../types";
-import {
-  IconFootstep,
-  IconFlame,
-  IconTarget,
-  IconCalendarWeek,
-  IconCalendarMonth,
-  IconTeam,
-  IconTrophy,
-  IconArrowUp,
-} from "./Icons";
 
 type Props = {
   challengeId: string;
@@ -24,30 +12,9 @@ type Props = {
   challengesError: string;
 };
 
-/**
- * Convert the server's URL-safe base64 VAPID public key into the raw byte
- * array that `pushManager.subscribe({ applicationServerKey })` expects.
- * Returns an ArrayBuffer so the result is a plain BufferSource regardless
- * of the DOM lib's stricter Uint8Array generic parameterisation.
- */
-function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const rawData = atob(base64);
-  const buffer = new ArrayBuffer(rawData.length);
-  const view = new Uint8Array(buffer);
-  for (let i = 0; i < rawData.length; i += 1) {
-    view[i] = rawData.charCodeAt(i);
-  }
-  return buffer;
-}
-
-const STREAK_MILESTONES = [7, 14, 21, 30, 60, 90];
-
 function HomeSkeleton() {
-  const { t } = useTranslation();
   return (
-    <div className="loading-skeleton" aria-label={t("home.loadingSummaryAria")}>
+    <div className="loading-skeleton" aria-label="Loading summary">
       <div className="skeleton skeleton-title" />
       <div className="stats-grid stats-grid-skeleton">
         <div className="skeleton skeleton-card" />
@@ -59,160 +26,34 @@ function HomeSkeleton() {
   );
 }
 
-type ProgressData = {
-  pct: number;
-  elapsedDays: number;
-  totalDays: number;
-  remainingDays: number;
-};
-
-function computeProgress(startDate: string, endDate: string, now: number): ProgressData {
-  const start = new Date(startDate).getTime();
-  const end = new Date(endDate).getTime();
-  const totalMs = end - start;
-  const elapsedMs = Math.max(0, Math.min(now - start, totalMs));
-  const pct = totalMs > 0 ? Math.round((elapsedMs / totalMs) * 100) : 0;
-  const totalDays = Math.round(totalMs / 86400000);
-  const elapsedDays = Math.round(elapsedMs / 86400000);
-  const remainingDays = Math.max(0, totalDays - elapsedDays);
-  return { pct, elapsedDays, totalDays, remainingDays };
-}
-
-function ChallengeProgress({ challenge, now }: { challenge: Challenge; now: number }) {
-  const { t } = useTranslation();
-  const progress = computeProgress(challenge.startDate, challenge.endDate, now);
-
-  if (challenge.locked || progress.pct >= 100) return null;
-
-  return (
-    <div className="challenge-progress">
-      <div className="challenge-progress-bar">
-        <div className="challenge-progress-fill" style={{ width: `${progress.pct}%` }} />
-      </div>
-      <p className="challenge-progress-label">
-        {t("home.challengeProgress.label", {
-          count: progress.remainingDays,
-          elapsed: progress.elapsedDays,
-          total: progress.totalDays,
-          remaining: progress.remainingDays,
-        })}
-      </p>
-    </div>
-  );
-}
-
-function StreakToast({ days, onDismiss }: { days: number; onDismiss: () => void }) {
-  const { t } = useTranslation();
-  useEffect(() => {
-    const timer = setTimeout(onDismiss, 5000);
-    return () => clearTimeout(timer);
-  }, [onDismiss]);
-
-  return (
-    <div className="streak-toast" role="alert" aria-live="assertive">
-      <div className="streak-toast-inner">
-        <IconFlame size={20} className="streak-toast-icon" />
-        <div>
-          <strong className="streak-toast-title">{t("home.streakToast.title", { days })}</strong>
-          <span className="streak-toast-body">{t("home.streakToast.body")}</span>
-        </div>
-        <button
-          type="button"
-          className="streak-toast-close"
-          onClick={onDismiss}
-          aria-label={t("home.streakToast.dismissAria")}
-        >
-          &times;
-        </button>
-      </div>
-    </div>
-  );
-}
-
 export function Home({
   challengeId,
   selectedChallenge,
   challengesLoading,
   challengesError,
 }: Props) {
-  const { t, i18n } = useTranslation();
-  const numberLocale = i18n.resolvedLanguage ?? undefined;
   const [summary, setSummary] = useState<Summary | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const [welcomeMessage] = useState(() => {
-    if (typeof sessionStorage === "undefined") return false;
-    return sessionStorage.getItem("stepSprintJustLoggedIn") !== null;
-  });
-  const [now] = useState<number>(() => Date.now());
+  const [welcomeMessage, setWelcomeMessage] = useState(false);
   const [dailyReminder, setDailyReminder] = useState(false);
-  const [pushKey, setPushKey] = useState<string | null>(null);
-  const [pushKeyLoaded, setPushKeyLoaded] = useState(false);
-  const [pushStatus, setPushStatus] = useState<
-    { kind: "success" | "error" | "info"; message: string } | null
-  >(null);
-  const [pushBusy, setPushBusy] = useState(false);
-  const [streakMilestone, setStreakMilestone] = useState<number | null>(null);
-  const [fitnessConnected, setFitnessConnected] = useState<boolean | null>(null);
-  const [lastFitnessAppleSyncAt, setLastFitnessAppleSyncAt] = useState<string | null>(null);
-
-  const pushSupported =
-    typeof window !== "undefined" &&
-    "serviceWorker" in navigator &&
-    "PushManager" in window &&
-    "Notification" in window;
+  const [streakReminder, setStreakReminder] = useState(false);
 
   useEffect(() => {
-    if (welcomeMessage && typeof sessionStorage !== "undefined") {
+    if (typeof sessionStorage !== "undefined" && sessionStorage.getItem("stepSprintJustLoggedIn")) {
       sessionStorage.removeItem("stepSprintJustLoggedIn");
+      setWelcomeMessage(true);
     }
-    // Only run on mount to clear the one-time flag; subsequent toggles don't retrigger storage clearing.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    async function loadPreferences() {
-      try {
-        const prefs = await api<{ dailyReminder: boolean }>("/api/me/notifications/preferences");
-        if (cancelled) return;
+    api<{ dailyReminder: boolean; streakAtRiskReminder: boolean }>("/api/me/notifications/preferences")
+      .then((prefs) => {
         setDailyReminder(prefs.dailyReminder);
-      } catch {
-        // ignore; notification preferences are best-effort
-      }
-    }
-    void loadPreferences();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!challengeId) {
-      setFitnessConnected(null);
-      setLastFitnessAppleSyncAt(null);
-      return;
-    }
-    let cancelled = false;
-    void api<{ connected: boolean; lastAppleHealthSyncAt: string | null }>(
-      `/api/integrations/fitness?challengeId=${encodeURIComponent(challengeId)}`
-    )
-      .then((data) => {
-        if (!cancelled) {
-          setFitnessConnected(data.connected);
-          setLastFitnessAppleSyncAt(data.lastAppleHealthSyncAt ?? null);
-        }
+        setStreakReminder(prefs.streakAtRiskReminder);
       })
-      .catch(() => {
-        if (!cancelled) {
-          setFitnessConnected(null);
-          setLastFitnessAppleSyncAt(null);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [challengeId]);
+      .catch(() => null);
+  }, []);
 
   function toggleDailyReminder() {
     const prev = dailyReminder;
@@ -224,171 +65,55 @@ export function Home({
     }).catch(() => setDailyReminder(prev));
   }
 
-  useEffect(() => {
-    if (!pushSupported) {
-      setPushKeyLoaded(true);
-      return;
-    }
-    let cancelled = false;
-    async function loadPushKey() {
-      try {
-        const res = await api<{ key: string | null }>(
-          "/api/me/notifications/push/public-key"
-        );
-        if (cancelled) return;
-        setPushKey(res.key);
-      } catch {
-        if (cancelled) return;
-        setPushKey(null);
-      } finally {
-        if (!cancelled) setPushKeyLoaded(true);
-      }
-    }
-    void loadPushKey();
-    return () => {
-      cancelled = true;
-    };
-  }, [pushSupported]);
-
-  async function enablePush() {
-    if (!pushKey || !pushSupported) return;
-    setPushBusy(true);
-    setPushStatus(null);
-    try {
-      const permission = await Notification.requestPermission();
-      if (permission !== "granted") {
-        setPushStatus({
-          kind: "error",
-          message: t("home.notifications.permissionDenied"),
-        });
-        return;
-      }
-      const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(pushKey),
-      });
-      const json = subscription.toJSON();
-      await api("/api/me/notifications/push/subscribe", {
-        method: "POST",
-        body: JSON.stringify({
-          endpoint: json.endpoint,
-          keys: json.keys,
-        }),
-      });
-      setPushStatus({
-        kind: "success",
-        message: t("home.notifications.enabled"),
-      });
-    } catch (err) {
-      setPushStatus({
-        kind: "error",
-        message: getErrorMessage(err),
-      });
-    } finally {
-      setPushBusy(false);
-    }
+  function toggleStreakReminder() {
+    const prev = streakReminder;
+    const next = !prev;
+    setStreakReminder(next);
+    api("/api/me/notifications/preferences", {
+      method: "PATCH",
+      body: JSON.stringify({ streakAtRiskReminder: next }),
+    }).catch(() => setStreakReminder(prev));
   }
 
   useEffect(() => {
     if (!challengeId) return;
 
-    track(ANALYTICS_EVENTS.challengeViewed, { challengeId });
-
-    let cancelled = false;
-
-    async function loadSummary() {
-      setIsLoading(true);
-      setError("");
-      try {
-        const data = await api<Summary>(`/api/me/summary?challengeId=${challengeId}`);
-        if (cancelled) return;
-        setSummary(data);
-
-        // Check for streak milestones — show toast once per milestone per session
-        const days = data.streak.currentDays;
-        const hit = STREAK_MILESTONES.find((m) => days === m);
-        if (hit && typeof sessionStorage !== "undefined") {
-          const key = `streakMilestone_${hit}`;
-          if (!sessionStorage.getItem(key)) {
-            sessionStorage.setItem(key, "1");
-            setStreakMilestone(hit);
-          }
-        }
-      } catch (err) {
-        if (cancelled) return;
+    setIsLoading(true);
+    setError("");
+    api<Summary>(`/api/me/summary?challengeId=${challengeId}`)
+      .then(setSummary)
+      .catch((err) => {
         setSummary(null);
         if (err instanceof ApiError && err.status === 403) {
-          setError(t("home.notEnrolled"));
-        } else {
-          setError(getErrorMessage(err));
+          setError("You are not enrolled in this challenge yet.");
+          return;
         }
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    }
-
-    void loadSummary();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [challengeId, t]);
+        setError(getErrorMessage(err));
+      })
+      .finally(() => setIsLoading(false));
+  }, [challengeId]);
 
   return (
     <section className="panel">
-      {streakMilestone !== null && (
-        <StreakToast days={streakMilestone} onDismiss={() => setStreakMilestone(null)} />
-      )}
-      <h2>{t("home.title")}</h2>
+      <h2>Participant Home</h2>
       {welcomeMessage && (
         <p className="status status-success" role="status" aria-live="polite">
-          {t("home.welcome")}
+          Welcome back! You&apos;ve signed in successfully.
         </p>
       )}
       {challengesError && <p className="status status-error">{challengesError}</p>}
       {selectedChallenge && (
-        <div className="challenge-header">
-          <span
-            className={`challenge-badge ${selectedChallenge.locked ? "locked" : "open"}`}
-          >
-            {selectedChallenge.name} &middot; {selectedChallenge.timezone} &middot;{" "}
-            {selectedChallenge.locked ? t("common.locked") : t("common.open")}
-          </span>
-          {!selectedChallenge.locked && (
-            <>
-              <Link to="/submit" className="btn-primary-sm">
-                {t("home.logSteps")}
-              </Link>
-              <Link to="/integrations" className="secondary">
-                {t("home.devicesLink")}
-              </Link>
-            </>
-          )}
-        </div>
+        <span
+          className={`challenge-badge ${selectedChallenge.locked ? "locked" : "open"}`}
+        >
+          {selectedChallenge.name} · {selectedChallenge.timezone} ·{" "}
+          {selectedChallenge.locked ? "Locked" : "Open"}
+        </span>
       )}
-      {selectedChallenge && challengeId && fitnessConnected !== null && (
-        <>
-          <p className="hint home-fitness-hint" role="note" aria-label={t("home.devicesFitnessAria")}>
-            {fitnessConnected ? t("home.devicesFitnessLinked") : t("home.devicesFitnessNotLinked")}
-          </p>
-          {lastFitnessAppleSyncAt && (
-            <p className="hint" role="status">
-              {t("submit.lastAppleHealthSync", {
-                datetime: new Date(lastFitnessAppleSyncAt).toLocaleString(undefined, {
-                  dateStyle: "medium",
-                  timeStyle: "short",
-                }),
-              })}
-            </p>
-          )}
-        </>
-      )}
-      {selectedChallenge && <ChallengeProgress challenge={selectedChallenge} now={now} />}
       {challengesLoading ? (
         <HomeSkeleton />
       ) : !challengeId ? (
-        <p className="status">{t("home.noChallenges")}</p>
+        <p className="status">No active challenges yet.</p>
       ) : isLoading ? (
         <HomeSkeleton />
       ) : error ? (
@@ -397,13 +122,14 @@ export function Home({
         <div className="stats-grid">
           <div className="stats-hero">
             <div className="card card-hero">
-              <h3><IconFootstep size={13} className="card-icon" /> {t("home.stats.today")}</h3>
-              <p>{summary.personalTotals.today.toLocaleString(numberLocale)} {t("common.steps")}</p>
+              <h3>Today</h3>
+              <p>{summary.personalTotals.today.toLocaleString()} steps</p>
             </div>
             <div className="card card-streak">
-              <h3><IconFlame size={13} className="card-icon" /> {t("home.stats.streak")}</h3>
+              <h3>Current streak</h3>
               <p>
-                {t("home.stats.days", { count: summary.streak.currentDays })}
+                {summary.streak.currentDays} day
+                {summary.streak.currentDays === 1 ? "" : "s"}
               </p>
             </div>
           </div>
@@ -411,88 +137,60 @@ export function Home({
             <div
               className="progress-ring"
               style={{ ["--value" as string]: summary.consistency.score }}
-              aria-label={`${t("home.stats.consistency")}: ${summary.consistency.score}%, ${t("home.stats.daysActive", { active: summary.consistency.activeDays, elapsed: summary.consistency.elapsedDays })}`}
+              aria-label={`Consistency: ${summary.consistency.score}%, ${summary.consistency.activeDays} of ${summary.consistency.elapsedDays} days active`}
             >
               <div className="progress-ring-inner">
                 {summary.consistency.score}%
               </div>
             </div>
             <div className="progress-ring-content">
-              <strong><IconTarget size={13} className="card-icon card-icon-inline" /> {t("home.stats.consistency")}</strong>
+              <strong>Consistency</strong>
               <span>
-                {t("home.stats.daysActive", {
-                  active: summary.consistency.activeDays,
-                  elapsed: summary.consistency.elapsedDays,
-                })}
+                {summary.consistency.activeDays} of {summary.consistency.elapsedDays} days active
               </span>
             </div>
           </div>
           <div className="card">
-            <h3><IconCalendarWeek size={13} className="card-icon" /> {t("home.stats.thisWeek")}</h3>
-            <p>{summary.personalTotals.week.toLocaleString(numberLocale)} {t("common.steps")}</p>
+            <h3>This week</h3>
+            <p>{summary.personalTotals.week.toLocaleString()} steps</p>
           </div>
           <div className="card">
-            <h3><IconCalendarMonth size={13} className="card-icon" /> {t("home.stats.thisMonth")}</h3>
-            <p>{summary.personalTotals.month.toLocaleString(numberLocale)} {t("common.steps")}</p>
+            <h3>This month</h3>
+            <p>{summary.personalTotals.month.toLocaleString()} steps</p>
           </div>
           <div className="card">
-            <h3><IconTeam size={13} className="card-icon" /> {t("home.stats.teamTotal")}</h3>
+            <h3>Team total</h3>
             <p>
-              {summary.teamTotals.teamName || t("common.unassigned")} &middot;{" "}
-              {summary.teamTotals.total.toLocaleString(numberLocale)} {t("common.steps")}
+              {summary.teamTotals.teamName || "Unassigned"} ·{" "}
+              {summary.teamTotals.total.toLocaleString()} steps
             </p>
           </div>
           <div className="card">
-            <h3><IconTrophy size={13} className="card-icon" /> {t("home.stats.rank")}</h3>
-            <p>{summary.rank != null ? summary.rank : t("common.notApplicable")}</p>
+            <h3>Rank</h3>
+            <p>{summary.rank ?? "—"}</p>
           </div>
           <div className="card">
-            <h3><IconArrowUp size={13} className="card-icon" /> {t("home.stats.gapToFirst")}</h3>
-            <p>{summary.gapToFirst.toLocaleString(numberLocale)} {t("common.steps")}</p>
+            <h3>Gap to #1</h3>
+            <p>{summary.gapToFirst.toLocaleString()} steps</p>
           </div>
         </div>
       ) : (
         <div className="empty-state" role="status">
-          <p className="status">{t("home.emptyState")}</p>
-          <Link to="/submit" className="btn-primary">
-            {t("home.logSteps")}
+          <p className="status">No summary yet. Submit your first steps to get started!</p>
+          <Link to="/submit" className="cta-primary" style={{ display: "inline-block" }}>
+            Log your steps
           </Link>
         </div>
       )}
       <div className="notification-prefs">
         <label>
           <input type="checkbox" checked={dailyReminder} onChange={toggleDailyReminder} />
-          {t("home.notifications.dailyReminder")}
+          Daily reminder to log steps
         </label>
-        {pushKeyLoaded && (!pushSupported || pushKey === null) ? (
-          <p className="status">{t("home.notifications.notAvailable")}</p>
-        ) : pushKeyLoaded ? (
-          <div>
-            <button
-              type="button"
-              onClick={enablePush}
-              disabled={pushBusy}
-              className="secondary"
-            >
-              {pushBusy ? t("home.notifications.enabling") : t("home.notifications.enable")}
-            </button>
-            {pushStatus && (
-              <p
-                className={
-                  pushStatus.kind === "error"
-                    ? "status status-error"
-                    : pushStatus.kind === "success"
-                      ? "status status-success"
-                      : "status"
-                }
-                role="status"
-                aria-live="polite"
-              >
-                {pushStatus.message}
-              </p>
-            )}
-          </div>
-        ) : null}
+        <label>
+          <input type="checkbox" checked={streakReminder} onChange={toggleStreakReminder} />
+          Email when your streak is at risk (logged yesterday, not yet today)
+        </label>
       </div>
     </section>
   );

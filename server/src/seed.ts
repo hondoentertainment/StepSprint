@@ -1,85 +1,53 @@
-import { Role } from "@prisma/client";
+import { PrismaClient, Role } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { Pool } from "pg";
 import { DateTime } from "luxon";
 import bcrypt from "bcryptjs";
-import crypto from "crypto";
-import { logger } from "./logger";
-import { createPrismaClient } from "./prismaClientFactory";
+import dotenv from "dotenv";
+import path from "path";
 
-const prisma = createPrismaClient(process.env.DATABASE_URL ?? "file:./dev.db");
+dotenv.config({ path: path.resolve(process.cwd(), "..", ".env") });
+dotenv.config();
+
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) {
+  throw new Error("DATABASE_URL is required for seed");
+}
+
+const pool = new Pool({ connectionString: databaseUrl });
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
 
 const TZ = "America/Chicago";
-
-const isProduction = process.env.NODE_ENV === "production";
+const DEFAULT_PASSWORD = "password123";
 
 async function main() {
-  const existingAdmin = await prisma.user.findUnique({
-    where: { email: "admin@stepsprint.local" },
-  });
-
-  let adminPasswordPlain: string | null = process.env.ADMIN_PASSWORD ?? null;
-
-  if (!adminPasswordPlain) {
-    if (isProduction) {
-      if (existingAdmin) {
-        // Redeploy / repeat seed: do not rotate the admin password when unset.
-        adminPasswordPlain = null;
-      } else {
-        adminPasswordPlain = crypto.randomBytes(16).toString("base64url");
-        logger.warn(
-          { password: adminPasswordPlain },
-          "ADMIN_PASSWORD not set — generated a random admin password for first deploy. Change it immediately after first login."
-        );
-      }
-    } else {
-      adminPasswordPlain = "password123";
-    }
-  }
-
-  const PARTICIPANT_PASSWORD = isProduction ? null : "password123";
-
-  const adminHash =
-    adminPasswordPlain !== null
-      ? await bcrypt.hash(adminPasswordPlain, 12)
-      : undefined;
-
-  const admin = await prisma.user.upsert({
-    where: { email: "admin@stepsprint.local" },
-    update: {
-      ...(adminHash !== undefined ? { passwordHash: adminHash } : {}),
-      emailVerified: true,
-    },
-    create: {
-      email: "admin@stepsprint.local",
-      name: "Admin User",
-      role: Role.ADMIN,
-      passwordHash: adminHash!,
-      emailVerified: true,
-    },
-  });
-
+  const passwordHash = await bcrypt.hash(DEFAULT_PASSWORD, 12);
   const now = DateTime.now().setZone(TZ);
   const start = now.startOf("month").toISODate();
   const end = now.endOf("month").toISODate();
 
-  if (isProduction) {
-    // In production we only seed the admin account — no demo data.
-    logger.info({ adminEmail: admin.email }, "Production seed complete.");
-    return;
-  }
-
-  const participantHash = await bcrypt.hash(PARTICIPANT_PASSWORD!, 12);
+  const admin = await prisma.user.upsert({
+    where: { email: "admin@stepsprint.local" },
+    update: { passwordHash },
+    create: {
+      email: "admin@stepsprint.local",
+      name: "Admin User",
+      role: Role.ADMIN,
+      passwordHash,
+    },
+  });
 
   const participants = await Promise.all(
     Array.from({ length: 12 }).map((_, idx) =>
       prisma.user.upsert({
         where: { email: `user${idx + 1}@stepsprint.local` },
-        update: { passwordHash: participantHash, emailVerified: true },
+        update: { passwordHash },
         create: {
           email: `user${idx + 1}@stepsprint.local`,
           name: `Walker ${idx + 1}`,
           role: Role.PARTICIPANT,
-          passwordHash: participantHash,
-          emailVerified: true,
+          passwordHash,
         },
       })
     )
@@ -106,12 +74,22 @@ async function main() {
     },
   });
 
-  await prisma.teamMember.deleteMany({ where: { challengeId: challenge.id } });
-  await prisma.team.deleteMany({ where: { challengeId: challenge.id } });
+  await prisma.teamMember.deleteMany({
+    where: { challengeId: challenge.id },
+  });
+
+  await prisma.team.deleteMany({
+    where: { challengeId: challenge.id },
+  });
 
   const teams = await Promise.all(
     ["Team Alpha", "Team Bravo", "Team Charlie"].map((name) =>
-      prisma.team.create({ data: { name, challengeId: challenge.id } })
+      prisma.team.create({
+        data: {
+          name,
+          challengeId: challenge.id,
+        },
+      })
     )
   );
 
@@ -122,12 +100,9 @@ async function main() {
     isLeader: index % teams.length === 0,
   }));
 
-  await prisma.teamMember.createMany({ data: assignments });
-
-  const user1 = participants[0];
-  if (user1) {
-    await prisma.integrationToken.deleteMany({ where: { userId: user1.id } });
-  }
+  await prisma.teamMember.createMany({
+    data: assignments,
+  });
 
   const dates = Array.from({ length: 10 }).map((_, offset) =>
     now.minus({ days: offset }).toISODate()
@@ -165,14 +140,15 @@ async function main() {
     },
   });
 
-  logger.info("Dev seed complete!");
+  console.log("Seed complete!");
 }
 
 main()
   .catch((error) => {
-    logger.error({ err: error }, "Seed failed");
+    console.error(error);
     process.exit(1);
   })
   .finally(async () => {
     await prisma.$disconnect();
+    await pool.end();
   });

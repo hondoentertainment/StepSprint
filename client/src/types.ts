@@ -53,6 +53,7 @@ export type Submission = {
   date: string;
   steps: number;
   isFlagged: boolean;
+  source?: "MANUAL" | "IMPORT";
   user: { email: string; name?: string | null };
   challenge: { name: string };
 };

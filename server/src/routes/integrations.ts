@@ -1,59 +1,22 @@
 import { Router } from "express";
 import { z } from "zod";
-import crypto from "crypto";
-import { DateTime } from "luxon";
-import { prisma } from "../prisma";
+import { FitnessProvider } from "@prisma/client";
 import { authRequired, AuthenticatedRequest } from "../middleware/auth";
-import { toDateOnly, toJsDate } from "../utils/dates";
-import { logger } from "../logger";
 import { config } from "../config";
-import { integrationSyncLimiter } from "../middleware/rateLimit";
-
-const MAX_TOKENS_PER_USER = config.nodeEnv === "production" ? 10 : 50;
+import { prisma } from "../prisma";
+import { sealSecret } from "../utils/cryptoSecret";
+import { fitbitConfigured, fitbitExchangeCode, fitbitFetchProfileUserId } from "../services/fitness/fitbitApi";
+import { googleFitConfigured, googleExchangeCode } from "../services/fitness/googleFitApi";
+import { fitnessProviderSlug, parseFitnessProviderSlug } from "../services/fitness/providers";
+import { syncFitnessForUser } from "../services/fitness/syncService";
 
 const router = Router();
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+const STATE_TTL_MIN = 15;
 
-function generateToken(): { plain: string; hash: string } {
-  const raw = crypto.randomBytes(32).toString("hex");
-  const plain = `ssp_${raw}`;
-  const hash = crypto.createHash("sha256").update(plain).digest("hex");
-  return { plain, hash };
+function callbackUrl(providerSlug: string): string {
+  return `${config.apiPublicUrl}/api/integrations/fitness/oauth/${providerSlug}/callback`;
 }
-
-function hashToken(plain: string): string {
-  return crypto.createHash("sha256").update(plain).digest("hex");
-}
-
-/** Extract Bearer token from Authorization header. */
-function extractBearerToken(authHeader: string | undefined): string | null {
-  if (!authHeader?.startsWith("Bearer ")) return null;
-  const token = authHeader.slice(7).trim();
-  return token || null;
-}
-
-/** Resolve a user from a raw integration token string. Returns null if invalid or expired. */
-async function resolveTokenUser(plain: string) {
-  const hash = hashToken(plain);
-  const record = await prisma.integrationToken.findUnique({
-    where: { tokenHash: hash },
-    include: { user: true },
-  });
-  if (!record) return null;
-  if (record.expiresAt && record.expiresAt < new Date()) return null;
-  // Update last-used timestamp without blocking the response
-  prisma.integrationToken
-    .update({ where: { id: record.id }, data: { lastUsedAt: new Date() } })
-    .catch((err: unknown) => logger.warn({ err }, "Failed to update lastUsedAt"));
-  return record.user;
-}
-
-// ---------------------------------------------------------------------------
-// Fitness provider status
-// ---------------------------------------------------------------------------
 
 router.get("/fitness", authRequired, async (req: AuthenticatedRequest, res) => {
   if (!req.user) {
@@ -61,502 +24,249 @@ router.get("/fitness", authRequired, async (req: AuthenticatedRequest, res) => {
     return;
   }
 
-  const challengeIdParam =
-    typeof req.query.challengeId === "string" && req.query.challengeId.length > 0
-      ? req.query.challengeId
-      : null;
+  const connections = await prisma.fitnessConnection.findMany({
+    where: { userId: req.user.id },
+    select: { provider: true, updatedAt: true, externalUserId: true },
+  });
 
-  const fitbitAvail = Boolean(config.oauth.fitbitClientId && config.oauth.fitbitClientSecret);
-  const googleAvail = Boolean(config.oauth.googleClientId && config.oauth.googleClientSecret);
-  const garminAvail = Boolean(config.oauth.garminClientId && config.oauth.garminClientSecret);
-
-  const [tokenCount, latestToken, oauthConnections] = await Promise.all([
-    prisma.integrationToken.count({ where: { userId: req.user.id } }),
-    prisma.integrationToken.findFirst({
-      where: { userId: req.user.id },
-      orderBy: { createdAt: "desc" },
-      select: { createdAt: true },
-    }),
-    prisma.oAuthConnection.findMany({
-      where: { userId: req.user.id },
-      select: { provider: true, updatedAt: true },
-    }),
-  ]);
-
-  let lastAppleHealthSync: Date | null = null;
-  const lastSyncByProvider = new Map<string, Date>();
-  if (challengeIdParam) {
-    const enrolled = await prisma.teamMember.findUnique({
-      where: { userId_challengeId: { userId: req.user.id, challengeId: challengeIdParam } },
-    });
-    if (enrolled) {
-      const trackedActions = [
-        "apple_health_sync",
-        "fitbit_sync",
-        "google_fit_sync",
-        "garmin_sync",
-      ];
-      // Pull latest sync row per action in a single query, then fold into the
-      // provider map. Faster than four separate findFirst calls.
-      const rows = await prisma.auditLog.findMany({
-        where: {
-          actorId: req.user.id,
-          challengeId: challengeIdParam,
-          action: { in: trackedActions },
-        },
-        orderBy: { createdAt: "desc" },
-        select: { action: true, createdAt: true },
-      });
-      for (const row of rows) {
-        if (row.action === "apple_health_sync") {
-          if (!lastAppleHealthSync) lastAppleHealthSync = row.createdAt;
-          continue;
-        }
-        const providerId = row.action.replace(/_sync$/u, "");
-        if (!lastSyncByProvider.has(providerId)) {
-          lastSyncByProvider.set(providerId, row.createdAt);
-        }
-      }
-    }
-  }
-
-  const oauthByProvider = new Map(oauthConnections.map((c) => [c.provider, c.updatedAt]));
-  const lastSyncIso = (id: string): string | null =>
-    lastSyncByProvider.get(id)?.toISOString() ?? null;
+  const connected = new Set(connections.map((c) => fitnessProviderSlug(c.provider)));
 
   res.json({
-    connected: tokenCount > 0 || oauthConnections.length > 0,
-    lastAppleHealthSyncAt: lastAppleHealthSync?.toISOString() ?? null,
+    connected: connections.length > 0,
     providers: [
-      {
-        id: "apple_health",
-        name: "Apple Health / Apple Watch",
-        available: true,
-        connected: tokenCount > 0,
-        connectedAt: latestToken?.createdAt?.toISOString() ?? null,
-        lastSyncedAt: lastAppleHealthSync?.toISOString() ?? null,
-      },
-      {
-        id: "google_fit",
-        name: "Google Fit",
-        available: googleAvail,
-        connected: oauthByProvider.has("google_fit"),
-        connectedAt: oauthByProvider.get("google_fit")?.toISOString() ?? null,
-        lastSyncedAt: lastSyncIso("google_fit"),
-      },
       {
         id: "fitbit",
         name: "Fitbit",
-        available: fitbitAvail,
-        connected: oauthByProvider.has("fitbit"),
-        connectedAt: oauthByProvider.get("fitbit")?.toISOString() ?? null,
-        lastSyncedAt: lastSyncIso("fitbit"),
+        available: fitbitConfigured(),
+        connectPath: "/api/integrations/fitness/oauth/fitbit/start",
+        connected: connected.has("fitbit"),
       },
       {
-        id: "garmin",
-        name: "Garmin Connect",
-        available: garminAvail,
-        connected: oauthByProvider.has("garmin"),
-        connectedAt: oauthByProvider.get("garmin")?.toISOString() ?? null,
-        lastSyncedAt: lastSyncIso("garmin"),
+        id: "google_fit",
+        name: "Google Fit / Health",
+        available: googleFitConfigured(),
+        connectPath: "/api/integrations/fitness/oauth/google_fit/start",
+        connected: connected.has("google_fit"),
+        note: "Uses Google Fitness REST (activity read). Apple Health is not available on web.",
       },
     ],
     message:
-      googleAvail || fitbitAvail || garminAvail
-        ? "Use OAuth for Fitbit, Google Fit, or Garmin Connect (when configured), or generate an integration token for Apple Watch via iOS Shortcuts."
-        : "Use an API token for Apple Watch / Health via iOS Shortcuts. Fitbit, Google Fit, and Garmin Connect appear after OAuth credentials are configured on the server.",
+      connections.length > 0
+        ? "Fitness sync runs periodically; use “Sync now” on Submit to pull the latest steps."
+        : "Connect a provider to import steps for the last 14 days. Manual entries are never overwritten.",
   });
 });
 
-// ---------------------------------------------------------------------------
-// Integration token management (JWT-authenticated)
-// ---------------------------------------------------------------------------
-
-const tokenCreateSchema = z.object({
-  label: z.string().min(1).max(80).optional(),
-  expiresAt: z.string().datetime().optional(),
+router.post("/fitness/sync", authRequired, async (req: AuthenticatedRequest, res) => {
+  if (!req.user) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+  const result = await syncFitnessForUser(req.user.id);
+  res.json({ ok: true, daysWritten: result.daysWritten });
 });
 
-/** POST /api/integrations/tokens — create a new integration token */
-router.post("/tokens", authRequired, async (req: AuthenticatedRequest, res) => {
+router.delete("/fitness/:provider", authRequired, async (req: AuthenticatedRequest, res) => {
+  if (!req.user) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+  const provider = parseFitnessProviderSlug(req.params.provider);
+  if (!provider) {
+    res.status(400).json({ error: "Unknown provider" });
+    return;
+  }
+  await prisma.fitnessConnection.deleteMany({
+    where: { userId: req.user.id, provider },
+  });
+  res.json({ ok: true });
+});
+
+router.get("/fitness/oauth/:provider/start", authRequired, async (req: AuthenticatedRequest, res) => {
   if (!req.user) {
     res.status(401).json({ error: "Authentication required" });
     return;
   }
 
-  const parsed = tokenCreateSchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: "Invalid request body" });
+  const provider = parseFitnessProviderSlug(req.params.provider);
+  if (!provider) {
+    res.status(400).send("Unknown provider");
     return;
   }
 
-  const existing = await prisma.integrationToken.count({ where: { userId: req.user.id } });
-  if (existing >= MAX_TOKENS_PER_USER) {
-    res.status(422).json({
-      error: `Token limit reached (max ${MAX_TOKENS_PER_USER}). Revoke an existing token first.`,
-      max: MAX_TOKENS_PER_USER,
-    });
+  if (provider === FitnessProvider.FITBIT && !fitbitConfigured()) {
+    res.status(503).send("Fitbit OAuth is not configured (set FITBIT_CLIENT_ID and FITBIT_CLIENT_SECRET).");
+    return;
+  }
+  if (provider === FitnessProvider.GOOGLE_FIT && !googleFitConfigured()) {
+    res.status(503).send("Google OAuth is not configured (set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET).");
     return;
   }
 
-  const label = parsed.data.label ?? "Apple Watch Sync";
-  const expiresAt = parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null;
-  const { plain, hash } = generateToken();
+  const slug = fitnessProviderSlug(provider);
+  const redirectUri = callbackUrl(slug);
+  const expiresAt = new Date(Date.now() + STATE_TTL_MIN * 60_000);
 
-  await prisma.integrationToken.create({
-    data: { userId: req.user.id, tokenHash: hash, label, ...(expiresAt ? { expiresAt } : {}) },
+  await prisma.fitnessOAuthState.deleteMany({
+    where: { userId: req.user.id, provider },
   });
-
-  // Return the plaintext token once — it is never stored or retrievable again.
-  res.status(201).json({ token: plain, label, expiresAt: expiresAt?.toISOString() ?? null });
-});
-
-/** GET /api/integrations/tokens — list the current user's tokens (no plaintext) */
-router.get("/tokens", authRequired, async (req: AuthenticatedRequest, res) => {
-  if (!req.user) {
-    res.status(401).json({ error: "Authentication required" });
-    return;
-  }
-
-  const tokens = await prisma.integrationToken.findMany({
-    where: { userId: req.user.id },
-    select: { id: true, label: true, createdAt: true, lastUsedAt: true, expiresAt: true },
-    orderBy: { createdAt: "desc" },
-  });
-
-  res.json({ tokens });
-});
-
-/** DELETE /api/integrations/tokens/:id — revoke a token */
-router.delete("/tokens/:id", authRequired, async (req: AuthenticatedRequest, res) => {
-  if (!req.user) {
-    res.status(401).json({ error: "Authentication required" });
-    return;
-  }
-
-  const { id } = req.params as { id: string };
-
-  const token = await prisma.integrationToken.findUnique({ where: { id } });
-  if (!token || token.userId !== req.user.id) {
-    res.status(404).json({ error: "Token not found" });
-    return;
-  }
-
-  await prisma.integrationToken.delete({ where: { id } });
-  res.status(204).send();
-});
-
-// ---------------------------------------------------------------------------
-// Apple Health / Watch sync (token-authenticated)
-// ---------------------------------------------------------------------------
-
-const appleHealthRowSchema = z.object({
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u, "date must be ISO YYYY-MM-DD"),
-  steps: z.number().int().min(0).max(200_000),
-});
-
-const appleHealthSchema = z.object({
-  challengeId: z.string().min(1),
-  rows: z
-    .array(appleHealthRowSchema)
-    .min(1)
-    .max(31, "max 31 rows per request (one month)")
-    .optional(),
-  // Convenience single-day shorthand (iOS Shortcut default)
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u).optional(),
-  steps: z.number().int().min(0).max(200_000).optional(),
-});
-
-/**
- * POST /api/integrations/apple-health
- *
- * Authenticated via `Authorization: Bearer ssp_<token>` — no session cookie
- * required. Accepts either a single-day shorthand `{ challengeId, date, steps }`
- * or a batch `{ challengeId, rows: [{ date, steps }] }`.
- *
- * This is the endpoint iOS Shortcuts call automatically after reading step
- * count from Apple Health. If the same calendar day appears multiple times in
- * `rows`, the highest step value is kept so batch shortcuts surface a full-day total.
- */
-router.post("/apple-health", integrationSyncLimiter, async (req, res) => {
-  const plain = extractBearerToken(req.headers.authorization);
-  if (!plain) {
-    res.status(401).json({ error: "Authorization: Bearer <token> required" });
-    return;
-  }
-
-  const user = await resolveTokenUser(plain);
-  if (!user) {
-    res.status(401).json({ error: "Invalid or revoked token" });
-    return;
-  }
-
-  const parsed = appleHealthSchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: "Invalid request body", details: parsed.error.flatten() });
-    return;
-  }
-
-  const { challengeId } = parsed.data;
-
-  // Normalise single-day shorthand into rows array
-  let rows: Array<{ date: string; steps: number }>;
-  if (parsed.data.rows && parsed.data.rows.length > 0) {
-    rows = parsed.data.rows;
-  } else if (parsed.data.date !== undefined && parsed.data.steps !== undefined) {
-    rows = [{ date: parsed.data.date, steps: parsed.data.steps }];
-  } else {
-    res.status(400).json({
-      error: "Provide either rows[] or both date and steps",
-    });
-    return;
-  }
-
-  const challenge = await prisma.challenge.findUnique({ where: { id: challengeId } });
-  if (!challenge) {
-    res.status(404).json({ error: "Challenge not found" });
-    return;
-  }
-  if (challenge.locked) {
-    res.status(409).json({ error: "Challenge is locked" });
-    return;
-  }
-
-  const membership = await prisma.teamMember.findUnique({
-    where: { userId_challengeId: { userId: user.id, challengeId: challenge.id } },
-  });
-  if (!membership) {
-    res.status(403).json({ error: "Not enrolled in this challenge" });
-    return;
-  }
-
-  const tz = challenge.timezone;
-  const challengeStart = toDateOnly(
-    DateTime.fromJSDate(challenge.startDate, { zone: tz }).toISODate() ?? "",
-    tz
-  );
-  const challengeEnd = toDateOnly(
-    DateTime.fromJSDate(challenge.endDate, { zone: tz }).toISODate() ?? "",
-    tz
-  );
-
-  const prepared: Array<{ date: Date; steps: number }> = [];
-  for (const row of rows) {
-    const day = toDateOnly(row.date, tz);
-    if (day < challengeStart || day > challengeEnd) {
-      res.status(400).json({
-        error: "One or more rows fall outside the challenge window",
-        offendingDate: row.date,
-      });
-      return;
-    }
-    prepared.push({ date: toJsDate(day), steps: row.steps });
-  }
-
-  // Same calendar day may appear more than once (Shortcuts batching). Keep the
-  // highest step count so the sync reflects the fullest daily total.
-  const byDayMs = new Map<number, { date: Date; steps: number }>();
-  for (const row of prepared) {
-    const ms = row.date.getTime();
-    const prev = byDayMs.get(ms);
-    if (!prev || row.steps > prev.steps) {
-      byDayMs.set(ms, row);
-    }
-  }
-  const daysToSync = [...byDayMs.values()];
-
-  const existing = await prisma.stepSubmission.findMany({
-    where: {
-      userId: user.id,
-      challengeId: challenge.id,
-      date: { in: daysToSync.map((r) => r.date) },
-    },
-    select: { date: true },
-  });
-  const existingKeys = new Set(existing.map((s) => s.date.getTime()));
-
-  await prisma.$transaction(
-    daysToSync.map((row) =>
-      prisma.stepSubmission.upsert({
-        where: {
-          userId_challengeId_date: { userId: user.id, challengeId: challenge.id, date: row.date },
-        },
-        update: { steps: row.steps, isFlagged: row.steps > 100_000 },
-        create: {
-          userId: user.id,
-          challengeId: challenge.id,
-          date: row.date,
-          steps: row.steps,
-          isFlagged: row.steps > 100_000,
-        },
-      })
-    )
-  );
-
-  const updated = daysToSync.filter((r) => existingKeys.has(r.date.getTime())).length;
-  const imported = daysToSync.length - updated;
-
-  await prisma.auditLog.create({
+  const state = await prisma.fitnessOAuthState.create({
     data: {
-      action: "apple_health_sync",
-      actorId: user.id,
-      challengeId: challenge.id,
-      metadata: {
-        imported,
-        updated,
-        days: daysToSync.length,
-        inputRows: prepared.length,
-      },
+      userId: req.user.id,
+      provider,
+      expiresAt,
     },
   });
 
-  res.json({ imported, updated, skipped: 0 });
-});
-
-// ---------------------------------------------------------------------------
-// CSV bulk import
-// ---------------------------------------------------------------------------
-
-const MAX_CSV_ROWS = 500;
-
-const csvRowSchema = z.object({
-  date: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/u, "date must be ISO YYYY-MM-DD"),
-  steps: z.number().int().min(0).max(200_000),
-});
-
-const csvImportSchema = z.object({
-  challengeId: z.string().min(1),
-  rows: z.array(csvRowSchema).min(1),
-});
-
-/**
- * Bulk CSV step import.
- *
- * Body: { challengeId, rows: [{ date: "YYYY-MM-DD", steps }] }
- */
-router.post("/csv", authRequired, async (req: AuthenticatedRequest, res) => {
-  if (!req.user) {
-    res.status(401).json({ error: "Authentication required" });
-    return;
-  }
-
-  const rawRows = (req.body as { rows?: unknown })?.rows;
-  if (Array.isArray(rawRows) && rawRows.length > MAX_CSV_ROWS) {
-    res.status(413).json({
-      error: `Too many rows (max ${MAX_CSV_ROWS})`,
-      max: MAX_CSV_ROWS,
+  if (provider === FitnessProvider.FITBIT) {
+    const params = new URLSearchParams({
+      response_type: "code",
+      client_id: config.fitbitClientId ?? "",
+      redirect_uri: redirectUri,
+      scope: "activity",
+      state: state.id,
     });
+    res.redirect(`https://www.fitbit.com/oauth2/authorize?${params.toString()}`);
     return;
   }
 
-  const parsed = csvImportSchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: "Invalid CSV import payload" });
-    return;
-  }
-
-  const { challengeId, rows } = parsed.data;
-
-  const challenge = await prisma.challenge.findUnique({
-    where: { id: challengeId },
+  const scope = [
+    "https://www.googleapis.com/auth/fitness.activity.read",
+    "openid",
+    "email",
+  ].join(" ");
+  const params = new URLSearchParams({
+    client_id: config.googleClientId ?? "",
+    redirect_uri: redirectUri,
+    response_type: "code",
+    scope,
+    access_type: "offline",
+    prompt: "consent",
+    state: state.id,
   });
-  if (!challenge) {
-    res.status(404).json({ error: "Challenge not found" });
+  res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
+});
+
+router.get("/fitness/oauth/:provider/callback", async (req, res) => {
+  const provider = parseFitnessProviderSlug(req.params.provider);
+  const code = typeof req.query.code === "string" ? req.query.code : "";
+  const stateId = typeof req.query.state === "string" ? req.query.state : "";
+  const err = typeof req.query.error === "string" ? req.query.error : "";
+
+  const redirectBack = (qs: string) => {
+    res.redirect(`${config.appOrigin}/submit${qs}`);
+  };
+
+  if (err) {
+    redirectBack(`?fitness=error&message=${encodeURIComponent(err)}`);
     return;
   }
-  if (challenge.locked) {
-    res.status(409).json({ error: "Challenge is locked" });
+  if (!provider || !code || !stateId) {
+    redirectBack(`?fitness=error&message=${encodeURIComponent("Missing code or state")}`);
     return;
   }
 
-  const membership = await prisma.teamMember.findUnique({
-    where: {
-      userId_challengeId: {
-        userId: req.user.id,
-        challengeId: challenge.id,
-      },
-    },
-  });
-  if (!membership) {
-    res.status(403).json({ error: "Not enrolled in this challenge" });
+  const row = await prisma.fitnessOAuthState.findUnique({ where: { id: stateId } });
+  if (!row || row.provider !== provider || row.expiresAt < new Date()) {
+    redirectBack(`?fitness=error&message=${encodeURIComponent("Invalid or expired session")}`);
     return;
   }
 
-  const userId = req.user.id;
-  const tz = challenge.timezone;
-  const challengeStart = toDateOnly(
-    DateTime.fromJSDate(challenge.startDate, { zone: tz }).toISODate() ?? "",
-    tz
-  );
-  const challengeEnd = toDateOnly(
-    DateTime.fromJSDate(challenge.endDate, { zone: tz }).toISODate() ?? "",
-    tz
-  );
+  const slug = fitnessProviderSlug(provider);
+  const redirectUri = callbackUrl(slug);
 
-  const prepared: Array<{ date: Date; steps: number }> = [];
-  for (const row of rows) {
-    const day = toDateOnly(row.date, tz);
-    if (day < challengeStart || day > challengeEnd) {
-      res.status(400).json({
-        error: "One or more rows fall outside the challenge window",
-        offendingDate: row.date,
-      });
-      return;
-    }
-    prepared.push({ date: toJsDate(day), steps: row.steps });
-  }
+  try {
+    if (provider === FitnessProvider.FITBIT) {
+      const tokens = await fitbitExchangeCode(code, redirectUri);
+      const userId = row.userId;
+      const access = tokens.access_token;
+      const refresh = tokens.refresh_token;
+      const expiresIn = tokens.expires_in;
+      const profileId = await fitbitFetchProfileUserId(access);
 
-  const existing = await prisma.stepSubmission.findMany({
-    where: {
-      userId,
-      challengeId: challenge.id,
-      date: { in: prepared.map((r) => r.date) },
-    },
-    select: { date: true },
-  });
-  const existingKeys = new Set(existing.map((s) => s.date.getTime()));
-
-  await prisma.$transaction(
-    prepared.map((row) =>
-      prisma.stepSubmission.upsert({
-        where: {
-          userId_challengeId_date: {
+      await prisma.$transaction([
+        prisma.fitnessOAuthState.delete({ where: { id: stateId } }),
+        prisma.fitnessConnection.upsert({
+          where: { userId_provider: { userId, provider } },
+          create: {
             userId,
-            challengeId: challenge.id,
-            date: row.date,
+            provider,
+            accessTokenEnc: sealSecret(access),
+            refreshTokenEnc: refresh ? sealSecret(refresh) : null,
+            expiresAt:
+              typeof expiresIn === "number"
+                ? new Date(Date.now() + expiresIn * 1000 - 60_000)
+                : null,
+            externalUserId: profileId,
           },
-        },
-        update: {
-          steps: row.steps,
-          isFlagged: row.steps > 100_000,
-        },
-        create: {
-          userId,
-          challengeId: challenge.id,
-          date: row.date,
-          steps: row.steps,
-          isFlagged: row.steps > 100_000,
-        },
-      })
-    )
-  );
+          update: {
+            accessTokenEnc: sealSecret(access),
+            ...(refresh ? { refreshTokenEnc: sealSecret(refresh) } : {}),
+            expiresAt:
+              typeof expiresIn === "number"
+                ? new Date(Date.now() + expiresIn * 1000 - 60_000)
+                : null,
+            externalUserId: profileId,
+          },
+        }),
+      ]);
+      redirectBack(`?fitness=connected&p=${slug}`);
+      return;
+    }
 
-  const updated = prepared.filter((r) => existingKeys.has(r.date.getTime())).length;
-  const imported = prepared.length - updated;
-  const skipped = 0;
+    if (provider === FitnessProvider.GOOGLE_FIT) {
+      const tokens = await googleExchangeCode(code, redirectUri);
+      const userId = row.userId;
+      const access = tokens.access_token;
+      const refresh = tokens.refresh_token;
+      const expiresIn = tokens.expires_in;
 
-  await prisma.auditLog.create({
-    data: {
-      action: "csv_import",
-      actorId: userId,
-      challengeId: challenge.id,
-      metadata: { imported, updated },
-    },
+      await prisma.$transaction([
+        prisma.fitnessOAuthState.delete({ where: { id: stateId } }),
+        prisma.fitnessConnection.upsert({
+          where: { userId_provider: { userId, provider } },
+          create: {
+            userId,
+            provider,
+            accessTokenEnc: sealSecret(access),
+            refreshTokenEnc: refresh ? sealSecret(refresh) : null,
+            expiresAt:
+              typeof expiresIn === "number"
+                ? new Date(Date.now() + expiresIn * 1000 - 60_000)
+                : null,
+            externalUserId: "google",
+          },
+          update: {
+            accessTokenEnc: sealSecret(access),
+            refreshTokenEnc: refresh ? sealSecret(refresh) : undefined,
+            expiresAt:
+              typeof expiresIn === "number"
+                ? new Date(Date.now() + expiresIn * 1000 - 60_000)
+                : null,
+          },
+        }),
+      ]);
+      redirectBack(`?fitness=connected&p=${slug}`);
+      return;
+    }
+
+    redirectBack(`?fitness=error&message=${encodeURIComponent("Unsupported provider")}`);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "OAuth failed";
+    redirectBack(`?fitness=error&message=${encodeURIComponent(message)}`);
+  }
+});
+
+/** Legacy POST entrypoint — returns absolute URL for GET …/start */
+router.post("/fitness/oauth/:provider", authRequired, async (req: AuthenticatedRequest, res) => {
+  const parsed = z.enum(["fitbit", "google_fit"]).safeParse(req.params.provider);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Unsupported provider" });
+    return;
+  }
+  res.json({
+    redirect: `${config.apiPublicUrl}/api/integrations/fitness/oauth/${parsed.data}/start`,
   });
-
-  res.json({ imported, updated, skipped });
 });
 
 export default router;

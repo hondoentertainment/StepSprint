@@ -1,19 +1,14 @@
-# Optional local PostgreSQL matching production. From repo root:
-#   docker compose up -d
-# Then copy server/prisma/schema.postgresql.prisma over schema.prisma (or symlink),
-# set DATABASE_URL=postgresql://stepsprint:stepsprint@localhost:5432/stepsprint,
-# and run prisma migrate dev from server/.
 services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: stepsprint
-      POSTGRES_PASSWORD: stepsprint
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
       POSTGRES_DB: stepsprint
     ports:
       - "5432:5432"
     volumes:
-      - stepsprint_pg:/var/lib/postgresql/data
+      - stepsprint_pgdata:/var/lib/postgresql/data
 
 volumes:
-  stepsprint_pg:
+  stepsprint_pgdata:

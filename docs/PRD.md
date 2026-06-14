@@ -1,7 +1,5 @@
 # StepSprint Product Requirements Document
 
-[Master roadmap (priorities & phases)](MASTER_ROADMAP.md)
-
 ## Vision
 
 StepSprint is a month-long step challenge platform that helps organizations run team-based fitness competitions. Teams compete on cumulative steps, building habits through accountability and friendly competition.
@@ -29,54 +27,49 @@ StepSprint is a month-long step challenge platform that helps organizations run 
 ## Core Flows
 
 ### Participant flow
-
-1. Sign in (email/password, email verification optional per deployment)
+1. Sign in (email and password — optional password reset via email when SMTP is configured)
 2. Select active challenge
-3. Log daily steps from Submit tab
+3. Log daily steps from Submit tab (manual or imported from a connected fitness provider)
 4. View Home: today, streak, consistency, team rank, gap to #1
 5. View Weekly Top Steppers and Team Standings leaderboards
-6. Optional: connect Fitbit / Google Fit (OAuth when server configured), Apple Watch shortcut token + `/api/integrations/apple-health`, or CSV bulk import
 
 ### Admin flow
-
 1. Create challenge (name, dates, timezone, team size)
-2. Add participants by email (comma-separated)
+2. Add participants by email (comma-separated) or invite link
 3. Assign teams (random or snake draft)
 4. Lock challenge when ready
 5. Moderate submissions (edit/delete with reason)
-6. Invite participants via per-email JWT link or shareable rotating challenge invite code (`/invite` + code flows)
-7. Review analytics dashboard (participation, dormant members, submissions-by-day chart)
-8. Export CSV (submissions, teams, weekly leaderboard)
+6. Review analytics (participation, weekly trend, inactive members) and export CSV (submissions, teams, weekly leaderboard, participation summary)
 
 ---
 
 ## Feature Requirements
 
-### Implemented
+### Implemented (v1)
 
-- [x] Email-based registration with password authentication, password reset, and optional verification mail (Resend or SMTP when configured)
+- [x] Email-based auth with password; optional forgot/reset password when SMTP is configured
 - [x] Challenge CRUD, lock/unlock, timezone
-- [x] Participant enrollment by email; invite JWT links + challenge invite codes (`/invite` page UX)
+- [x] Participant enrollment by email
 - [x] Team assignment (random, snake)
-- [x] Step submission; high-step flagging (>100k)
+- [x] Step submission, high-step flagging (>100k); submissions tagged **manual** vs **import**
+- [x] **Fitness integrations** — Fitbit and Google Fit (Fitness REST) OAuth, encrypted token storage, scheduled + on-demand sync for the last 14 days; imports do not overwrite manual entries for the same day
 - [x] Personal summary (today, week, month, streak, consistency, rank, gap)
-- [x] Weekly and team leaderboards; date-based ISO week picker
-- [x] Admin moderation (edit/delete submissions) with audit
-- [x] CSV exports (submissions, teams, weekly) using API-linked downloads in hosted environments
-- [x] Admin analytics: participation, never-logged count, dormant (7-day) count, submissions-by-day trend
-- [x] Reminders (opt-in `dailyReminder`): Web Push where VAPID is configured + email where Resend/SMTP configured; hourly sweep at each challenge’s local reminder hour (`REMINDER_NOTIFICATION_HOUR_LOCAL`)
-- [x] Fitness integrations: Apple Watch Shortcut token endpoint; OAuth Fitbit and Google Fit (connect/sync/disconnect); server reports provider availability accurately
-- [x] PostgreSQL-ready schema + single-Vercel deploy (SPA + Function + Vercel Postgres via Marketplace Neon), Docker Compose for optional local Postgres, SQLite for dev defaults
-- [x] Security: CSP on API (+ Swagger carve-out), CSP connect-src on Vercel client; JWT session cookies with `SameSite=None` + `Secure` in production split hosting; CSRF double-submit on mutating API calls in production; rate limiting tiers in production
-- [x] Unit, API, and E2E tests; OpenAPI `/api/docs`
+- [x] Weekly and team leaderboards; week selection aligned to challenge timezone
+- [x] Admin moderation (edit/delete submissions) with audit; edits mark rows as manual again
+- [x] CSV exports (submissions including source, teams, weekly, **participation summary**)
+- [x] **Notifications** — Email preferences (daily reminder, streak at risk) and scheduled reminder job (SMTP + cron env)
+- [x] **Analytics** — Admin API and UI: participation rate, inactive count, totals, weekly trend bars, inactive participant list
+- [x] **Invite flow** — Admin creates invite links; optional invite email when SMTP is configured; `/invite` acceptance page
+- [x] **Production readiness** — PostgreSQL (`docker compose` in repo), `/api/health` with DB check and uptime, optional `LOG_HTTP=1` request logging, `API_PUBLIC_URL` for OAuth callbacks
+- [x] **Rate limiting** on auth and general API routes
+- [x] Unit, API, and E2E tests (API tests require a running seeded Postgres database)
+- [x] Mobile-responsive layout
 
-### Improvements roadmap (stretch)
+### Planned enhancements
 
-- [x] Dedicated admin cohort analytics (benchmark table across challenges; optional **re-engagement / churn-risk count** — participants who logged at least once but have no submission in the dormant window; fuller forecasting remains future work)
-- [x] **Health platform scope (roadmap decision)** — The web/PWA client does not target in-browser Apple HealthKit or Android Health Connect reads (browser APIs do not allow it). **Supported:** iOS Shortcuts posting to `/api/integrations/apple-health` with a user-generated bearer token; OAuth for Fitbit, Google Fit, and Garmin when the server is registered with each provider (production always uses each vendor’s developer program / OAuth client where applicable). **Future optional:** a native shell (for example Capacitor) could add HealthKit or Health Connect; that is not part of the current PWA scope.
-- [x] Broader **i18n** — Primary participant and admin UI strings live in `client/src/i18n/en.json` (including fitness sync, cohort analytics, and core flows). Add languages by registering locale resources in `client/src/i18n`.
-- [x] **Cron webhook** — `POST /api/cron/reminder-sweep` with `Authorization: Bearer <REMINDER_CRON_SECRET>` when `REMINDER_USE_EXTERNAL_CRON=true`
-- [x] Postgres migration parity CI job (`server-test-postgres` in GitHub Actions; SQLite remains the default local dev DB)
+- [ ] **Apple Health** — No first-class web integration; document companion/export path if needed
+- [ ] **Deeper analytics** — Per-user timelines, richer charts, anomaly detection
+- [ ] **Deployment guides** — Hosted reference architecture (e.g. Render/Fly) with worker split for cron-heavy workloads
 
 ---
 
@@ -94,25 +87,26 @@ StepSprint is a month-long step challenge platform that helps organizations run 
 ## Out of Scope (for now)
 
 - Multi-tenancy / white-label
-- Native mobile apps beyond PWA installation
-- Real-time leaderboard websockets (polling only)
+- Native mobile apps
+- Real-time leaderboard updates (polling only)
 - Social sharing / badges
 
 ---
 
 ## Technical Constraints
 
-- SQLite in local dev; PostgreSQL on Render blueprint
-- JWT in HTTP-only cookies for SPA (cross-origin safe in prod with SameSite=None)
+- PostgreSQL for local and production (see repo `docker-compose.yml` and `.env.example`)
+- JWT in HTTP-only cookies for auth
 - Vite + React frontend; Express API
-- Prisma ORM
+- Prisma ORM for database
+- OAuth tokens at rest are encrypted using a key derived from `JWT_SECRET` (set a strong secret in production)
 
 ---
 
 ## Appendix: Terminology
 
 | Term | Definition |
-|------|-------------|
+|------|------------|
 | Challenge | A time-bounded step competition (e.g., "March Madness Steps") |
 | Team | Group of participants within a challenge |
 | Submission | One user's step count for one date |

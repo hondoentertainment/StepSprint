@@ -1,19 +1,14 @@
 import { Router } from "express";
-import { DateTime } from "luxon";
 import { z } from "zod";
 import { prisma } from "../prisma";
 import { config } from "../config";
 import { sameMonthRange, toDateOnly, toJsDate, getIsoWeekRange } from "../utils/dates";
 import { AuthenticatedRequest, authRequired, roleRequired } from "../middleware/auth";
-import { Role } from "@prisma/client";
-import { normalizeEmail } from "../utils/email";
+import { Role, StepSubmissionSource } from "@prisma/client";
 
 const router = Router();
 
 router.use(authRequired, roleRequired(Role.ADMIN));
-
-const sqlLikeCaseInsensitive =
-  config.databaseUrl.startsWith("postgresql:") || config.databaseUrl.startsWith("postgres:");
 
 const challengeSchema = z.object({
   name: z.string().min(1),
@@ -103,17 +98,15 @@ router.post("/challenges/:id/participants", async (req, res) => {
     return;
   }
 
-  // Admin-added participants are pre-verified — they'll set a password via /register.
   const usersFromEmails = parsed.data.emails
     ? await Promise.all(
-        parsed.data.emails.map((raw) => {
-          const email = normalizeEmail(raw);
-          return prisma.user.upsert({
+        parsed.data.emails.map((email) =>
+          prisma.user.upsert({
             where: { email },
-            update: { emailVerified: true },
-            create: { email, emailVerified: true },
-          });
-        })
+            update: {},
+            create: { email },
+          })
+        )
       )
     : [];
 
@@ -123,28 +116,15 @@ router.post("/challenges/:id/participants", async (req, res) => {
 
   const userIds = [...usersFromEmails, ...usersFromIds].map((user) => user.id);
 
-  // SQLite via the @prisma/adapter-better-sqlite3 does not support
-  // createMany({ skipDuplicates: true }); pre-filter the list against
-  // the (userId, challengeId) unique constraint instead.
-  const existing = userIds.length
-    ? await prisma.teamMember.findMany({
-        where: { challengeId: challenge.id, userId: { in: userIds } },
-        select: { userId: true },
-      })
-    : [];
-  const existingIds = new Set(existing.map((m) => m.userId));
-  const newUserIds = userIds.filter((id) => !existingIds.has(id));
-
-  if (newUserIds.length > 0) {
-    await prisma.teamMember.createMany({
-      data: newUserIds.map((userId) => ({
-        userId,
-        challengeId: challenge.id,
-        teamId: null,
-        isLeader: false,
-      })),
-    });
-  }
+  await prisma.teamMember.createMany({
+    data: userIds.map((userId) => ({
+      userId,
+      challengeId: challenge.id,
+      teamId: null,
+      isLeader: false,
+    })),
+    skipDuplicates: true,
+  });
 
   await prisma.auditLog.create({
     data: {
@@ -278,152 +258,24 @@ router.post("/challenges/:id/assign-teams", async (req, res) => {
   res.json({ teams: result });
 });
 
-const submissionsQuerySchema = z.object({
-  query: z.string().optional(),
-  challengeId: z.string().optional(),
-  cursor: z.string().optional(),
-  limit: z.coerce.number().int().min(1).max(200).default(50),
-});
-
-const activityGridQuerySchema = z.object({
-  weekYear: z.coerce.number().int(),
-  weekNumber: z.coerce.number().int().min(1).max(53),
-});
-
-router.get("/challenges/:challengeId/activity-grid", async (req, res) => {
-  const parsed = activityGridQuerySchema.safeParse(req.query);
-  if (!parsed.success) {
-    res.status(400).json({ error: "weekYear and weekNumber (1-53) are required" });
-    return;
-  }
-
-  const challenge = await prisma.challenge.findUnique({
-    where: { id: req.params.challengeId },
-  });
-  if (!challenge) {
-    res.status(404).json({ error: "Challenge not found" });
-    return;
-  }
-
-  const tz = challenge.timezone;
-  const { weekYear, weekNumber } = parsed.data;
-  const challengeStart = DateTime.fromJSDate(challenge.startDate, { zone: tz }).startOf("day");
-  const challengeEnd = DateTime.fromJSDate(challenge.endDate, { zone: tz }).startOf("day");
-  const { start: weekMonday } = getIsoWeekRange(weekYear, weekNumber, tz);
-  const weekSunday = weekMonday.plus({ days: 6 }).startOf("day");
-
-  let gridStart = weekMonday > challengeStart ? weekMonday : challengeStart;
-  let gridEnd = weekSunday < challengeEnd ? weekSunday : challengeEnd;
-  if (gridStart > gridEnd) {
-    const membersEmpty = await prisma.teamMember.findMany({
-      where: { challengeId: challenge.id },
-      include: { user: true },
-      orderBy: { user: { email: "asc" } },
-    });
-    res.json({
-      challengeId: challenge.id,
-      weekYear,
-      weekNumber,
-      timezone: tz,
-      days: [],
-      rows: membersEmpty.map((m) => ({
-        userId: m.user.id,
-        email: m.user.email,
-        name: m.user.name,
-        cells: [],
-      })),
-    });
-    return;
-  }
-
-  const days: string[] = [];
-  for (let d = gridStart; d <= gridEnd; d = d.plus({ days: 1 })) {
-    const iso = d.toISODate();
-    if (iso) days.push(iso);
-  }
-
-  const members = await prisma.teamMember.findMany({
-    where: { challengeId: challenge.id },
-    include: { user: true },
-    orderBy: { user: { email: "asc" } },
-  });
-
-  const submissions = await prisma.stepSubmission.findMany({
-    where: {
-      challengeId: challenge.id,
-      date: {
-        gte: gridStart.toJSDate(),
-        lte: gridEnd.endOf("day").toJSDate(),
-      },
-    },
-    select: { userId: true, date: true, steps: true, isFlagged: true },
-  });
-
-  const stepsMap = new Map<string, { steps: number; flagged: boolean }>();
-  const daySet = new Set(days);
-  for (const s of submissions) {
-    const iso = DateTime.fromJSDate(s.date, { zone: tz }).toISODate();
-    if (!iso || !daySet.has(iso)) continue;
-    const key = `${s.userId}\t${iso}`;
-    const prev = stepsMap.get(key);
-    if (prev) {
-      prev.steps += s.steps;
-      prev.flagged = prev.flagged || s.isFlagged;
-    } else {
-      stepsMap.set(key, { steps: s.steps, flagged: s.isFlagged });
-    }
-  }
-
-  const rows = members.map((m) => ({
-    userId: m.user.id,
-    email: m.user.email,
-    name: m.user.name,
-    cells: days.map((day) => {
-      const entry = stepsMap.get(`${m.user.id}\t${day}`);
-      return entry ? { steps: entry.steps, flagged: entry.flagged } : { steps: null, flagged: false };
-    }),
-  }));
-
-  res.json({
-    challengeId: challenge.id,
-    weekYear,
-    weekNumber,
-    timezone: tz,
-    days,
-    rows,
-  });
-});
-
 router.get("/submissions", async (req, res) => {
-  const parsed = submissionsQuerySchema.safeParse(req.query);
-  if (!parsed.success) {
-    res.status(400).json({ error: "Invalid query parameters" });
-    return;
-  }
-
-  const { query, challengeId, cursor, limit } = parsed.data;
+  const query = typeof req.query.query === "string" ? req.query.query : "";
+  const challengeId = typeof req.query.challengeId === "string" ? req.query.challengeId : undefined;
   const where: Record<string, unknown> = {};
   if (challengeId) where.challengeId = challengeId;
   if (query) {
-    const textFilter = sqlLikeCaseInsensitive
-      ? { contains: query, mode: "insensitive" as const }
-      : { contains: query };
-    where.OR = [{ user: { email: textFilter } }, { user: { name: textFilter } }];
+    where.OR = [
+      { user: { email: { contains: query, mode: "insensitive" } } },
+      { user: { name: { contains: query, mode: "insensitive" } } },
+    ];
   }
-
   const submissions = await prisma.stepSubmission.findMany({
     where,
     include: { user: true, challenge: true },
-    orderBy: [{ date: "desc" }, { id: "desc" }],
-    take: limit + 1,
-    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    orderBy: { date: "desc" },
+    take: 200,
   });
-
-  const hasMore = submissions.length > limit;
-  const page = hasMore ? submissions.slice(0, limit) : submissions;
-  const nextCursor = hasMore ? page[page.length - 1]?.id : undefined;
-
-  res.json({ submissions: page, nextCursor: nextCursor ?? null, hasMore });
+  res.json({ submissions });
 });
 
 const editSchema = z.object({
@@ -457,6 +309,7 @@ router.patch("/submissions/:id", async (req, res) => {
         ? toJsDate(toDateOnly(parsed.data.date, tz))
         : submission.date,
       isFlagged: (parsed.data.steps ?? submission.steps) > 100000,
+      source: StepSubmissionSource.MANUAL,
     },
   });
 
@@ -522,6 +375,39 @@ router.get("/export/submissions", async (req, res) => {
         submission.steps.toString(),
         submission.isFlagged ? "yes" : "no",
       ].join(",")
+    ),
+  ];
+  res.header("Content-Type", "text/csv");
+  res.send(rows.join("\n"));
+});
+
+router.get("/export/participation", async (req, res) => {
+  const challengeId = typeof req.query.challengeId === "string" ? req.query.challengeId : undefined;
+  if (!challengeId) {
+    res.status(400).json({ error: "challengeId required" });
+    return;
+  }
+  const members = await prisma.teamMember.findMany({
+    where: { challengeId },
+    include: { user: true },
+  });
+  const submissions = await prisma.stepSubmission.findMany({
+    where: { challengeId },
+  });
+  const activeByUser = new Map<string, number>();
+  submissions.forEach((s) => {
+    activeByUser.set(s.userId, (activeByUser.get(s.userId) ?? 0) + 1);
+  });
+  const list = members.map((m) => ({
+    email: m.user.email,
+    name: m.user.name ?? "",
+    days: activeByUser.get(m.userId) ?? 0,
+  }));
+  list.sort((a, b) => a.days - b.days);
+  const rows = [
+    ["email", "name", "submissionDays", "status"].join(","),
+    ...list.map((r) =>
+      [r.email, r.name, String(r.days), r.days === 0 ? "inactive" : "active"].join(",")
     ),
   ];
   res.header("Content-Type", "text/csv");

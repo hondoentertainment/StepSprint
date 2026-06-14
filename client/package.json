@@ -3,9 +3,6 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "engines": {
-    "node": ">=20 <23"
-  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -15,26 +12,20 @@
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "test:e2e:desktop": "playwright test --project=desktop-chrome",
-    "test:e2e:mobile": "playwright test --project=mobile-chrome --project=mobile-safari",
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
-    "@sentry/react": "^10.49.0",
-    "i18next": "^26.0.6",
-    "posthog-js": "^1.369.3",
+    "luxon": "^3.7.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "react-i18next": "^17.0.4",
     "react-router-dom": "^7.13.0"
   },
   "devDependencies": {
-    "@axe-core/playwright": "^4.11.2",
     "@eslint/js": "^9.39.1",
     "@playwright/test": "^1.49.0",
-    "@sentry/vite-plugin": "^5.2.1",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",
+    "@types/luxon": "^3.7.0",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
@@ -47,7 +38,6 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
     "vite": "^7.2.4",
-    "vite-plugin-pwa": "^1.2.0",
     "vitest": "^3.0.0"
   }
 }

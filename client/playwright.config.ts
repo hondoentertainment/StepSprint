@@ -14,8 +14,7 @@ export default defineConfig({
   reporter: "html",
   timeout: 60_000,
   use: {
-    // Use 127.0.0.1 so WebKit on Windows does not prefer IPv6 (::1) when Vite binds IPv4-only.
-    baseURL: "http://127.0.0.1:5173",
+    baseURL: "http://localhost:5173",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
   },
@@ -50,23 +49,22 @@ export default defineConfig({
   webServer: [
     {
       command: "npm run dev",
-      url: "http://127.0.0.1:5173",
-      // Avoid attaching to an unrelated process on :5173 (different host/bind breaks tests mid-run).
-      reuseExistingServer: false,
+      url: "http://localhost:5173",
+      reuseExistingServer: !process.env.CI,
       timeout: 120_000,
     },
     {
-      command: "npm run dev:e2e",
-      url: "http://127.0.0.1:3001/api/health",
+      command: "npm run dev",
+      url: "http://localhost:3001/api/health",
       cwd: serverDir,
-      // Avoid attaching to an unrelated process on :5173 (different host/bind breaks tests mid-run).
-      reuseExistingServer: false,
-      timeout: 180_000,
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
       env: {
         ...process.env,
-        JWT_SECRET: process.env.JWT_SECRET || "test-jwt-secret-ci-stepsprint-minimum-32-chars",
-        DATABASE_URL: process.env.DATABASE_URL || "file:./e2e.db",
-        NODE_ENV: process.env.NODE_ENV || "development",
+        JWT_SECRET: process.env.JWT_SECRET || "test-jwt-secret-min-16-chars",
+        DATABASE_URL:
+          process.env.DATABASE_URL ||
+          "postgresql://postgres:postgres@localhost:5432/stepsprint?schema=public",
       },
     },
   ],

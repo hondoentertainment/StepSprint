@@ -5,17 +5,15 @@ export default defineConfig({
   test: {
     globals: false,
     environment: "node",
-    globalSetup: [path.resolve(__dirname, "vitest.global-setup.ts")],
-    // These are injected before any module is evaluated, so config.ts validation passes.
     env: {
-      JWT_SECRET: process.env.JWT_SECRET ?? "test-jwt-secret-ci-stepsprint-minimum-32-chars",
-      DATABASE_URL: process.env.DATABASE_URL ?? "file:./test.db",
+      DATABASE_URL:
+        process.env.DATABASE_URL ??
+        "postgresql://postgres:postgres@localhost:5432/stepsprint?schema=public",
+      JWT_SECRET: process.env.JWT_SECRET ?? "test-jwt-secret-min-16-chars",
     },
     setupFiles: [path.resolve(__dirname, "vitest.setup.ts")],
     include: ["src/**/*.test.ts"],
     testTimeout: 10_000,
-    /** beforeAll hooks (heavy DB fixtures) exceed default 10s when files run in parallel. */
-    hookTimeout: 60_000,
     coverage: {
       provider: "v8",
       reporter: ["text", "html", "lcov"],

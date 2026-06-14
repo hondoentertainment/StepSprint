@@ -44,9 +44,12 @@ export function Admin({
   const [inviteUrl, setInviteUrl] = useState("");
   const [analytics, setAnalytics] = useState<{
     participationRate: number;
+    dropoutCount: number;
     avgActiveDays: number;
     totalSubmissions: number;
     totalSteps: number;
+    weeklyTrend: { weekYear: number; weekNumber: number; label: string; submissionCount: number }[];
+    inactiveParticipants?: { email: string; name: string }[];
   } | null>(null);
 
   useEffect(() => {
@@ -59,9 +62,15 @@ export function Admin({
 
   useEffect(() => {
     if (user.role !== "ADMIN" || !selectedChallengeId) return;
-    api<{ participationRate: number; avgActiveDays: number; totalSubmissions: number; totalSteps: number }>(
-      `/api/admin/analytics?challengeId=${selectedChallengeId}`
-    )
+    api<{
+      participationRate: number;
+      dropoutCount: number;
+      avgActiveDays: number;
+      totalSubmissions: number;
+      totalSteps: number;
+      weeklyTrend: { weekYear: number; weekNumber: number; label: string; submissionCount: number }[];
+      inactiveParticipants?: { email: string; name: string }[];
+    }>(`/api/admin/analytics?challengeId=${selectedChallengeId}`)
       .then(setAnalytics)
       .catch(() => setAnalytics(null));
   }, [user.role, selectedChallengeId]);
@@ -72,12 +81,17 @@ export function Admin({
       return;
     }
     try {
-      const data = await api<{ inviteUrl: string }>("/api/invites", {
+      const data = await api<{ inviteUrl: string; emailSent?: boolean }>("/api/invites", {
         method: "POST",
         body: JSON.stringify({ challengeId: selectedChallengeId, email: inviteEmail }),
       });
       setInviteUrl(data.inviteUrl);
-      showFeedback("success", "Invite link created. Share it with the participant.");
+      showFeedback(
+        "success",
+        data.emailSent
+          ? "Invite link created and emailed to the participant."
+          : "Invite link created. Share it with the participant (configure SMTP to send email automatically)."
+      );
     } catch (err) {
       showFeedback("error", getErrorMessage(err));
     }
@@ -247,7 +261,9 @@ export function Admin({
             {submissions.map((sub) => (
               <div key={sub.id} className="list-row">
                 <div>
-                  {sub.user.name ?? sub.user.email} · {sub.date.slice(0, 10)} · {sub.steps} steps {sub.isFlagged ? "(flagged)" : ""}
+                  {sub.user.name ?? sub.user.email} · {sub.date.slice(0, 10)} · {sub.steps} steps{" "}
+                  {sub.source === "IMPORT" ? <span className="badge-ready">import</span> : null}{" "}
+                  {sub.isFlagged ? "(flagged)" : ""}
                 </div>
                 <div className="row">
                   <button
@@ -283,9 +299,53 @@ export function Admin({
           {analytics && selectedChallengeId ? (
             <div className="analytics-stats">
               <span>Participation: {analytics.participationRate}%</span>
+              <span>Inactive (no submissions): {analytics.dropoutCount}</span>
               <span>Avg active days: {analytics.avgActiveDays}</span>
               <span>Total submissions: {analytics.totalSubmissions}</span>
               <span>Total steps: {analytics.totalSteps.toLocaleString()}</span>
+              <div className="analytics-bars" aria-label="Weekly submission totals">
+                {(() => {
+                  const max = Math.max(1, ...analytics.weeklyTrend.map((w) => w.submissionCount));
+                  return analytics.weeklyTrend.map((w) => (
+                    <div key={`${w.weekYear}-W${w.weekNumber}`} className="analytics-bar-col">
+                      <div className="analytics-bar-track" title={`${w.submissionCount} submissions`}>
+                        <div
+                          className="analytics-bar-fill"
+                          style={{ height: `${Math.round((w.submissionCount / max) * 100)}%` }}
+                        />
+                      </div>
+                      <div className="analytics-bar-meta">
+                        W{w.weekNumber}
+                        <br />
+                        {w.submissionCount}
+                      </div>
+                    </div>
+                  ));
+                })()}
+              </div>
+              <div className="analytics-trend" role="list">
+                <strong>Recent weeks (submissions)</strong>
+                <ul>
+                  {analytics.weeklyTrend.map((w) => (
+                    <li key={`${w.weekYear}-W${w.weekNumber}-list`}>
+                      W{w.weekNumber} ({w.label}): {w.submissionCount}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              {analytics.inactiveParticipants && analytics.inactiveParticipants.length > 0 && (
+                <div className="analytics-inactive">
+                  <strong>No submissions yet</strong>
+                  <ul>
+                    {analytics.inactiveParticipants.map((p) => (
+                      <li key={p.email}>
+                        {p.name ? `${p.name} · ` : ""}
+                        {p.email}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           ) : (
             <p className="hint">Select a challenge to view analytics.</p>
@@ -297,6 +357,13 @@ export function Admin({
             <a href={`/api/admin/export/submissions?challengeId=${selectedChallengeId || ""}`} target="_blank" rel="noreferrer">Export submissions CSV</a>
             <a href={`/api/admin/export/teams?challengeId=${selectedChallengeId || ""}`} target="_blank" rel="noreferrer">Export team leaderboard CSV</a>
             <a href={`/api/admin/export/weekly?challengeId=${selectedChallengeId || ""}&weekYear=${weekYear}&weekNumber=${weekNumber}`} target="_blank" rel="noreferrer">Export weekly leaderboard CSV</a>
+            <a
+              href={`/api/admin/export/participation?challengeId=${selectedChallengeId || ""}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Export participation CSV
+            </a>
           </div>
         </div>
       </div>

@@ -1,12 +1,27 @@
-import { useState } from "react";
-import { api } from "../api";
-import { getErrorMessage } from "../api";
+import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { api, getApiUrl, getErrorMessage } from "../api";
 import { todayInTimezone, isFutureDate } from "../utils";
 import type { Challenge } from "../types";
 import type { Summary } from "../types";
 
 const MIN_STEPS = 0;
 const MAX_STEPS = 999999;
+
+type FitnessProviderInfo = {
+  id: string;
+  name: string;
+  available: boolean;
+  connectPath?: string;
+  connected?: boolean;
+  note?: string;
+};
+
+type FitnessStatusResponse = {
+  connected: boolean;
+  providers: FitnessProviderInfo[];
+  message: string;
+};
 
 type Props = {
   challengeId: string;
@@ -21,11 +36,49 @@ export function Submit({
   challengesLoading,
   onSummaryUpdated,
 }: Props) {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [date, setDate] = useState(() => todayInTimezone());
   const [steps, setSteps] = useState(8000);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [fitnessOpen, setFitnessOpen] = useState(false);
+  const [fitness, setFitness] = useState<FitnessStatusResponse | null>(null);
+  const [fitnessLoadError, setFitnessLoadError] = useState("");
+  const [fitnessBanner, setFitnessBanner] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [syncBusy, setSyncBusy] = useState(false);
+
+  const loadFitness = useCallback(() => {
+    api<FitnessStatusResponse>("/api/integrations/fitness")
+      .then((d) => {
+        setFitness(d);
+        setFitnessLoadError("");
+      })
+      .catch((err) => {
+        setFitness(null);
+        setFitnessLoadError(getErrorMessage(err));
+      });
+  }, []);
+
+  useEffect(() => {
+    const f = searchParams.get("fitness");
+    const msg = searchParams.get("message");
+    const p = searchParams.get("p");
+    if (f === "connected") {
+      const label = p === "fitbit" ? "Fitbit" : p === "google_fit" ? "Google Fit" : "your device";
+      setFitnessBanner({ type: "success", text: `Connected ${label}. Tap “Sync now” to import recent steps.` });
+      loadFitness();
+    } else if (f === "error" && msg) {
+      setFitnessBanner({ type: "error", text: decodeURIComponent(msg) });
+    }
+    if (f) {
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams, loadFitness]);
+
+  useEffect(() => {
+    if (fitnessOpen) loadFitness();
+  }, [fitnessOpen, loadFitness]);
 
   function resetDate() {
     setDate(todayInTimezone(selectedChallenge?.timezone));
@@ -75,6 +128,37 @@ export function Submit({
     }
   }
 
+  async function handleSyncNow() {
+    try {
+      setSyncBusy(true);
+      setFitnessBanner(null);
+      const r = await api<{ daysWritten: number }>("/api/integrations/fitness/sync", { method: "POST" });
+      setFitnessBanner({
+        type: "success",
+        text:
+          r.daysWritten > 0
+            ? `Imported or updated ${r.daysWritten} day(s) from connected providers.`
+            : "Sync complete. No new days to import (you may already be up to date, or manual entries block imports for those days).",
+      });
+      const summary = await api<Summary>(`/api/me/summary?challengeId=${challengeId}`);
+      onSummaryUpdated?.(summary);
+    } catch (err) {
+      setFitnessBanner({ type: "error", text: getErrorMessage(err) });
+    } finally {
+      setSyncBusy(false);
+    }
+  }
+
+  async function handleDisconnect(providerId: string) {
+    try {
+      await api(`/api/integrations/fitness/${providerId}`, { method: "DELETE" });
+      loadFitness();
+      setFitnessBanner({ type: "success", text: "Disconnected." });
+    } catch (err) {
+      setFitnessBanner({ type: "error", text: getErrorMessage(err) });
+    }
+  }
+
   const validationError = getValidationError();
   const canSubmit = date && challengeId && !validationError && !isSubmitting;
 
@@ -106,16 +190,69 @@ export function Submit({
         </button>
       </form>
       <p className="hint">Submissions above 100,000 steps are flagged.</p>
-      <p className="hint">
-        <button
-          type="button"
-          className="link-button"
-          onClick={() => api<{ message: string }>("/api/integrations/fitness").then((d) => alert(d.message))}
-        >
-          Connect fitness device
-        </button>{" "}
-        <span className="badge-coming-soon">Coming soon</span> (Google Fit, Apple Health)
-      </p>
+
+      <div className="fitness-import">
+        <button type="button" className="link-button fitness-import-toggle" onClick={() => setFitnessOpen((o) => !o)}>
+          {fitnessOpen ? "Hide" : "Show"} fitness import
+        </button>
+        {fitnessOpen && (
+          <div className="fitness-import-panel">
+            {fitnessBanner && (
+              <p className={`status status-${fitnessBanner.type === "success" ? "success" : "error"}`} role="status">
+                {fitnessBanner.text}
+              </p>
+            )}
+            {fitnessLoadError && <p className="status status-error">{fitnessLoadError}</p>}
+            {fitness && (
+              <>
+                <p className="hint">{fitness.message}</p>
+                <div className="fitness-actions">
+                  <button type="button" className="secondary" disabled={syncBusy || !fitness.connected} onClick={handleSyncNow}>
+                    {syncBusy ? "Syncing…" : "Sync now"}
+                  </button>
+                </div>
+                <ul className="fitness-provider-list">
+                  {fitness.providers.map((p) => (
+                    <li key={p.id}>
+                      <div className="fitness-provider-row">
+                        <div>
+                          <strong>{p.name}</strong>
+                          {p.connected ? (
+                            <span className="badge-connected">Connected</span>
+                          ) : p.available ? (
+                            <span className="badge-ready">Ready to connect</span>
+                          ) : (
+                            <span className="badge-coming-soon">Not configured</span>
+                          )}
+                          {p.note && <p className="hint tight">{p.note}</p>}
+                        </div>
+                        <div className="fitness-provider-actions">
+                          {p.available && p.connectPath && !p.connected && (
+                            <button
+                              type="button"
+                              className="secondary"
+                              onClick={() => {
+                                window.location.assign(getApiUrl(p.connectPath!));
+                              }}
+                            >
+                              Connect
+                            </button>
+                          )}
+                          {p.connected && (
+                            <button type="button" className="secondary danger-outline" onClick={() => void handleDisconnect(p.id)}>
+                              Disconnect
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </section>
   );
 }

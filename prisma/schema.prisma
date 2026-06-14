@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  output   = "../server/node_modules/.prisma/client"
 }
 
 datasource db {
@@ -59,7 +60,6 @@ model NotificationPreference {
   user                  User    @relation(fields: [userId], references: [id])
 }
 
-/** Short-lived CSRF/state row for OAuth redirect flow */
 model FitnessOAuthState {
   id         String          @id @default(cuid())
   userId     String
@@ -72,16 +72,16 @@ model FitnessOAuthState {
 }
 
 model FitnessConnection {
-  id             String          @id @default(cuid())
-  userId         String
-  provider       FitnessProvider
-  accessTokenEnc String
+  id              String          @id @default(cuid())
+  userId          String
+  provider        FitnessProvider
+  accessTokenEnc  String
   refreshTokenEnc String?
-  expiresAt      DateTime?
-  externalUserId String?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt       DateTime?
+  externalUserId  String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, provider])
   @@index([userId])

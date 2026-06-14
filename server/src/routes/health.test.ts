@@ -3,10 +3,10 @@ import request from "supertest";
 import app from "../app";
 
 describe("Health", () => {
-  it("GET /api/health returns ok", async () => {
+  it("GET /api/health returns database status and uptime", async () => {
     const res = await request(app).get("/api/health").expect(200);
     expect(res.body.ok).toBe(true);
-    expect(res.body.db).toBe("up");
-    expect(res.body.service).toBe("stepsprint-api");
+    expect(res.body.database).toBe("ok");
+    expect(typeof res.body.uptimeSeconds).toBe("number");
   });
 });
