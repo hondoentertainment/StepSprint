@@ -22,15 +22,6 @@ export function Layout({
 }: Props) {
   const visibleTabs = TABS.filter((t) => t !== "Admin" || user.role === "ADMIN");
 
-  const pathToTab: Record<string, string> = {
-    "/": "Home",
-    "/home": "Home",
-    "/submit": "Submit",
-    "/weekly": "Weekly Top Steppers",
-    "/teams": "Team Standings",
-    "/admin": "Admin",
-  };
-
   const tabToPath: Record<string, string> = {
     Home: "/home",
     Submit: "/submit",

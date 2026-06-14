@@ -110,7 +110,7 @@ export function Submit({
         <button
           type="button"
           className="link-button"
-          onClick={() => api("/api/integrations/fitness").then((d: { message: string }) => alert(d.message))}
+          onClick={() => api<{ message: string }>("/api/integrations/fitness").then((d) => alert(d.message))}
         >
           Connect fitness device
         </button>{" "}
