@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import { z } from "zod";
 import { prisma } from "../prisma";
 import { config } from "../config";
+import { sendEmail } from "../services/email";
 import { authRequired, roleRequired, AuthenticatedRequest } from "../middleware/auth";
 import { Role } from "@prisma/client";
 
@@ -36,7 +37,20 @@ router.post("/", authRequired, roleRequired(Role.ADMIN), async (req: Authenticat
 
   const baseUrl = config.appOrigin.replace(/\/$/, "");
   const inviteUrl = `${baseUrl}/invite?token=${token}`;
-  res.json({ inviteUrl, expiresIn: INVITE_EXPIRY });
+
+  let emailSent = false;
+  try {
+    await sendEmail({
+      to: parsed.data.email,
+      subject: `You're invited: ${challenge.name}`,
+      text: `You've been invited to join the StepSprint challenge "${challenge.name}".\n\nOpen this link to accept (expires in 7 days):\n${inviteUrl}\n\nIf you did not expect this, you can ignore this email.`,
+    });
+    emailSent = Boolean(config.smtp);
+  } catch (err) {
+    console.error("Invite email failed:", err);
+  }
+
+  res.json({ inviteUrl, expiresIn: INVITE_EXPIRY, emailSent });
 });
 
 /** Public: accept invite (enrolls user and returns session) */

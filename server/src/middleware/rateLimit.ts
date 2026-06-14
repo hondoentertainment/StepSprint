@@ -7,10 +7,12 @@ export const authLimiter = rateLimit({
   message: { error: "Too many requests, please try again later." },
 });
 
-/** General API rate limit (applied in production) */
+const isProduction = process.env.NODE_ENV === "production";
+
+/** General API rate limit (stricter in production) */
 export const apiLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
-  max: 120,
+  max: isProduction ? 120 : 2000,
   message: { error: "Too many requests, please try again later." },
 });
 

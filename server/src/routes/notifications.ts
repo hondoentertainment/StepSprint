@@ -11,12 +11,20 @@ router.get("/preferences", authRequired, async (req: AuthenticatedRequest, res) 
   const pref = await prisma.notificationPreference.findUnique({
     where: { userId },
   });
-  res.json({ dailyReminder: pref?.dailyReminder ?? false });
+  res.json({
+    dailyReminder: pref?.dailyReminder ?? false,
+    streakAtRiskReminder: pref?.streakAtRiskReminder ?? false,
+  });
 });
 
 /** Update notification preferences */
 router.patch("/preferences", authRequired, async (req: AuthenticatedRequest, res) => {
-  const parsed = z.object({ dailyReminder: z.boolean().optional() }).safeParse(req.body);
+  const parsed = z
+    .object({
+      dailyReminder: z.boolean().optional(),
+      streakAtRiskReminder: z.boolean().optional(),
+    })
+    .safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid payload" });
     return;
@@ -26,10 +34,17 @@ router.patch("/preferences", authRequired, async (req: AuthenticatedRequest, res
   const updated = await prisma.notificationPreference.upsert({
     where: { userId },
     update: { ...parsed.data },
-    create: { userId, dailyReminder: parsed.data.dailyReminder ?? false },
+    create: {
+      userId,
+      dailyReminder: parsed.data.dailyReminder ?? false,
+      streakAtRiskReminder: parsed.data.streakAtRiskReminder ?? false,
+    },
   });
 
-  res.json({ dailyReminder: updated.dailyReminder });
+  res.json({
+    dailyReminder: updated.dailyReminder,
+    streakAtRiskReminder: updated.streakAtRiskReminder,
+  });
 });
 
 export default router;

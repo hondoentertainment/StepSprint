@@ -58,6 +58,7 @@ export function WeeklyLeaderboard({ challengeId, selectedChallenge }: Props) {
         onChange={setWeek}
         challengeStart={selectedChallenge?.startDate}
         challengeEnd={selectedChallenge?.endDate}
+        timezone={selectedChallenge?.timezone}
       />
       {isLoading ? (
         <div className="loading-skeleton">

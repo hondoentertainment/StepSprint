@@ -1,11 +1,21 @@
 import { PrismaClient, Role } from "@prisma/client";
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { Pool } from "pg";
 import { DateTime } from "luxon";
 import bcrypt from "bcryptjs";
+import dotenv from "dotenv";
 import path from "path";
 
-const dbPath = path.resolve(__dirname, "../dev.db");
-const adapter = new PrismaBetterSqlite3({ url: `file:${dbPath}` });
+dotenv.config({ path: path.resolve(process.cwd(), "..", ".env") });
+dotenv.config();
+
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) {
+  throw new Error("DATABASE_URL is required for seed");
+}
+
+const pool = new Pool({ connectionString: databaseUrl });
+const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 const TZ = "America/Chicago";
@@ -140,4 +150,5 @@ main()
   })
   .finally(async () => {
     await prisma.$disconnect();
+    await pool.end();
   });

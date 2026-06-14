@@ -37,6 +37,7 @@ export function Home({
   const [error, setError] = useState("");
   const [welcomeMessage, setWelcomeMessage] = useState(false);
   const [dailyReminder, setDailyReminder] = useState(false);
+  const [streakReminder, setStreakReminder] = useState(false);
 
   useEffect(() => {
     if (typeof sessionStorage !== "undefined" && sessionStorage.getItem("stepSprintJustLoggedIn")) {
@@ -46,8 +47,11 @@ export function Home({
   }, []);
 
   useEffect(() => {
-    api<{ dailyReminder: boolean }>("/api/me/notifications/preferences")
-      .then((prefs) => setDailyReminder(prefs.dailyReminder))
+    api<{ dailyReminder: boolean; streakAtRiskReminder: boolean }>("/api/me/notifications/preferences")
+      .then((prefs) => {
+        setDailyReminder(prefs.dailyReminder);
+        setStreakReminder(prefs.streakAtRiskReminder);
+      })
       .catch(() => null);
   }, []);
 
@@ -59,6 +63,16 @@ export function Home({
       method: "PATCH",
       body: JSON.stringify({ dailyReminder: next }),
     }).catch(() => setDailyReminder(prev));
+  }
+
+  function toggleStreakReminder() {
+    const prev = streakReminder;
+    const next = !prev;
+    setStreakReminder(next);
+    api("/api/me/notifications/preferences", {
+      method: "PATCH",
+      body: JSON.stringify({ streakAtRiskReminder: next }),
+    }).catch(() => setStreakReminder(prev));
   }
 
   useEffect(() => {
@@ -172,6 +186,10 @@ export function Home({
         <label>
           <input type="checkbox" checked={dailyReminder} onChange={toggleDailyReminder} />
           Daily reminder to log steps
+        </label>
+        <label>
+          <input type="checkbox" checked={streakReminder} onChange={toggleStreakReminder} />
+          Email when your streak is at risk (logged yesterday, not yet today)
         </label>
       </div>
     </section>

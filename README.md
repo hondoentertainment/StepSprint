@@ -10,18 +10,21 @@ StepSprint is a month-long step challenge platform with teams, leaderboards, and
 
 ## Setup
 
-1. Copy `.env.example` to `.env` and fill in values.
-2. Install dependencies:
+1. Copy `.env.example` to `.env` and fill in values (including `DATABASE_URL` for PostgreSQL).
+2. Start PostgreSQL, for example: `docker compose up -d` from this repo (uses `docker-compose.yml`).
+3. Install dependencies:
    - `cd server && npm install`
    - `cd client && npm install`
-3. Run Prisma migrations:
-   - `cd server && npm run db:migrate`
+4. Apply the database schema and seed data:
+   - `cd server && npm run db:push`
    - `cd server && npm run db:seed`
-4. Start the servers:
+5. Start the servers:
    - `cd server && npm run dev`
    - `cd client && npm run dev`
 
 ## Testing
+
+Integration tests on the server hit a real PostgreSQL database. Start Postgres (`docker compose up -d`), apply the schema (`cd server && npm run db:push`), and seed (`cd server && npm run db:seed`) before `npm run test:server`.
 
 ### Unit & integration tests
 ```bash

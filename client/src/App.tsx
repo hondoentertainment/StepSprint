@@ -13,21 +13,30 @@ import { Submit } from "./components/Submit";
 import { WeeklyLeaderboard } from "./components/WeeklyLeaderboard";
 import { TeamStandings } from "./components/TeamStandings";
 import { Admin } from "./components/Admin";
+import type { User, Challenge } from "./types";
 
-function AuthenticatedApp() {
-  const { user, logout } = useAuth();
-  const {
-    challenges,
-    selectedChallengeId,
-    setSelectedChallengeId,
-    selectedChallenge,
-    isLoading: challengesLoading,
-    error: challengesError,
-    refreshChallenges,
-  } = useChallenges();
+function AuthenticatedAppRoutes({
+  user,
+  logout,
+  challenges,
+  selectedChallengeId,
+  setSelectedChallengeId,
+  selectedChallenge,
+  challengesLoading,
+  challengesError,
+  refreshChallenges,
+}: {
+  user: User;
+  logout: () => void;
+  challenges: Challenge[];
+  selectedChallengeId: string;
+  setSelectedChallengeId: (id: string) => void;
+  selectedChallenge: Challenge | null;
+  challengesLoading: boolean;
+  challengesError: string;
+  refreshChallenges: () => Promise<Challenge[]>;
+}) {
   const { week } = useWeek();
-
-  if (!user) return null;
 
   return (
     <Routes>
@@ -97,6 +106,37 @@ function AuthenticatedApp() {
   );
 }
 
+function AuthenticatedApp() {
+  const { user, logout } = useAuth();
+  const {
+    challenges,
+    selectedChallengeId,
+    setSelectedChallengeId,
+    selectedChallenge,
+    isLoading: challengesLoading,
+    error: challengesError,
+    refreshChallenges,
+  } = useChallenges();
+
+  if (!user) return null;
+
+  return (
+    <WeekProvider timezone={selectedChallenge?.timezone}>
+      <AuthenticatedAppRoutes
+        user={user}
+        logout={logout}
+        challenges={challenges}
+        selectedChallengeId={selectedChallengeId}
+        setSelectedChallengeId={setSelectedChallengeId}
+        selectedChallenge={selectedChallenge}
+        challengesLoading={challengesLoading}
+        challengesError={challengesError}
+        refreshChallenges={refreshChallenges}
+      />
+    </WeekProvider>
+  );
+}
+
 function App() {
   const { user, setUser, isLoading, login, register } = useAuth();
 
@@ -125,9 +165,7 @@ function App() {
 
   return (
     <BrowserRouter>
-      <WeekProvider>
-        <AuthenticatedApp />
-      </WeekProvider>
+      <AuthenticatedApp />
     </BrowserRouter>
   );
 }

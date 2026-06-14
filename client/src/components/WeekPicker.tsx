@@ -1,4 +1,15 @@
-import { getISOWeek, weekToDate, formatWeekRange } from "../utils";
+import {
+  getISOWeek,
+  weekToDate,
+  formatWeekRange,
+} from "../utils";
+import { DateTime } from "luxon";
+import {
+  parseWeekFromDateStringInTz,
+  weekMondayIsoInTimezone,
+  formatWeekRangeLabel,
+  getWeekForNowInTimezone,
+} from "../weekTz";
 
 type WeekInfo = { year: number; week: number };
 
@@ -7,35 +18,52 @@ type Props = {
   onChange: (value: WeekInfo) => void;
   challengeStart?: string;
   challengeEnd?: string;
+  /** When set, ISO weeks match the challenge timezone (same as server leaderboards). */
+  timezone?: string;
 };
 
 /** Date-based week picker: pick a week by selecting a date within it */
-export function WeekPicker({ value, onChange, challengeStart, challengeEnd }: Props) {
-  const mondayOfWeek = weekToDate(value.year, value.week);
+export function WeekPicker({ value, onChange, challengeStart, challengeEnd, timezone }: Props) {
+  const mondayOfWeek = timezone
+    ? weekMondayIsoInTimezone(value.year, value.week, timezone)
+    : weekToDate(value.year, value.week);
   const min = challengeStart || "2020-01-01";
   const max = challengeEnd || "2030-12-31";
 
   function handleDateChange(dateStr: string) {
-    const d = new Date(dateStr + "T12:00:00");
-    const { year, week } = getISOWeek(d);
+    const { year, week } = timezone
+      ? parseWeekFromDateStringInTz(dateStr, timezone)
+      : (() => {
+          const d = new Date(dateStr + "T12:00:00");
+          return getISOWeek(d);
+        })();
     onChange({ year, week });
   }
 
   function goToThisWeek() {
-    const now = getISOWeek(new Date());
-    onChange({ year: now.year, week: now.week });
+    onChange(getWeekForNowInTimezone(timezone));
   }
 
   function goToPreviousWeek() {
+    if (timezone) {
+      const m = DateTime.fromObject(
+        { weekYear: value.year, weekNumber: value.week, weekday: 1 },
+        { zone: timezone }
+      ).minus({ weeks: 1 });
+      onChange({ year: m.weekYear, week: m.weekNumber });
+      return;
+    }
     const mondayStr = weekToDate(value.year, value.week);
     const monday = new Date(mondayStr + "T12:00:00");
     monday.setDate(monday.getDate() - 7);
-    const { year, week } = getISOWeek(monday);
-    onChange({ year, week });
+    onChange(getISOWeek(monday));
   }
 
-  const isThisWeek =
-    value.year === getISOWeek(new Date()).year && value.week === getISOWeek(new Date()).week;
+  const nowWeek = getWeekForNowInTimezone(timezone);
+  const isThisWeek = value.year === nowWeek.year && value.week === nowWeek.week;
+  const rangeLabel = timezone
+    ? formatWeekRangeLabel(value.year, value.week, timezone)
+    : formatWeekRange(value.year, value.week);
 
   return (
     <div className="week-picker">
@@ -52,7 +80,7 @@ export function WeekPicker({ value, onChange, challengeStart, challengeEnd }: Pr
           />
         </label>
         <span className="week-picker-label" aria-live="polite">
-          {formatWeekRange(value.year, value.week)}
+          {rangeLabel}
         </span>
       </div>
       <div className="week-picker-shortcuts row">

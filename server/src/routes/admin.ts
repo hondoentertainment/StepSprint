@@ -4,7 +4,7 @@ import { prisma } from "../prisma";
 import { config } from "../config";
 import { sameMonthRange, toDateOnly, toJsDate, getIsoWeekRange } from "../utils/dates";
 import { AuthenticatedRequest, authRequired, roleRequired } from "../middleware/auth";
-import { Role } from "@prisma/client";
+import { Role, StepSubmissionSource } from "@prisma/client";
 
 const router = Router();
 
@@ -309,6 +309,7 @@ router.patch("/submissions/:id", async (req, res) => {
         ? toJsDate(toDateOnly(parsed.data.date, tz))
         : submission.date,
       isFlagged: (parsed.data.steps ?? submission.steps) > 100000,
+      source: StepSubmissionSource.MANUAL,
     },
   });
 
@@ -380,6 +381,39 @@ router.get("/export/submissions", async (req, res) => {
   res.send(rows.join("\n"));
 });
 
+router.get("/export/participation", async (req, res) => {
+  const challengeId = typeof req.query.challengeId === "string" ? req.query.challengeId : undefined;
+  if (!challengeId) {
+    res.status(400).json({ error: "challengeId required" });
+    return;
+  }
+  const members = await prisma.teamMember.findMany({
+    where: { challengeId },
+    include: { user: true },
+  });
+  const submissions = await prisma.stepSubmission.findMany({
+    where: { challengeId },
+  });
+  const activeByUser = new Map<string, number>();
+  submissions.forEach((s) => {
+    activeByUser.set(s.userId, (activeByUser.get(s.userId) ?? 0) + 1);
+  });
+  const list = members.map((m) => ({
+    email: m.user.email,
+    name: m.user.name ?? "",
+    days: activeByUser.get(m.userId) ?? 0,
+  }));
+  list.sort((a, b) => a.days - b.days);
+  const rows = [
+    ["email", "name", "submissionDays", "status"].join(","),
+    ...list.map((r) =>
+      [r.email, r.name, String(r.days), r.days === 0 ? "inactive" : "active"].join(",")
+    ),
+  ];
+  res.header("Content-Type", "text/csv");
+  res.send(rows.join("\n"));
+});
+
 router.get("/export/teams", async (req, res) => {
   const challengeId = typeof req.query.challengeId === "string" ? req.query.challengeId : undefined;
   if (!challengeId) {
@@ -390,8 +424,8 @@ router.get("/export/teams", async (req, res) => {
     where: { challengeId },
     include: { members: { include: { user: true } }, challenge: true },
   });
-  const rows = [
-    ["challenge", "team", "leader", "memberEmail", "memberName"].join(","),
+  const rows: string[][] = [
+    ["challenge", "team", "leader", "memberEmail", "memberName"],
     ...teams.flatMap((team) =>
       team.members.map((member) => [
         team.challenge.name,

@@ -1,11 +1,14 @@
 import { PrismaClient } from "@prisma/client";
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
-import path from "path";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { Pool } from "pg";
+import { config } from "./config";
 
-const dbPath = path.resolve(__dirname, "../dev.db");
-
-const adapter = new PrismaBetterSqlite3({
-  url: `file:${dbPath}`,
-});
+const pool = new Pool({ connectionString: config.databaseUrl });
+const adapter = new PrismaPg(pool);
 
 export const prisma = new PrismaClient({ adapter });
+
+export async function disconnectDatabase(): Promise<void> {
+  await prisma.$disconnect();
+  await pool.end();
+}

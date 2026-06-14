@@ -47,6 +47,7 @@ router.get("/", async (req: AuthenticatedRequest, res) => {
     members.length > 0
       ? members.filter((m) => (activeByUser.get(m.userId) ?? 0) > 0).length / members.length
       : 0;
+  const dropoutCount = members.filter((m) => (activeByUser.get(m.userId) ?? 0) === 0).length;
   const avgActiveDays =
     members.length > 0
       ? members.reduce((sum, m) => sum + (activeByUser.get(m.userId) ?? 0), 0) / members.length
@@ -54,15 +55,41 @@ router.get("/", async (req: AuthenticatedRequest, res) => {
   const totalSubmissions = submissions.length;
   const totalSteps = submissions.reduce((sum, s) => sum + s.steps, 0);
 
+  const weeklyTrend: { weekYear: number; weekNumber: number; label: string; submissionCount: number }[] =
+    [];
+  for (let back = 3; back >= 0; back--) {
+    const anchor = DateTime.now().setZone(tz).minus({ weeks: back }).startOf("week");
+    const wStart = anchor.startOf("day");
+    const wEnd = anchor.endOf("week").endOf("day");
+    const submissionCount = submissions.filter((s) => {
+      const d = DateTime.fromJSDate(s.date, { zone: tz });
+      return d >= wStart && d <= wEnd;
+    }).length;
+    weeklyTrend.push({
+      weekYear: anchor.weekYear,
+      weekNumber: anchor.weekNumber,
+      label: anchor.toFormat("LLL d") + " week",
+      submissionCount,
+    });
+  }
+
+  const inactiveParticipants = members
+    .filter((m) => (activeByUser.get(m.userId) ?? 0) === 0)
+    .map((m) => ({ email: m.user.email, name: m.user.name ?? "" }))
+    .slice(0, 100);
+
   res.json({
     challengeId,
     challengeName: challenge.name,
     elapsedDays,
     participantCount: members.length,
     participationRate: Math.round(participationRate * 100),
+    dropoutCount,
     avgActiveDays: Math.round(avgActiveDays * 10) / 10,
     totalSubmissions,
     totalSteps,
+    weeklyTrend,
+    inactiveParticipants,
   });
 });
 
