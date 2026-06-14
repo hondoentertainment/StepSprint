@@ -4,8 +4,6 @@ import { useAuth } from "./hooks/useAuth";
 import { useChallenges } from "./hooks/useChallenges";
 import { WeekProvider, useWeek } from "./contexts/WeekContext";
 import { Login } from "./components/Login";
-import { ForgotPassword } from "./components/ForgotPassword";
-import { ResetPassword } from "./components/ResetPassword";
 import { InvitePage } from "./components/InvitePage";
 import { Layout } from "./components/Layout";
 import { Home } from "./components/Home";
@@ -138,7 +136,7 @@ function AuthenticatedApp() {
 }
 
 function App() {
-  const { user, setUser, isLoading, login, register } = useAuth();
+  const { user, setUser, isLoading, login } = useAuth();
 
   if (isLoading) {
     return (
@@ -155,9 +153,7 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/invite" element={<InvitePage onAccepted={(u) => setUser(u)} />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="*" element={<Login onLogin={login} onRegister={register} />} />
+          <Route path="*" element={<Login onLogin={login} />} />
         </Routes>
       </BrowserRouter>
     );

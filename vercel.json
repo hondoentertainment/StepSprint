@@ -1,9 +1,6 @@
 {
-  "rootDirectory": "client",
+  "buildCommand": "cd client && npm ci && npm run build",
+  "outputDirectory": "client/dist",
   "framework": "vite",
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }

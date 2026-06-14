@@ -1,32 +1,47 @@
 import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { getErrorMessage } from "../api";
+import { useTranslation } from "react-i18next";
+import { ApiError, api, getErrorMessage } from "../api";
 import { isValidEmail } from "../utils";
-import type { User } from "../types";
+import { identify } from "../analytics";
+import type { RegisterOutcome, User } from "../types";
+import { StepSprintLogo } from "./StepSprintLogo";
+import { LanguageSwitcher } from "./LanguageSwitcher";
 
 type Props = {
   onLogin: (email: string, password: string) => Promise<User>;
-  onRegister: (email: string, password: string, name?: string) => Promise<User>;
+  onRegister: (
+    email: string,
+    password: string,
+    name?: string
+  ) => Promise<RegisterOutcome>;
 };
 
-function getPasswordStrength(pw: string): { label: string; cls: string } {
-  if (pw.length < 8) return { label: "Too short", cls: "pw-weak" };
+type StrengthKey = "tooShort" | "weak" | "fair" | "strong";
+
+function getPasswordStrength(pw: string): { key: StrengthKey; cls: string } {
+  if (pw.length < 8) return { key: "tooShort", cls: "pw-weak" };
   const hasLetter = /[a-zA-Z]/.test(pw);
   const hasNumber = /[0-9]/.test(pw);
   const hasSpecial = /[^a-zA-Z0-9]/.test(pw);
-  if (!hasLetter || !hasNumber) return { label: "Weak", cls: "pw-weak" };
-  if (pw.length >= 12 && hasSpecial) return { label: "Strong", cls: "pw-strong" };
-  if (pw.length >= 10 || hasSpecial) return { label: "Fair", cls: "pw-fair" };
-  return { label: "Fair", cls: "pw-fair" };
+  if (!hasLetter || !hasNumber) return { key: "weak", cls: "pw-weak" };
+  if (pw.length >= 12 && hasSpecial) return { key: "strong", cls: "pw-strong" };
+  if (pw.length >= 10 || hasSpecial) return { key: "fair", cls: "pw-fair" };
+  return { key: "fair", cls: "pw-fair" };
 }
 
 export function Login({ onLogin, onRegister }: Props) {
+  const { t } = useTranslation();
   const [mode, setMode] = useState<"login" | "register" | "setup">("login");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [postRegisterBanner, setPostRegisterBanner] = useState("");
+  const [verifyResendInfo, setVerifyResendInfo] = useState("");
+  const [verificationBlocked, setVerificationBlocked] = useState(false);
+  const [resendBusy, setResendBusy] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const emailInputRef = useRef<HTMLInputElement>(null);
@@ -40,33 +55,33 @@ export function Login({ onLogin, onRegister }: Props) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!email.trim()) {
-      setError("Please enter your email address.");
+      setError(t("login.errors.emailRequired"));
       return;
     }
     if (!isValidEmail(email)) {
-      setError("Please enter a valid email address (e.g. you@example.com).");
+      setError(t("login.errors.emailInvalid"));
       return;
     }
     if (!password) {
-      setError("Please enter a password.");
+      setError(t("login.errors.passwordRequired"));
       return;
     }
 
     if (mode === "register" || mode === "setup") {
       if (password.length < 8) {
-        setError("Password must be at least 8 characters.");
+        setError(t("login.errors.passwordTooShort"));
         return;
       }
       if (!/[a-zA-Z]/.test(password)) {
-        setError("Password must contain at least one letter.");
+        setError(t("login.errors.passwordNeedsLetter"));
         return;
       }
       if (!/[0-9]/.test(password)) {
-        setError("Password must contain at least one number.");
+        setError(t("login.errors.passwordNeedsNumber"));
         return;
       }
       if (password !== confirmPassword) {
-        setError("Passwords do not match.");
+        setError(t("login.errors.passwordsDoNotMatch"));
         return;
       }
     }
@@ -74,14 +89,28 @@ export function Login({ onLogin, onRegister }: Props) {
     try {
       setBusy(true);
       setError("");
+      setVerifyResendInfo("");
+      setVerificationBlocked(false);
       if (mode === "login") {
-        await onLogin(email.trim(), password);
+        const user = await onLogin(email.trim(), password);
+        setPostRegisterBanner("");
+        identify(user.id);
       } else {
-        await onRegister(
+        const outcome = await onRegister(
           email.trim(),
           password,
           name?.trim() || undefined
         );
+        if (outcome.kind === "session") {
+          identify(outcome.user.id);
+          setPostRegisterBanner("");
+        } else {
+          setPostRegisterBanner(outcome.message);
+          setVerificationBlocked(false);
+          setPassword("");
+          setConfirmPassword("");
+          setMode("login");
+        }
       }
     } catch (err) {
       const msg = getErrorMessage(err);
@@ -90,12 +119,47 @@ export function Login({ onLogin, onRegister }: Props) {
         setPassword("");
         setConfirmPassword("");
         setError("");
+        setVerificationBlocked(false);
+      } else if (
+        err instanceof ApiError &&
+        msg === "EMAIL_VERIFICATION_REQUIRED"
+      ) {
+        setVerificationBlocked(true);
+        setError(t("login.errors.emailNotVerified"));
       } else {
+        setVerificationBlocked(false);
         setError(msg);
       }
     } finally {
       setBusy(false);
     }
+  }
+
+  async function handleResendVerification() {
+    if (!email.trim() || !isValidEmail(email)) {
+      setError(t("login.errors.emailInvalid"));
+      return;
+    }
+    try {
+      setResendBusy(true);
+      setVerifyResendInfo("");
+      await api("/api/auth/resend-verification", {
+        method: "POST",
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      setVerifyResendInfo(t("login.verifyEmailActions.resendDone"));
+    } catch (e) {
+      setVerifyResendInfo(getErrorMessage(e));
+    } finally {
+      setResendBusy(false);
+    }
+  }
+
+  function clearVerificationExtras() {
+    setVerificationBlocked(false);
+    setVerifyResendInfo("");
+    setPostRegisterBanner("");
+    setError("");
   }
 
   const strength = (mode === "register" || mode === "setup") && password
@@ -107,43 +171,68 @@ export function Login({ onLogin, onRegister }: Props) {
   return (
     <div className="app">
       <header className="hero">
-        <h1>Schafer Shufflers</h1>
-        <p>Track steps. Compete with your team. Build habits that stick.</p>
+        <div className="hero-logo">
+          <StepSprintLogo size={40} />
+          <h1>{t("app.name")}</h1>
+        </div>
+        <p>{t("app.tagline")}</p>
       </header>
       <section className="panel panel-login">
         <h2>
           {mode === "login"
-            ? "Sign in"
+            ? t("login.title.login")
             : mode === "setup"
-              ? "Set your password"
-              : "Create account"}
+              ? t("login.title.setup")
+              : t("login.title.register")}
         </h2>
 
         {mode === "setup" && (
-          <p className="hint">
-            Your account was created before passwords were required. Please set
-            a password to continue.
-          </p>
+          <p className="hint">{t("login.hint.setup")}</p>
         )}
         {mode === "login" && (
-          <p className="hint">
-            Enter your email and password to sign in.
-          </p>
+          <p className="hint">{t("login.hint.login")}</p>
         )}
         {mode === "register" && (
-          <p className="hint">
-            Create an account to join a step challenge.
-          </p>
+          <p className="hint">{t("login.hint.register")}</p>
         )}
+
+        {mode === "login" && postRegisterBanner ? (
+          <div role="status" aria-live="polite">
+            <p className="hint">{t("login.afterRegister.title")}</p>
+            <p className="status status-success">{postRegisterBanner}</p>
+          </div>
+        ) : null}
+
+        {mode === "login" && (postRegisterBanner || verificationBlocked) ? (
+          <div className="verification-resend-block">
+            <p className="hint">{t("login.afterRegister.resendPrompt")}</p>
+            <button
+              type="button"
+              className="secondary"
+              disabled={resendBusy || !email.trim() || busy}
+              onClick={handleResendVerification}
+            >
+              {resendBusy
+                ? t("login.verifyEmailActions.resending")
+                : t("login.verifyEmailActions.resend")}
+            </button>
+            {verifyResendInfo ? (
+              <p className="status status-success">{verifyResendInfo}</p>
+            ) : null}
+          </div>
+        ) : null}
 
         <form onSubmit={handleSubmit}>
           <label>
-            Email
+            {t("login.email")}
             <input
               ref={emailInputRef}
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setVerificationBlocked(false);
+              }}
               autoComplete="email"
               readOnly={mode === "setup"}
               aria-invalid={!!error && error.toLowerCase().includes("email")}
@@ -152,7 +241,7 @@ export function Login({ onLogin, onRegister }: Props) {
 
           {mode === "register" && (
             <label>
-              Name (optional)
+              {t("login.name")}
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -162,7 +251,7 @@ export function Login({ onLogin, onRegister }: Props) {
           )}
 
           <label>
-            Password
+            {t("login.password")}
             <div className="password-field">
               <input
                 type={showPassword ? "text" : "password"}
@@ -174,9 +263,13 @@ export function Login({ onLogin, onRegister }: Props) {
                 type="button"
                 className="password-toggle"
                 onClick={() => setShowPassword(!showPassword)}
-                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-label={
+                  showPassword
+                    ? t("login.hidePassword")
+                    : t("login.showPassword")
+                }
               >
-                {showPassword ? "Hide" : "Show"}
+                {showPassword ? t("login.hide") : t("login.show")}
               </button>
             </div>
           </label>
@@ -185,14 +278,14 @@ export function Login({ onLogin, onRegister }: Props) {
             <div className="password-strength">
               <div className={`password-strength-bar ${strength.cls}`} />
               <span className={`password-strength-label ${strength.cls}`}>
-                {strength.label}
+                {t(`login.strength.${strength.key}`)}
               </span>
             </div>
           )}
 
           {isRegisterMode && (
             <label>
-              Confirm password
+              {t("login.confirmPassword")}
               <input
                 type={showPassword ? "text" : "password"}
                 value={confirmPassword}
@@ -205,13 +298,13 @@ export function Login({ onLogin, onRegister }: Props) {
           {isRegisterMode && (
             <ul className="password-requirements">
               <li className={password.length >= 8 ? "met" : ""}>
-                At least 8 characters
+                {t("login.requirements.length")}
               </li>
               <li className={/[a-zA-Z]/.test(password) ? "met" : ""}>
-                At least one letter
+                {t("login.requirements.letter")}
               </li>
               <li className={/[0-9]/.test(password) ? "met" : ""}>
-                At least one number
+                {t("login.requirements.number")}
               </li>
             </ul>
           )}
@@ -229,11 +322,11 @@ export function Login({ onLogin, onRegister }: Props) {
           >
             {busy
               ? isRegisterMode
-                ? "Creating account..."
-                : "Signing in..."
+                ? t("login.submit.registering")
+                : t("login.submit.loggingIn")
               : isRegisterMode
-                ? "Create account"
-                : "Sign in"}
+                ? t("login.submit.register")
+                : t("login.submit.login")}
           </button>
         </form>
 
@@ -241,19 +334,19 @@ export function Login({ onLogin, onRegister }: Props) {
           {mode === "login" && (
             <>
               <Link to="/forgot-password" className="form-link">
-                Forgot password?
+                {t("login.links.forgot")}
               </Link>
               <button
                 type="button"
                 className="form-link link-button"
                 onClick={() => {
                   setMode("register");
-                  setError("");
+                  clearVerificationExtras();
                   setPassword("");
                   setConfirmPassword("");
                 }}
               >
-                Don't have an account? Sign up
+                {t("login.links.toRegister")}
               </button>
             </>
           )}
@@ -263,12 +356,12 @@ export function Login({ onLogin, onRegister }: Props) {
               className="form-link link-button"
               onClick={() => {
                 setMode("login");
-                setError("");
+                clearVerificationExtras();
                 setPassword("");
                 setConfirmPassword("");
               }}
             >
-              Already have an account? Sign in
+              {t("login.links.toLogin")}
             </button>
           )}
           {mode === "setup" && (
@@ -277,16 +370,17 @@ export function Login({ onLogin, onRegister }: Props) {
               className="form-link link-button"
               onClick={() => {
                 setMode("login");
-                setError("");
+                clearVerificationExtras();
                 setPassword("");
                 setConfirmPassword("");
               }}
             >
-              Back to sign in
+              {t("login.links.backToLogin")}
             </button>
           )}
         </div>
       </section>
+      <LanguageSwitcher />
     </div>
   );
 }

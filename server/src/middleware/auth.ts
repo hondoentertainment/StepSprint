@@ -14,6 +14,7 @@ export interface AuthenticatedRequest extends Request {
 type TokenPayload = {
   sub: string;
   role: Role;
+  ver: number;
 };
 
 function getTokenFromRequest(req: Request): string | null {
@@ -43,15 +44,20 @@ export async function authRequired(
     const payload = jwt.verify(token, config.jwtSecret) as TokenPayload;
     const user = await prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { id: true, role: true },
+      select: { id: true, role: true, tokenVersion: true },
     });
     if (!user) {
       res.status(401).json({ error: "Invalid session" });
       return;
     }
-    req.user = user;
+    // Reject tokens issued before the last logout or password change.
+    if (typeof payload.ver === "number" && payload.ver !== user.tokenVersion) {
+      res.status(401).json({ error: "Session expired" });
+      return;
+    }
+    req.user = { id: user.id, role: user.role };
     next();
-  } catch (error) {
+  } catch {
     res.status(401).json({ error: "Invalid session" });
   }
 }

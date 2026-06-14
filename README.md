@@ -1,12 +1,18 @@
 # StepSprint
 
-StepSprint is a month-long step challenge platform with teams, leaderboards, and an admin console.
+StepSprint is a month-long step challenge platform with teams, leaderboards, and an admin console. It deploys as a single **Vercel** project: SPA + serverless Express API + Vercel Postgres (Neon) + Vercel Cron.
+
+See [docs/LAUNCH.md](docs/LAUNCH.md) for the ordered launch-day runbook, [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the deep dive, and [docs/PRODUCTION.md](docs/PRODUCTION.md) for the production-readiness review.
 
 ## Workspace layout
 
-- `client/` - Vite React + TypeScript frontend
-- `server/` - Express + TypeScript API
-- `prisma/` - Prisma schema, migrations, and seed data
+- `client/` - Vite React + TypeScript frontend (PWA)
+- `server/` - Express + TypeScript API (includes `server/prisma/` — the
+  canonical Prisma schema, migrations, and the seed entry point at
+  `server/src/seed.ts`)
+- `api/[...all].js` - Vercel Function shim that mounts the compiled Express
+  app (`server/dist/app.js`) at `/api/*`
+- `scripts/vercel-build.mjs` - build orchestrator used by Vercel
 
 ## Setup
 
@@ -55,6 +61,12 @@ cd client && npm run test:e2e
 For UI mode: `npm run test:e2e:ui`
 
 The test suite will start both client and server automatically. Tests use `user1@stepsprint.local` from the seed data.
+
+## Database configuration
+
+- The active development database is **SQLite**, wired up via `@prisma/adapter-better-sqlite3`. The schema lives in `prisma/schema.prisma` and the default `DATABASE_URL` in `.env.example` is `file:./dev.db`.
+- `prisma/schema.postgresql.prisma` is the **planned production schema** for when StepSprint migrates to PostgreSQL. It is kept in the repo intentionally; do not delete it.
+- When modifying models, update **both** `prisma/schema.prisma` and `prisma/schema.postgresql.prisma` so the two stay in sync. This keeps the future Postgres migration a straightforward swap.
 
 ## Notes
 

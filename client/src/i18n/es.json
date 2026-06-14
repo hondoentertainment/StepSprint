@@ -1,0 +1,499 @@
+{
+  "app": {
+    "name": "StepSprint",
+    "tagline": "Registra pasos. Compite con tu equipo. Crea hábitos que perduran.",
+    "loading": "Cargando"
+  },
+  "common": {
+    "skipToContent": "Saltar al contenido principal",
+    "loading": "Cargando…",
+    "locked": "Bloqueado",
+    "open": "Abrir",
+    "steps": "pasos",
+    "unassigned": "Sin equipo",
+    "tryAgain": "Volver a intentar",
+    "backToSignIn": "Volver al inicio de sesión",
+    "confirm": "Confirmar",
+    "cancel": "Cancelar",
+    "notApplicable": "—"
+  },
+  "login": {
+    "title": {
+      "login": "Iniciar sesión",
+      "register": "Crear cuenta",
+      "setup": "Establece tu contraseña"
+    },
+    "hint": {
+      "login": "Introduce tu correo y contraseña para entrar.",
+      "register": "Crea una cuenta para unirte al reto de pasos.",
+      "setup": "Tu cuenta se creó antes de exigir contraseña. Elige una contraseña para continuar."
+    },
+    "email": "Correo electrónico",
+    "name": "Nombre (opcional)",
+    "password": "Contraseña",
+    "confirmPassword": "Confirmar contraseña",
+    "showPassword": "Mostrar contraseña",
+    "hidePassword": "Ocultar contraseña",
+    "show": "Mostrar",
+    "hide": "Ocultar",
+    "submit": {
+      "login": "Iniciar sesión",
+      "register": "Crear cuenta",
+      "loggingIn": "Iniciando sesión...",
+      "registering": "Creando cuenta..."
+    },
+    "links": {
+      "forgot": "¿Olvidaste la contraseña?",
+      "toRegister": "¿No tienes cuenta? Regístrate",
+      "toLogin": "¿Ya tienes cuenta? Inicia sesión",
+      "backToLogin": "Volver al inicio de sesión"
+    },
+    "requirements": {
+      "length": "Al menos 8 caracteres",
+      "letter": "Al menos una letra",
+      "number": "Al menos un número"
+    },
+    "strength": {
+      "tooShort": "Demasiado corta",
+      "weak": "Débil",
+      "fair": "Aceptable",
+      "strong": "Fuerte"
+    },
+    "errors": {
+      "emailRequired": "Introduce tu correo electrónico.",
+      "emailInvalid": "Introduce un correo válido (p. ej. tu@ejemplo.com).",
+      "passwordRequired": "Introduce una contraseña.",
+      "passwordTooShort": "La contraseña debe tener al menos 8 caracteres.",
+      "passwordNeedsLetter": "La contraseña debe incluir al menos una letra.",
+      "passwordNeedsNumber": "La contraseña debe incluir al menos un número.",
+      "passwordsDoNotMatch": "Las contraseñas no coinciden.",
+      "emailNotVerified": "Verifica tu correo antes de iniciar sesión. Revisa tu bandeja (y spam) por un enlace de StepSprint."
+    },
+    "afterRegister": {
+      "title": "Revisa tu correo",
+      "resendPrompt": "¿No llega el mensaje? Prueba a reenviar el correo de verificación."
+    },
+    "verifyEmailActions": {
+      "resend": "Reenviar correo de verificación",
+      "resending": "Enviando…",
+      "resendDone": "Si existe una cuenta sin verificar con esta dirección, se ha enviado otro correo."
+    }
+  },
+  "verifyEmail": {
+    "title": "Confirma tu correo",
+    "working": "Confirmando…",
+    "success": "Tu correo está verificado. Ya puedes iniciar sesión.",
+    "failed": "Este enlace no es válido o ha caducado.",
+    "invalidLink": "Faltan datos en el enlace de verificación. Solicita uno nuevo desde el inicio de sesión."
+  },
+  "layout": {
+    "welcome": "Hola, {{name}}",
+    "noChallenges": "No hay retos disponibles",
+    "logout": "Cerrar sesión",
+    "selectChallenge": "Seleccionar reto",
+    "logStepsShortcut": "+ Registrar pasos",
+    "logStepsShortcutAria": "Registrar los pasos de hoy",
+    "languageSelectAria": "Elegir idioma",
+    "localeEnglish": "English",
+    "localeSpanish": "Español",
+    "siteHeaderAria": "Cabecera del sitio",
+    "mainNavAria": "Navegación principal",
+    "tabs": {
+      "Home": "Inicio",
+      "Submit": "Registrar",
+      "Devices": "Dispositivos",
+      "Leaderboard": "Top semanal",
+      "Teams": "Equipos",
+      "Admin": "Administración"
+    }
+  },
+  "integrations": {
+    "title": "Sincronización fitness",
+    "subtitle": "Vincula tu wearable o cuenta de actividad para que los pasos lleguen a StepSprint. Apple Watch usa un token seguro y Atajos en el iPhone; Fitbit, Google Fit y Garmin usan inicio de sesión si el administrador lo activa.",
+    "summaryStripAria": "Resumen del estado de sincronización",
+    "summaryLinked": "La sincronización automática o un rastreador vinculado está activado en tu cuenta.",
+    "summaryNotLinked": "Aún no hay sincronización automática. Está bien: las entradas manuales cuentan igual.",
+    "summaryManualLink": "Ir a Registrar pasos",
+    "trackersSectionTitle": "Fitbit, Google Fit y Garmin",
+    "trackersSectionHint": "Toca Conectar e inicia sesión con la marca y luego Sincronizar hoy para traer tus totales al reto actual. Si pone «No configurado», el servidor aún no tiene credenciales OAuth para esa marca.",
+    "badge": {
+      "linked": "Vinculado",
+      "notLinked": "Sin vincular"
+    },
+    "oauthAdminHint": "Quién aloja StepSprint debe configurar OAuth para esta integración antes de que aparezca Conectar.",
+    "noChallenge": "Selecciona un reto activo en la cabecera para configurar la sincronización.",
+    "backToSubmit": "Volver a registrar pasos",
+    "oauthError": "Error de OAuth: {{error}}",
+    "syncResult": "{{name}}: {{imported}} nuevos, {{updated}} actualizados, {{skipped}} omitidos.",
+    "syncResultNoData": "{{name}} no devolvió pasos para este rango — comprueba que tu reloj se haya sincronizado con el proveedor para esos días e inténtalo de nuevo.",
+    "syncResultOutOfWindow": "{{name}} devolvió {{skipped}} día(s), pero todos quedaron fuera del periodo de este reto — elige una fecha dentro del reto o espera a que esos días entren en el periodo.",
+    "syncResultUpToDate": "{{name}}: ya estaba al día — se actualizaron {{updated}} día(s) con los totales más recientes.",
+    "notEnrolledInChallenge": "Aún no estás inscrito en este reto; la importación CSV en bloque está desactivada. Pide una invitación a un administrador o configura el token de Apple si solo preparas un Atajo.",
+    "csv": {
+      "sectionTitle": "Pegado masivo (JSON)",
+      "intro": "Pega JSON con la misma forma que la API: un objeto con challengeId y un array rows (fecha YYYY-MM-DD, pasos número). Hasta 500 filas por envío.",
+      "textareaLabel": "Carga JSON para importación masiva",
+      "submit": "Importar filas",
+      "submitting": "Importando…",
+      "invalidJson": "No es JSON válido. Revísalo y vuelve a intentarlo.",
+      "invalidShape": "El JSON debe incluir challengeId y un array rows no vacío.",
+      "challengeMismatch": "El challengeId del JSON debe coincidir con el reto seleccionado en la cabecera.",
+      "success": "{{imported}} día(s) nuevos importados, {{updated}} actualizados, {{skipped}} omitidos.",
+      "constraintsSummary": "Fechas y límites",
+      "constraintsBody": "Cada fecha debe caer dentro del periodo del reto. La importación se bloquea si el reto está cerrado. Registrar a mano y Apple Shortcuts siguen disponibles cuando no puedas usar el pegado masivo."
+    },
+    "appleHealth": {
+      "sectionTitle": "Apple Watch / Apple Health",
+      "introOptional": "Opcional: úsalo si quieres que los pasos lleguen automáticamente desde el iPhone. Siempre puedes introducir totales a mano en Registrar.",
+      "introShortcut": "Usa un Atajo de iOS para enviar el total diario de pasos de Apple Health a StepSprint (HealthKit no se puede leer desde esta web). Genera un token y configura el Atajo para hacer POST a StepSprint.",
+      "challengeTimezoneHint": "Usa fechas YYYY-MM-DD como días naturales en la zona horaria del reto ({{timezone}}), igual que en Registrar pasos.",
+      "batchBackfillHint": "Para varios días en bloque, envía una sola petición con un array \"rows\" (hasta 31 días). Si un día sale repetido, StepSprint conserva el mayor valor de pasos.",
+      "lastSyncToChallenge": "Última sincronización de Apple Health con este reto: {{datetime}}.",
+      "tokenCreated": "Token creado. Cópialo ahora: no se volverá a mostrar.",
+      "tokenAriaLabel": "Token de API",
+      "copyToken": "Copiar token",
+      "copied": "¡Copiado!",
+      "shortcutGuideSummary": "Instrucciones del Atajo de iOS",
+      "shortcutStep1": "Abre la app Atajos en el iPhone y pulsa + para crear un atajo nuevo.",
+      "shortcutStep2": "Añade Buscar muestras de salud (u Obtener muestra de salud). Tipo Pasos y el periodo debe cubrir el día natural completo que envías (desde el inicio hasta el final de ese día), para que el total refleje todo el día, incluidos Apple Watch e iPhone cuando Salud fusiona fuentes.",
+      "shortcutStep3": "Con muchas muestras, añade Calcular estadísticas con función Suma. Si el total sigue sin coincidir con Pasos en Salud para ese día, ajusta la consulta (por ejemplo agrupar por día o filtrar fuentes) hasta que el atajo coincida con el total diario esperado.",
+      "shortcutStep4": "Añade Formatear fecha del día elegido. Formato yyyy-MM-dd.",
+      "shortcutStep5Title": "Añade Obtener contenidos de URL:",
+      "shortcutStep5Url": "URL:",
+      "shortcutStep5Method": "Método: POST",
+      "shortcutStep5Header": "Cabecera: Authorization = Bearer {{token}}",
+      "shortcutStep5HeaderJson": "Cabecera: Content-Type = application/json",
+      "shortcutStep5Body": "Cuerpo (JSON):",
+      "shortcutStep5Json": "{\n  \"challengeId\": \"{{challengeId}}\",\n  \"date\": \"<fecha formateada del paso anterior>\",\n  \"steps\": <suma de pasos>\n}",
+      "shortcutStep6": "Opcional: añade una Automatización para ejecutar el atajo al final del día.",
+      "apiTokensHeading": "Tokens de API",
+      "noTokensYet": "Aún no hay tokens.",
+      "createdOn": "Creado {{date}}",
+      "lastUsedOn": "Último uso {{date}}",
+      "expiresOn": "Caduca {{date}}",
+      "revokeAriaLabel": "Revocar token {{label}}",
+      "revoking": "Revocando…",
+      "revoke": "Revocar",
+      "generating": "Generando…",
+      "generateToken": "Generar nuevo token",
+      "apiReferenceSummary": "Referencia API Apple Health",
+      "apiReferenceIntro": "POST a {{url}} con cabecera Authorization: Bearer <tu-token>:",
+      "apiReferenceExample": "// Un día\n{ \"challengeId\": \"{{challengeId}}\", \"date\": \"YYYY-MM-DD\", \"steps\": 8000 }\n\n// Lote (hasta 31 días)\n{ \"challengeId\": \"{{challengeId}}\", \"rows\": [{ \"date\": \"YYYY-MM-DD\", \"steps\": 8000 }] }",
+      "curlTestSummary": "Prueba desde el escritorio (curl)",
+      "curlTestIntro": "Ejecuta esto en Terminal, Git Bash o WSL para comprobar el token y la URL de la API. Ajusta fecha, pasos o token si hace falta. \"401\" indica token incorrecto o revocado; usa un token recién generado o cópialo de tu gestor de contraseñas.",
+      "curlPlaceholderToken": "TU_TOKEN_AQUI",
+      "curlCopy": "Copiar comando curl",
+      "curlCopied": "¡curl copiado!",
+      "tokenLabelDefault": "Sincronización Apple Watch"
+    },
+    "syncDate": {
+      "modeLabel": "Cuánto traer del reloj",
+      "modeSingle": "Un día",
+      "modeLast7": "Últimos 7 días",
+      "modeLast30": "Últimos 30 días",
+      "label": "Fecha que quieres traer del reloj",
+      "hint": "Hoy por defecto. Elige un día anterior para rellenar pasos desde tu reloj — la fecha debe estar dentro de este reto.",
+      "rangeHint": "Traerá {{days}} día(s): {{start}} a {{end}} (limitado a este reto).",
+      "rangeHintEmpty": "Ningún día cae dentro de este reto todavía — prueba con un día único.",
+      "resetToToday": "Volver a hoy"
+    },
+    "syncResultRange": "{{name}}: trajo {{days}} día(s) — {{imported}} nuevos, {{updated}} actualizados, {{skipped}} omitidos.",
+    "oauth": {
+      "notConfigured": "No configurado",
+      "connectedOn": "Conectado {{date}}",
+      "lastSyncedOn": "Sincronizado por última vez {{date}}",
+      "backfillSinceLast": "Rellenar {{days}} día(s) desde entonces",
+      "backfillNothingToDo": "{{name}} ya está al día.",
+      "syncing": "Sincronizando…",
+      "syncToday": "Sincronizar hoy",
+      "syncDateButton": "Sincronizar {{date}}",
+      "syncLastDays": "Sincronizar últimos {{days}} días",
+      "disconnecting": "Desconectando…",
+      "disconnect": "Desconectar",
+      "connectProvider": "Conectar {{name}}"
+    }
+  },
+  "home": {
+    "title": "Inicio del participante",
+    "welcome": "Has iniciado sesión correctamente.",
+    "noChallenges": "Aún no hay retos activos.",
+    "notEnrolled": "Aún no estás inscrito en este reto.",
+    "stats": {
+      "today": "Hoy",
+      "streak": "Racha actual",
+      "days_one": "{{count}} día",
+      "days_other": "{{count}} días",
+      "consistency": "Constancia",
+      "daysActive": "{{active}} de {{elapsed}} días activos",
+      "thisWeek": "Esta semana",
+      "thisMonth": "Este mes",
+      "teamTotal": "Total del equipo",
+      "rank": "Puesto",
+      "gapToFirst": "Distancia al nº1"
+    },
+    "emptyState": "Aún no hay resumen. ¡Registra tus primeros pasos!",
+    "logSteps": "Registrar pasos",
+    "devicesLink": "Dispositivos y sincronización",
+    "devicesFitnessLinked": "Hay un rastreador o sincronización automática vinculada a tu cuenta.",
+    "devicesFitnessNotLinked": "Aún no hay sync de wearable — opcional; configúralo en Dispositivos.",
+    "devicesFitnessAria": "Estado de integración con wearable",
+    "loadingSummaryAria": "Cargando resumen",
+    "challengeProgress": {
+      "label_one": "Día {{elapsed}} de {{total}} — queda {{remaining}} día",
+      "label_other": "Día {{elapsed}} de {{total}} — quedan {{remaining}} días"
+    },
+    "streakToast": {
+      "title": "¡Racha de {{days}} días!",
+      "body": "Lo estás bordando. ¡Sigue así!",
+      "dismissAria": "Cerrar"
+    },
+    "notifications": {
+      "dailyReminder": "Recordatorios para registrar pasos (notificación web si está activada y correo si el servidor lo tiene configurado)",
+      "notAvailable": "Notificaciones push no disponibles.",
+      "enable": "Activar recordatorios push",
+      "enabling": "Activando…",
+      "permissionDenied": "No se concedió permiso para las notificaciones.",
+      "enabled": "Recordatorios push activados en este dispositivo."
+    }
+  },
+  "submit": {
+    "title": "Registrar pasos",
+    "manualIntro": "Introduce tus pasos para cualquier día del reto. Puedes escribirlos aquí aunque no conectes ninguna sincronización fitness.",
+    "manualHintNoIntegration": "Aún no hay sincronización fitness en tu cuenta; no pasa nada. Las entradas manuales cuentan igual que las sincronizadas.",
+    "lastAppleHealthSync": "Última sincronización de Apple Health para este reto: {{datetime}}.",
+    "noChallengeSelected": "Elige un reto activo antes de registrar pasos.",
+    "dateLabel": "Fecha",
+    "stepsLabel": "Pasos",
+    "submit": "Registrar pasos",
+    "submitting": "Enviando…",
+    "success": "Pasos registrados correctamente.",
+    "flaggedHint": "Las entregas superiores a 100.000 pasos se marcan para revisión.",
+    "validation": {
+      "selectDate": "Selecciona una fecha.",
+      "futureDate": "No puedes registrar pasos para una fecha futura.",
+      "minSteps": "Los pasos deben ser al menos {{min}}.",
+      "maxSteps": "Los pasos no pueden superar {{max}}."
+    },
+    "connectDevice": "Sincronización y wearables",
+    "connectDeviceNeedChallenge": "(elige un reto primero)"
+  },
+  "weeklyLeaderboard": {
+    "title": "Top semanal de pasos",
+    "biggestImprovement": "Mayor mejora",
+    "vsLastWeek": "+{{delta}} pasos vs la semana pasada",
+    "noChallengeSelected": "Selecciona un reto para ver la clasificación.",
+    "noEntries": "Aún no hay datos para esta semana.",
+    "rank": "Nº{{rank}}",
+    "you": "Tú"
+  },
+  "weekPicker": {
+    "weekOf": "Semana del",
+    "pickDate": "Elige una fecha para su semana",
+    "jumpToWeek": "Ir a semana por fecha",
+    "weekNumber": "Semana {{week}}",
+    "thisWeek": "Esta semana",
+    "previousWeek": "Semana anterior",
+    "nextWeek": "Semana siguiente",
+    "showThisWeek": "Mostrar esta semana",
+    "showPreviousWeek": "Mostrar semana anterior"
+  },
+  "forgotPassword": {
+    "title": "Restablecer contraseña",
+    "hint": "Introduce tu correo y te enviaremos un enlace para restablecer la contraseña.",
+    "emailLabel": "Correo electrónico",
+    "submit": "Enviar enlace",
+    "sending": "Enviando...",
+    "successMessage": "Si existe una cuenta con ese correo, se ha enviado un enlace. Revisa tu bandeja (o la consola del servidor en desarrollo).",
+    "errors": {
+      "invalidEmail": "Introduce un correo electrónico válido."
+    }
+  },
+  "resetPassword": {
+    "invalidTitle": "Enlace no válido",
+    "invalidMessage": "Este enlace de restablecimiento no es válido o está incompleto.",
+    "requestNewLink": "Solicitar un enlace nuevo",
+    "title": "Nueva contraseña",
+    "hint": "Elige una contraseña nueva para {{email}}.",
+    "newPasswordLabel": "Nueva contraseña",
+    "confirmPasswordLabel": "Confirmar contraseña",
+    "submit": "Restablecer contraseña",
+    "resetting": "Restableciendo...",
+    "successMessage": "Tu contraseña se ha restablecido. Ya puedes iniciar sesión.",
+    "signIn": "Iniciar sesión",
+    "errors": {
+      "tooShort": "La contraseña debe tener al menos 8 caracteres.",
+      "needsLetter": "La contraseña debe incluir al menos una letra.",
+      "needsNumber": "La contraseña debe incluir al menos un número.",
+      "doNotMatch": "Las contraseñas no coinciden."
+    }
+  },
+  "invite": {
+    "title": "Aceptando invitación",
+    "loading": "Cargando…",
+    "successWithChallenge": "Te has unido a {{challengeName}}. Redirigiendo…",
+    "successGeneric": "¡Bienvenido! Redirigiendo…",
+    "missingToken": "Falta el token de invitación",
+    "invalidInviteFallback": "Invitación no válida",
+    "alreadyHaveAccountHint": "Si ya tenías cuenta, tu sesión sigue activa. El resto puede registrarse desde Inicio de sesión.",
+    "goHomeEarly": "Ir al inicio ahora"
+  },
+  "errorBoundary": {
+    "title": "Algo salió mal",
+    "message": "Ha ocurrido un error inesperado. Puedes reintentar o recargar la página.",
+    "tryAgain": "Reintentar"
+  },
+  "admin": {
+    "title": "Consola de administración",
+    "noAccess": "No tienes permisos de administración.",
+    "scopedTo": "Filtrado a este reto",
+    "selectChallengeFirst": "Selecciona un reto primero.",
+    "sections": {
+      "challengeSetup": "Configuración del reto",
+      "participants": "Participantes",
+      "teamAssignment": "Asignación de equipos",
+      "moderation": "Moderación",
+      "inviteParticipant": "Invitar participante",
+      "cohort": "Comparar retos",
+      "analytics": "Analíticas",
+      "dailyActivity": "Cuadrícula de actividad diaria",
+      "exports": "Exportaciones"
+    },
+    "scope": {
+      "challenge": "{{name}}",
+      "selectPrompt": "Seleccionar reto",
+      "thisChallenge": "este reto",
+      "all": "todos"
+    },
+    "fields": {
+      "name": "Nombre",
+      "startDate": "Fecha de inicio",
+      "endDate": "Fecha de fin",
+      "timezone": "Zona horaria",
+      "teamSize": "Tamaño del equipo",
+      "emails": "Correos (separados por coma)",
+      "strategy": "Estrategia",
+      "search": "Buscar",
+      "searchPlaceholder": "correo o nombre",
+      "reason": "Motivo (obligatorio)",
+      "editSteps": "Editar pasos (opcional)",
+      "email": "Correo",
+      "emailPlaceholder": "participante@ejemplo.com"
+    },
+    "strategies": {
+      "random": "Aleatorio",
+      "snake": "Serpiente"
+    },
+    "actions": {
+      "createChallenge": "Crear reto",
+      "addParticipants": "Añadir participantes",
+      "assignTeams": "Asignar equipos",
+      "lockChallenge": "Bloquear reto",
+      "unlockChallenge": "Desbloquear reto",
+      "createInviteLink": "Crear enlace de invitación",
+      "edit": "Editar",
+      "delete": "Eliminar"
+    },
+    "invite": {
+      "shareLink": "Comparte este enlace:",
+      "copy": "Copiar enlace",
+      "copied": "¡Copiado!",
+      "hintExpiry": "El enlace caduca en 7 días. El participante lo abre para unirse e iniciar sesión.",
+      "clipboardUnavailable": "No se pudo copiar. Selecciona la URL y cópiala a mano."
+    },
+    "analytics": {
+      "participation": "Participación: {{rate}}%",
+      "avgActiveDays": "Media de días activos por participante: {{days}}",
+      "totalSubmissions": "Entregas totales: {{count}}",
+      "totalSteps": "Pasos totales: {{steps}}",
+      "neverLogged": "Sin registrar nunca: {{never}} / {{total}} participantes",
+      "dormant": "Sin actividad {{days}}+ días (sin entregas): {{dormant}} participantes",
+      "reEngagement": "Activos antes, ahora quietos {{days}}+ días: {{count}} participantes (señal simple de riesgo de abandono).",
+      "submissionsTrend": "Actividad de entregas por día",
+      "trendAria": "Gráfico de barras de entregas por día",
+      "emptyTrend": "Aún no hay entregas en esta línea de tiempo.",
+      "selectChallenge": "Selecciona un reto para ver analíticas."
+    },
+    "cohort": {
+      "intro": "Compara el compromiso de todos los retos (ordenados por fecha de inicio).",
+      "empty": "Aún no hay retos. Crea uno para ver métricas.",
+      "headers": {
+        "challenge": "Reto",
+        "status": "Estado",
+        "participants": "Concursantes",
+        "participation": "Participación",
+        "dormant": "Quietos (7d+)",
+        "neverLogged": "Sin registrar",
+        "reEngagement": "Riesgo abandono (7d+)"
+      },
+      "lifecycle": {
+        "upcoming": "Próximo",
+        "active": "Activo",
+        "ended": "Finalizado"
+      }
+    },
+    "activityGrid": {
+      "intro": "Filas de participantes y columnas por día de calendario para la semana elegida (zona horaria del reto).",
+      "participant": "Participante",
+      "weekHint": "Elige la semana ISO (mismo estado que el top semanal).",
+      "loading": "Cargando cuadrícula…",
+      "emptyWeek": "Ningún día del reto cae en esta semana ISO.",
+      "selectChallenge": "Selecciona un reto para cargar la cuadrícula.",
+      "loadError": "No se pudo cargar la cuadrícula.",
+      "noSubmission": "Sin entrega",
+      "flaggedSuffix": "marcado",
+      "ariaGrid": "Pasos diarios por participante"
+    },
+    "exports": {
+      "hint": "Las exportaciones CSV van al host de la API. Permanece iniciado sesión; el navegador envía la cookie de sesión al origen de la API.",
+      "selectChallengeFirstLink": "Selecciona un reto arriba para habilitar los enlaces.",
+      "submissions": "Exportar CSV de entregas",
+      "teams": "Exportar CSV de clasificación por equipos",
+      "weekly": "Exportar CSV de clasificación semanal"
+    },
+    "confirm": {
+      "deleteTitle": "¿Eliminar entrega?",
+      "editTitle": "¿Editar entrega?",
+      "deleteMessage": "¿Seguro que quieres eliminar esta entrega? ({{user}} · {{date}} · {{steps}} pasos) No se puede deshacer.",
+      "editMessage": "¿Editar pasos de {{user}} el {{date}}?",
+      "delete": "Eliminar",
+      "save": "Guardar"
+    },
+    "submission": {
+      "flagged": "(marcado)"
+    },
+    "feedback": {
+      "challengeCreated": "Reto creado.",
+      "participantsAdded_one": "Se añadió {{count}} participante.",
+      "participantsAdded_other": "Se añadieron {{count}} participantes.",
+      "teamsAssigned": "Equipos asignados.",
+      "challengeLocked": "Reto bloqueado.",
+      "challengeUnlocked": "Reto desbloqueado.",
+      "submissionUpdated": "Entrega actualizada.",
+      "submissionDeleted": "Entrega eliminada.",
+      "inviteCreated": "Enlace de invitación creado. Compártelo con el participante.",
+      "selectChallengeAndEmail": "Selecciona un reto e introduce el correo.",
+      "selectChallenge": "Selecciona un reto primero."
+    }
+  },
+  "teamStandings": {
+    "title": "Clasificación por equipos",
+    "loading": "Cargando clasificación…",
+    "emptyAdmin": "Aún no hay clasificación. Añade participantes y asigna equipos.",
+    "emptyParticipant": "Aún no hay clasificación. Registra pasos o pide a tu admin que asigne equipos.",
+    "goToAdmin": "Ir a administración",
+    "logSteps": "Registrar pasos",
+    "myTeam": "(tu equipo)",
+    "rank": "Nº{{rank}}",
+    "total": "{{steps}} en total",
+    "lead": "Líder: {{name}} ({{steps}})",
+    "leads": "lidera",
+    "behind": "{{steps}} por detrás",
+    "behindShort": "detrás"
+  },
+  "cookieConsent": {
+    "title": "Cookies y analítica",
+    "body": "Usamos cookies esenciales para el inicio de sesión. Si aceptas, también cargamos analítica opcional para mejorar StepSprint.",
+    "accept": "Aceptar analítica",
+    "decline": "Solo esenciales"
+  }
+}
