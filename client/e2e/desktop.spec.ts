@@ -27,7 +27,11 @@ test.describe("Desktop viewport", () => {
     const stepsInput = page.locator("form input[type='number']");
     await expect(stepsInput).toBeVisible();
     await stepsInput.fill("4321");
-    await page.getByRole("button", { name: /log steps|registrar pasos/i }).click();
+    // Wait for the challenge selector to hydrate so challengeId is populated
+    // and the submit button becomes enabled.
+    const submitBtn = page.getByRole("button", { name: /log steps|registrar pasos/i });
+    await expect(submitBtn).toBeEnabled({ timeout: 15_000 });
+    await submitBtn.click();
     await expect(
       page.getByText(/Steps submitted successfully|Pasos registrados correctamente/i)
     ).toBeVisible({ timeout: 15_000 });

@@ -1,6 +1,6 @@
 # StepSprint launch runbook
 
-A single ordered checklist for taking StepSprint from a green CI to a public production deploy on **Vercel** (SPA + Function + Postgres on the same project). Reference docs: [DEPLOYMENT.md](DEPLOYMENT.md) for the deep-dive, [PRODUCTION.md](PRODUCTION.md) for the security/compliance review, [BACKUP_DRILL.md](BACKUP_DRILL.md) for restore practice. **Use this file as the do-it-in-order sheet on launch day.**
+A single ordered checklist for taking StepSprint from a green CI to a public production deploy on **Vercel** (SPA + Function + Postgres on the same project). Reference docs: [DEPLOYMENT.md](DEPLOYMENT.md) for the deep-dive, [PRODUCTION.md](PRODUCTION.md) for the security/compliance review, [BACKUP_DRILL.md](BACKUP_DRILL.md) for restore practice, [LAUNCH_CHECKLIST.md](LAUNCH_CHECKLIST.md) for the tick-as-you-go operator list. **Use this file as the do-it-in-order sheet on launch day.**
 
 > Estimated wall time end-to-end: **30–60 minutes** assuming Vercel and Resend accounts already exist.
 

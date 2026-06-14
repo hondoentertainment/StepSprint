@@ -1,6 +1,6 @@
 # StepSprint master roadmap
 
-Single place to see **where we are**, **what ships next**, and **longer bets**. Detailed requirements stay in [PRD.md](PRD.md); production-readiness review in [PRODUCTION.md](PRODUCTION.md); hosting steps in [DEPLOYMENT.md](DEPLOYMENT.md); ordered launch-day runbook in [LAUNCH.md](LAUNCH.md).
+Single place to see **where we are**, **what ships next**, and **longer bets**. Detailed requirements stay in [PRD.md](PRD.md); production-readiness review in [PRODUCTION.md](PRODUCTION.md); hosting steps in [DEPLOYMENT.md](DEPLOYMENT.md); ordered launch-day runbook in [LAUNCH.md](LAUNCH.md); tick-as-you-go operator list in [LAUNCH_CHECKLIST.md](LAUNCH_CHECKLIST.md).
 
 ---
 

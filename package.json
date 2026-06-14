@@ -16,7 +16,8 @@
     "test:coverage:server": "cd server && npm run test:coverage",
     "test:e2e": "cd client && npm run test:e2e",
     "check:api": "node scripts/check-api-health.mjs",
-    "postgres:parity": "node scripts/switch-to-postgres-schema.mjs"
+    "postgres:parity": "node scripts/switch-to-postgres-schema.mjs",
+    "generate:vapid": "node scripts/generate-vapid-keys.mjs"
   },
   "devDependencies": {
     "prisma": "^6.19.2"
