@@ -12,31 +12,87 @@ enum Role {
 }
 
 model User {
-  id          String           @id @default(cuid())
-  email       String           @unique
-  name        String?
-  role        Role             @default(PARTICIPANT)
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  memberships TeamMember[]
-  submissions StepSubmission[]
-  auditLogs   AuditLog[]       @relation("AuditActor")
+  id                          String                       @id @default(cuid())
+  email                       String                       @unique
+  name                        String?
+  passwordHash                String?
+  role                        Role                         @default(PARTICIPANT)
+  tokenVersion                Int                          @default(0)
+  emailVerified               Boolean                      @default(false)
+  createdAt                   DateTime                     @default(now())
+  updatedAt                   DateTime                     @updatedAt
+  memberships                 TeamMember[]
+  submissions                 StepSubmission[]
+  auditLogs                   AuditLog[]                   @relation("AuditActor")
+  resetTokens                 PasswordResetToken[]
+  emailVerificationTokens     EmailVerificationToken[]
+  notificationPreference      NotificationPreference?
+  pushSubscriptions           PushSubscription[]
+  integrationTokens           IntegrationToken[]
+  oauthConnections            OAuthConnection[]
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model NotificationPreference {
+  id                      String    @id @default(cuid())
+  userId                  String    @unique
+  dailyReminder           Boolean   @default(false)
+  lastDailyReminderSentAt DateTime?
+  user                    User      @relation(fields: [userId], references: [id])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Challenge {
-  id          String           @id @default(cuid())
-  name        String
-  startDate   DateTime
-  endDate     DateTime
-  timezone    String
-  teamSize    Int
-  locked      Boolean          @default(false)
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  teams       Team[]
-  members     TeamMember[]
-  submissions StepSubmission[]
-  auditLogs   AuditLog[]
+  id                   String           @id @default(cuid())
+  name                 String
+  startDate            DateTime
+  endDate              DateTime
+  timezone             String
+  teamSize             Int
+  locked               Boolean          @default(false)
+  inviteCode           String?          @unique
+  inviteCodeExpiresAt  DateTime?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  teams                Team[]
+  members              TeamMember[]
+  submissions          StepSubmission[]
+  auditLogs            AuditLog[]
 
   @@index([startDate, endDate])
 }
@@ -83,6 +139,36 @@ model StepSubmission {
 
   @@unique([userId, challengeId, date])
   @@index([challengeId, date])
+}
+
+model IntegrationToken {
+  id         String    @id @default(cuid())
+  userId     String
+  tokenHash  String    @unique
+  label      String    @default("Apple Watch Sync")
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  expiresAt  DateTime?
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model OAuthConnection {
+  id             String    @id @default(cuid())
+  userId         String
+  provider       String
+  accessToken    String
+  refreshToken   String?
+  expiresAt      DateTime?
+  providerUserId String?
+  scopes         String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@index([userId])
 }
 
 model AuditLog {

@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { api } from "../api";
 import { getErrorMessage } from "../api";
 import type { WeeklyEntry } from "../types";
 import { WeekPicker } from "./WeekPicker";
 import type { Challenge } from "../types";
-import { useWeek } from "../contexts/WeekContext";
+import { useWeek } from "../contexts/useWeek";
 
 type Props = {
   challengeId: string;
@@ -13,6 +14,8 @@ type Props = {
 };
 
 export function WeeklyLeaderboard({ challengeId, selectedChallenge }: Props) {
+  const { t, i18n } = useTranslation();
+  const numberLocale = i18n.resolvedLanguage ?? undefined;
   const { week, setWeek } = useWeek();
   const weekYear = week.year;
   const weekNumber = week.week;
@@ -23,17 +26,31 @@ export function WeeklyLeaderboard({ challengeId, selectedChallenge }: Props) {
   useEffect(() => {
     if (!challengeId) return;
 
-    setIsLoading(true);
-    setError("");
-    api<{ leaderboard: WeeklyEntry[] }>(
-      `/api/leaderboards/weekly?challengeId=${challengeId}&weekYear=${weekYear}&weekNumber=${weekNumber}`
-    )
-      .then((data) => setLeaderboard(data.leaderboard))
-      .catch((err) => {
+    let cancelled = false;
+
+    async function loadLeaderboard() {
+      setIsLoading(true);
+      setError("");
+      try {
+        const data = await api<{ leaderboard: WeeklyEntry[] }>(
+          `/api/leaderboards/weekly?challengeId=${challengeId}&weekYear=${weekYear}&weekNumber=${weekNumber}`
+        );
+        if (cancelled) return;
+        setLeaderboard(data.leaderboard);
+      } catch (err) {
+        if (cancelled) return;
         setLeaderboard([]);
         setError(getErrorMessage(err));
-      })
-      .finally(() => setIsLoading(false));
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    }
+
+    void loadLeaderboard();
+
+    return () => {
+      cancelled = true;
+    };
   }, [challengeId, weekYear, weekNumber]);
 
   const biggest = leaderboard
@@ -42,14 +59,14 @@ export function WeeklyLeaderboard({ challengeId, selectedChallenge }: Props) {
 
   return (
     <section className="panel">
-      <h2>Weekly Top Steppers</h2>
+      <h2>{t("weeklyLeaderboard.title")}</h2>
       {error && <p className="status status-error">{error}</p>}
       {!isLoading && biggest && (
         <div className="spotlight spotlight-improvement">
-          <span className="spotlight-label">Biggest improvement</span>
+          <span className="spotlight-label">{t("weeklyLeaderboard.biggestImprovement")}</span>
           <span className="spotlight-name">{biggest.name || biggest.email}</span>
           <span className="spotlight-steps">
-            +{biggest.delta.toLocaleString()} steps vs last week
+            {t("weeklyLeaderboard.vsLastWeek", { delta: biggest.delta.toLocaleString(numberLocale) })}
           </span>
         </div>
       )}
@@ -64,13 +81,13 @@ export function WeeklyLeaderboard({ challengeId, selectedChallenge }: Props) {
           <div className="skeleton skeleton-row" />
           <div className="skeleton skeleton-row" />
           <div className="skeleton skeleton-row" />
-          <p className="status">Loading weekly leaderboard...</p>
+          <p className="status">{t("common.loading")}</p>
         </div>
       ) : leaderboard.length === 0 ? (
         <div className="empty-state" role="status">
-          <p className="status">No weekly data yet for this selection.</p>
+          <p className="status">{t("weeklyLeaderboard.noEntries")}</p>
           <Link to="/submit" className="cta-primary" style={{ display: "inline-block" }}>
-            Log steps to appear here
+            {t("home.logSteps")}
           </Link>
         </div>
       ) : (
@@ -83,14 +100,17 @@ export function WeeklyLeaderboard({ challengeId, selectedChallenge }: Props) {
               tabIndex={0}
             >
               <div className="primary">
-                <span className="rank">#{index + 1}</span> {entry.name || entry.email}
+                <span className="rank">#{index + 1}</span>
+                <span className="list-name" title={entry.name || entry.email}>
+                  {entry.name || entry.email}
+                </span>
               </div>
               <div className="meta">
-                {entry.steps.toLocaleString()} steps · {entry.trend}
+                {entry.steps.toLocaleString(numberLocale)} {t("common.steps")}
                 {entry.delta !== 0 && (
                   <span className="delta">
-                    ({entry.delta > 0 ? "+" : ""}
-                    {entry.delta.toLocaleString()} vs last week)
+                    {" "}({entry.delta > 0 ? "+" : ""}
+                    {entry.delta.toLocaleString(numberLocale)})
                   </span>
                 )}
               </div>

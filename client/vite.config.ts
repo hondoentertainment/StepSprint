@@ -1,10 +1,77 @@
 /// <reference types="vitest" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { sentryVitePlugin } from "@sentry/vite-plugin";
+import { VitePWA } from "vite-plugin-pwa";
+
+const sentryRelease =
+  process.env.VITE_SENTRY_RELEASE?.trim() ||
+  (process.env.VERCEL_GIT_COMMIT_SHA?.trim()
+    ? `stepsprint-client@${process.env.VERCEL_GIT_COMMIT_SHA.slice(0, 7)}`
+    : process.env.GITHUB_SHA?.trim()
+      ? `stepsprint-client@${process.env.GITHUB_SHA.slice(0, 7)}`
+      : "");
+
+const sentryAuth = process.env.SENTRY_AUTH_TOKEN?.trim();
+const sentryOrg = process.env.SENTRY_ORG?.trim();
+const sentryProject = process.env.SENTRY_PROJECT?.trim();
+
+const sentrySourceMapsPlugin =
+  sentryAuth && sentryOrg && sentryProject && sentryRelease
+    ? sentryVitePlugin({
+        org: sentryOrg,
+        project: sentryProject,
+        authToken: sentryAuth,
+        release: { name: sentryRelease },
+        telemetry: false,
+      })
+    : null;
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  define: {
+    "import.meta.env.VITE_SENTRY_RELEASE": JSON.stringify(sentryRelease),
+  },
+  build: {
+    sourcemap: "hidden",
+  },
+  plugins: [
+    react(),
+    VitePWA({
+      registerType: "autoUpdate",
+      includeAssets: ["vite.svg", "icons/icon-192.png", "icons/icon-512.png"],
+      manifest: {
+        name: "StepSprint",
+        short_name: "StepSprint",
+        description: "Month-long step challenges with teams and leaderboards.",
+        start_url: "/",
+        scope: "/",
+        display: "standalone",
+        orientation: "portrait",
+        background_color: "#0f172a",
+        theme_color: "#0f172a",
+        icons: [
+          {
+            src: "/icons/icon-192.png",
+            sizes: "192x192",
+            type: "image/png",
+            purpose: "any maskable",
+          },
+          {
+            src: "/icons/icon-512.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "any maskable",
+          },
+        ],
+      },
+      workbox: {
+        globPatterns: ["**/*.{js,css,html,svg,png,webmanifest}"],
+        navigateFallback: "index.html",
+      },
+    }),
+    ...(sentrySourceMapsPlugin ? [sentrySourceMapsPlugin] : []),
+  ],
   test: {
     globals: true,
     environment: "jsdom",
@@ -18,8 +85,12 @@ export default defineConfig({
     },
   },
   server: {
+    // Explicit loopback so dev + Playwright share the same address (Windows IPv6/IPv4 quirks).
+    host: "127.0.0.1",
+    port: 5173,
+    strictPort: true,
     proxy: {
-      "/api": "http://localhost:3001",
+      "/api": "http://127.0.0.1:3001",
     },
   },
 });

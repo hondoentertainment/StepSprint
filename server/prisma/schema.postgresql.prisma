@@ -1,0 +1,203 @@
+// PostgreSQL schema for production. To use:
+// 1. Copy this file over server/prisma/schema.prisma (or swap as needed)
+// 2. Set DATABASE_URL to your PostgreSQL connection string
+// 3. Run: npx prisma migrate dev (or deploy in prod)
+
+generator client {
+  provider      = "prisma-client-js"
+  // `native` for local dev; `rhel-openssl-3.0.x` for the Vercel Functions
+  // runtime (Amazon Linux 2023 base image with OpenSSL 3). Adding both lets
+  // the same generated client run in both places without re-generating.
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  // Prisma 7 removed `url` and `directUrl` from the datasource block; the URL
+  // now lives in `prisma.config.ts` and is read from DATABASE_URL there. At
+  // runtime, PrismaClient gets a `@prisma/adapter-pg` instance constructed
+  // with the same URL (see `src/prismaClientFactory.ts`). For pooled Postgres
+  // (Vercel Postgres / Neon pgbouncer), point DATABASE_URL at the pooled URL
+  // for the runtime client and at POSTGRES_URL_NON_POOLING for `prisma
+  // migrate deploy` (handled by `scripts/vercel-build.mjs`).
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  PARTICIPANT
+}
+
+model User {
+  id                          String                       @id @default(cuid())
+  email                       String                       @unique
+  name                        String?
+  passwordHash                String?
+  role                        Role                         @default(PARTICIPANT)
+  tokenVersion                Int                          @default(0)
+  emailVerified               Boolean                      @default(false)
+  createdAt                   DateTime                     @default(now())
+  updatedAt                   DateTime                     @updatedAt
+  memberships                 TeamMember[]
+  submissions                 StepSubmission[]
+  auditLogs                   AuditLog[]                   @relation("AuditActor")
+  resetTokens                 PasswordResetToken[]
+  emailVerificationTokens     EmailVerificationToken[]
+  notificationPreference      NotificationPreference?
+  pushSubscriptions           PushSubscription[]
+  integrationTokens           IntegrationToken[]
+  oauthConnections            OAuthConnection[]
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model NotificationPreference {
+  id                      String    @id @default(cuid())
+  userId                  String    @unique
+  dailyReminder           Boolean   @default(false)
+  lastDailyReminderSentAt DateTime?
+  user                    User      @relation(fields: [userId], references: [id])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Challenge {
+  id                  String           @id @default(cuid())
+  name                String
+  startDate           DateTime
+  endDate             DateTime
+  timezone            String
+  teamSize            Int
+  locked              Boolean          @default(false)
+  inviteCode          String?          @unique
+  inviteCodeExpiresAt DateTime?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  teams               Team[]
+  members             TeamMember[]
+  submissions         StepSubmission[]
+  auditLogs           AuditLog[]
+
+  @@index([startDate, endDate])
+}
+
+model Team {
+  id          String       @id @default(cuid())
+  name        String
+  challengeId String
+  challenge   Challenge    @relation(fields: [challengeId], references: [id])
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  members     TeamMember[]
+
+  @@unique([challengeId, name])
+}
+
+model TeamMember {
+  id          String     @id @default(cuid())
+  userId      String
+  challengeId String
+  teamId      String?
+  isLeader    Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  user        User       @relation(fields: [userId], references: [id])
+  challenge   Challenge  @relation(fields: [challengeId], references: [id])
+  team        Team?      @relation(fields: [teamId], references: [id])
+
+  @@unique([userId, challengeId])
+  @@index([teamId])
+}
+
+model StepSubmission {
+  id          String     @id @default(cuid())
+  userId      String
+  challengeId String
+  date        DateTime
+  steps       Int
+  isFlagged   Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  user        User       @relation(fields: [userId], references: [id])
+  challenge   Challenge  @relation(fields: [challengeId], references: [id])
+
+  @@unique([userId, challengeId, date])
+  @@index([challengeId, date])
+}
+
+model IntegrationToken {
+  id         String    @id @default(cuid())
+  userId     String
+  tokenHash  String    @unique
+  label      String    @default("Apple Watch Sync")
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  expiresAt  DateTime?
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model OAuthConnection {
+  id             String    @id @default(cuid())
+  userId         String
+  provider       String
+  accessToken    String
+  refreshToken   String?
+  expiresAt      DateTime?
+  providerUserId String?
+  scopes         String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@index([userId])
+}
+
+model AuditLog {
+  id          String     @id @default(cuid())
+  action      String
+  reason      String?
+  metadata    Json?
+  actorId     String?
+  challengeId String?
+  createdAt   DateTime   @default(now())
+  actor       User?      @relation("AuditActor", fields: [actorId], references: [id])
+  challenge   Challenge? @relation(fields: [challengeId], references: [id])
+
+  @@index([challengeId])
+  @@index([actorId])
+}

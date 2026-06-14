@@ -1,0 +1,17 @@
+node_modules
+dist
+coverage
+*.db
+*.db-journal
+*.sqlite
+*.sqlite-journal
+.env
+.env.*
+.git
+.gitignore
+.vscode
+.idea
+*.log
+npm-debug.log*
+.DS_Store
+README.md

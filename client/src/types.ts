@@ -5,6 +5,11 @@ export type User = {
   role: "ADMIN" | "PARTICIPANT";
 };
 
+/** POST /api/auth/register: session for provisioned accounts, or email verification for new sign-ups */
+export type RegisterOutcome =
+  | { kind: "session"; user: User }
+  | { kind: "verify_email"; message: string };
+
 export type Challenge = {
   id: string;
   name: string;
@@ -52,5 +57,5 @@ export type Submission = {
   challenge: { name: string };
 };
 
-export const TABS = ["Home", "Submit", "Weekly Top Steppers", "Team Standings", "Admin"] as const;
+export const TABS = ["Home", "Submit", "Devices", "Leaderboard", "Teams", "Admin"] as const;
 export type Tab = (typeof TABS)[number];

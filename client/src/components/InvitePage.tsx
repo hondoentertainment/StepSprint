@@ -1,10 +1,12 @@
 import { useEffect, useState, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { getErrorMessage, getApiUrl } from "../api";
 import type { User } from "../types";
 
 /** Standalone page for accepting invite links: /invite?token=... */
 export function InvitePage({ onAccepted }: { onAccepted: (user: User) => void }) {
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const token = searchParams.get("token");
@@ -12,63 +14,78 @@ export function InvitePage({ onAccepted }: { onAccepted: (user: User) => void })
   const [error, setError] = useState("");
   const [challengeName, setChallengeName] = useState<string | null>(null);
 
-  const acceptInvite = useCallback(() => {
+  const acceptInvite = useCallback(async () => {
     if (!token) {
       setStatus("error");
-      setError("Missing invite token");
+      setError(t("invite.missingToken"));
       return;
     }
 
     setStatus("loading");
     setError("");
 
-    fetch(getApiUrl(`/api/invites/accept?token=${encodeURIComponent(token)}`), { credentials: "include" })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.user) {
-          onAccepted(data.user);
-          setChallengeName(data.challengeName || null);
-          setStatus("success");
-          const targetPath = data.challengeId ? `/home?challenge=${data.challengeId}` : "/home";
-          setTimeout(() => navigate(targetPath, { replace: true }), 1500);
-        } else {
-          setStatus("error");
-          setError(data.error || "Invalid invite");
-        }
-      })
-      .catch((err) => {
+    try {
+      const res = await fetch(
+        getApiUrl(`/api/invites/accept?token=${encodeURIComponent(token)}`),
+        { credentials: "include" }
+      );
+      const data = await res.json();
+      if (data.user) {
+        onAccepted(data.user);
+        setChallengeName(data.challengeName || null);
+        setStatus("success");
+        const targetPath = data.challengeId ? `/home?challenge=${data.challengeId}` : "/home";
+        setTimeout(() => navigate(targetPath, { replace: true }), 1500);
+      } else {
         setStatus("error");
-        setError(getErrorMessage(err));
-      });
-  }, [token, onAccepted, navigate]);
+        setError(data.error || t("invite.invalidInviteFallback"));
+      }
+    } catch (err) {
+      setStatus("error");
+      setError(getErrorMessage(err));
+    }
+  }, [token, onAccepted, navigate, t]);
 
   useEffect(() => {
-    acceptInvite();
+    let cancelled = false;
+    (async () => {
+      if (cancelled) return;
+      await acceptInvite();
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [acceptInvite]);
 
   return (
     <div className="app">
       <section className="panel panel-login">
-        <h2>Accepting invite</h2>
-        {status === "loading" && <p className="status">Loading…</p>}
+        <h2>{t("invite.title")}</h2>
+        {status === "loading" && <p className="status">{t("invite.loading")}</p>}
         {status === "success" && (
-          <p className="status status-success" role="status" aria-live="polite">
-            {challengeName
-              ? `You've joined ${challengeName}. Redirecting…`
-              : "Welcome! Redirecting…"}
-          </p>
+          <div role="status" aria-live="polite">
+            <p className="status status-success">
+              {challengeName
+                ? t("invite.successWithChallenge", { challengeName })
+                : t("invite.successGeneric")}
+            </p>
+            <p className="hint invite-next-hint">{t("invite.alreadyHaveAccountHint")}</p>
+            <button type="button" className="cta-primary" onClick={() => navigate("/home", { replace: true })}>
+              {t("invite.goHomeEarly")}
+            </button>
+          </div>
         )}
         {status === "error" && (
           <>
             <p className="status status-error" role="alert">{error}</p>
-            {error !== "Missing invite token" && (
+            {error !== t("invite.missingToken") && (
               <button
                 type="button"
                 className="cta-primary"
                 onClick={acceptInvite}
-                aria-label="Try again"
+                aria-label={t("common.tryAgain")}
               >
-                Try again
+                {t("common.tryAgain")}
               </button>
             )}
           </>

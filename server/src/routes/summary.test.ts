@@ -1,24 +1,56 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import bcrypt from "bcryptjs";
 import request from "supertest";
 import app from "../app";
 import { prisma } from "../prisma";
 
 describe("Summary routes", () => {
-  it("GET /api/me/summary returns 401 without auth", async () => {
+  let userId: string;
+  let challengeId: string;
+  let cookie: string[];
+
+  beforeAll(async () => {
+    const suffix = Date.now().toString(36);
+    const email = `summary-test-${suffix}@stepsprint.local`;
+    const passwordHash = await bcrypt.hash("password123", 12);
+    const user = await prisma.user.create({
+      data: { email, passwordHash, emailVerified: true },
+    });
+    userId = user.id;
+
     const challenge = await prisma.challenge.findFirst();
     if (!challenge) return;
+    challengeId = challenge.id;
+
+    await prisma.teamMember.upsert({
+      where: { userId_challengeId: { userId, challengeId } },
+      update: {},
+      create: { userId, challengeId },
+    });
+
+    const loginRes = await request(app)
+      .post("/api/auth/login")
+      .send({ email, password: "password123" });
+    const raw = loginRes.headers["set-cookie"];
+    cookie = Array.isArray(raw) ? raw : [raw];
+  });
+
+  afterAll(async () => {
+    if (userId) {
+      await prisma.teamMember.deleteMany({ where: { userId } });
+      await prisma.user.delete({ where: { id: userId } });
+    }
+  });
+
+  it("GET /api/me/summary returns 401 without auth", async () => {
+    if (!challengeId) return;
     await request(app)
-      .get(`/api/me/summary?challengeId=${challenge.id}`)
+      .get(`/api/me/summary?challengeId=${challengeId}`)
       .expect(401);
   });
 
   it("GET /api/me/summary returns 400 without challengeId", async () => {
-    const loginRes = await request(app)
-      .post("/api/auth/login")
-      .send({ email: "user1@stepsprint.local" });
-    const cookie = loginRes.headers["set-cookie"];
     if (!cookie) return;
-
     await request(app)
       .get("/api/me/summary")
       .set("Cookie", cookie)
@@ -26,15 +58,9 @@ describe("Summary routes", () => {
   });
 
   it("GET /api/me/summary returns summary when enrolled", async () => {
-    const loginRes = await request(app)
-      .post("/api/auth/login")
-      .send({ email: "user1@stepsprint.local" });
-    const cookie = loginRes.headers["set-cookie"];
-    const challenge = await prisma.challenge.findFirst();
-    if (!cookie || !challenge) return;
-
+    if (!cookie || !challengeId) return;
     const res = await request(app)
-      .get(`/api/me/summary?challengeId=${challenge.id}`)
+      .get(`/api/me/summary?challengeId=${challengeId}`)
       .set("Cookie", cookie)
       .expect(200);
 

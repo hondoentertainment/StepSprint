@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { api } from "../api";
 import { getErrorMessage } from "../api";
 import type { TeamEntry } from "../types";
@@ -12,6 +13,8 @@ type Props = {
 };
 
 export function TeamStandings({ challengeId, user }: Props) {
+  const { t, i18n } = useTranslation();
+  const numberLocale = i18n.resolvedLanguage ?? undefined;
   const [teams, setTeams] = useState<TeamEntry[]>([]);
   const [userTeamName, setUserTeamName] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -20,48 +23,80 @@ export function TeamStandings({ challengeId, user }: Props) {
   useEffect(() => {
     if (!challengeId) return;
 
-    setIsLoading(true);
-    setError("");
-    api<{ leaderboard: TeamEntry[] }>(`/api/leaderboards/teams?challengeId=${challengeId}`)
-      .then((data) => setTeams(data.leaderboard))
-      .catch((err) => {
+    let cancelled = false;
+
+    async function loadTeams() {
+      setIsLoading(true);
+      setError("");
+      try {
+        const data = await api<{ leaderboard: TeamEntry[] }>(
+          `/api/leaderboards/teams?challengeId=${challengeId}`
+        );
+        if (cancelled) return;
+        setTeams(data.leaderboard);
+      } catch (err) {
+        if (cancelled) return;
         setTeams([]);
         setError(getErrorMessage(err));
-      })
-      .finally(() => setIsLoading(false));
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    }
+
+    void loadTeams();
+
+    return () => {
+      cancelled = true;
+    };
   }, [challengeId]);
 
   useEffect(() => {
     if (!challengeId) return;
-    api<Summary>(`/api/me/summary?challengeId=${challengeId}`)
-      .then((data) => setUserTeamName(data.teamTotals.teamName || null))
-      .catch(() => setUserTeamName(null));
+
+    let cancelled = false;
+
+    async function loadSummary() {
+      try {
+        const data = await api<Summary>(`/api/me/summary?challengeId=${challengeId}`);
+        if (cancelled) return;
+        setUserTeamName(data.teamTotals.teamName || null);
+      } catch {
+        if (cancelled) return;
+        setUserTeamName(null);
+      }
+    }
+
+    void loadSummary();
+
+    return () => {
+      cancelled = true;
+    };
   }, [challengeId]);
 
   return (
     <section className="panel">
-      <h2>Team Leaderboard</h2>
+      <h2>{t("teamStandings.title")}</h2>
       {error && <p className="status status-error">{error}</p>}
       {isLoading ? (
         <div className="loading-skeleton">
           <div className="skeleton skeleton-row" />
           <div className="skeleton skeleton-row" />
           <div className="skeleton skeleton-row" />
-          <p className="status">Loading team standings...</p>
+          <p className="status">{t("teamStandings.loading")}</p>
         </div>
       ) : teams.length === 0 ? (
         <div className="empty-state" role="status">
           <p className="status">
             {user?.role === "ADMIN"
-              ? "No team standings yet. Add participants and assign teams to get started."
-              : "No team standings yet. Log steps to contribute, or ask your admin to assign teams."}
+              ? t("teamStandings.emptyAdmin")
+              : t("teamStandings.emptyParticipant")}
           </p>
           <Link
             to={user?.role === "ADMIN" ? "/admin" : "/submit"}
             className={user?.role === "ADMIN" ? "secondary" : "cta-primary"}
             style={{ display: "inline-block" }}
           >
-            {user?.role === "ADMIN" ? "Go to Admin" : "Log steps"}
+            {user?.role === "ADMIN" ? t("teamStandings.goToAdmin") : t("teamStandings.logSteps")}
           </Link>
         </div>
       ) : (
@@ -72,14 +107,17 @@ export function TeamStandings({ challengeId, user }: Props) {
               className={`list-row ${userTeamName && entry.teamName === userTeamName ? "list-row-my-team" : ""}`}
             >
               <div className="primary">
-                <span className="rank">#{index + 1}</span> {entry.teamName}
+                <span className="rank">#{index + 1}</span>
+                <span className="list-name" title={entry.teamName}>{entry.teamName}</span>
                 {userTeamName && entry.teamName === userTeamName && (
-                  <span className="my-team-badge" aria-hidden> (your team)</span>
+                  <span className="my-team-badge" aria-hidden> {t("teamStandings.myTeam")}</span>
                 )}
               </div>
               <div className="meta">
-                {entry.totalSteps.toLocaleString()} total · Lead: {entry.leaderName || "—"} (
-                {entry.leaderSteps.toLocaleString()}) · {entry.stepsBehind.toLocaleString()} behind
+                <span className="meta-steps">{entry.totalSteps.toLocaleString(numberLocale)} {t("common.steps")}</span>
+                <span className="meta-detail">
+                  {entry.leaderName || t("common.notApplicable")} {t("teamStandings.leads")} &middot; {entry.stepsBehind.toLocaleString(numberLocale)} {t("teamStandings.behindShort")}
+                </span>
               </div>
             </div>
           ))}

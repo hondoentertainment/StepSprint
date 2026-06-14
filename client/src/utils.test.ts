@@ -34,9 +34,17 @@ describe("getISOWeek", () => {
 
 describe("formatWeekRange", () => {
   it("returns formatted date range for week", () => {
-    const result = formatWeekRange(2025, 7);
+    const result = formatWeekRange(2025, 7, "en-US");
     expect(result).toMatch(/^\w{3} \d+–/);
     expect(result).toContain("2025");
+  });
+
+  it("uses locale for month abbreviations", () => {
+    const en = formatWeekRange(2025, 7, "en-US");
+    const es = formatWeekRange(2025, 7, "es-ES");
+    expect(en.length).toBeGreaterThan(5);
+    expect(es.length).toBeGreaterThan(5);
+    expect(en).not.toBe(es);
   });
 });
 
