@@ -6,7 +6,7 @@ import { isValidEmail } from "../utils";
 import { identify } from "../analytics";
 import type { RegisterOutcome, User } from "../types";
 import { StepSprintLogo } from "./StepSprintLogo";
-import { LegalFooter } from "./LegalFooter";
+import { LanguageSwitcher } from "./LanguageSwitcher";
 
 type Props = {
   onLogin: (email: string, password: string) => Promise<User>;
@@ -380,7 +380,7 @@ export function Login({ onLogin, onRegister }: Props) {
           )}
         </div>
       </section>
-      <LegalFooter />
+      <LanguageSwitcher />
     </div>
   );
 }

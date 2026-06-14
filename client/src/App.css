@@ -1794,8 +1794,8 @@ textarea:focus-visible {
   max-width: 200px;
 }
 
-/* ========== Legal footer & cookie banner ========== */
-.legal-footer {
+/* ========== Language switcher & cookie banner ========== */
+.language-switcher {
   margin-top: auto;
   padding-top: 1rem;
   text-align: center;
@@ -1803,22 +1803,13 @@ textarea:focus-visible {
   color: var(--text-muted);
 }
 
-.legal-footer a {
-  color: var(--text-secondary);
-  font-weight: 500;
-}
-
-.legal-footer a:hover {
-  color: var(--accent);
-}
-
-.legal-footer-lang {
+.language-switcher-label {
   display: inline-flex;
   align-items: center;
   vertical-align: middle;
 }
 
-.legal-footer-lang-select {
+.language-switcher-select {
   font: inherit;
   font-size: 0.85rem;
   padding: 0.15rem 0.4rem;
@@ -1827,20 +1818,6 @@ textarea:focus-visible {
   background: var(--surface);
   color: var(--text);
   max-width: 9rem;
-}
-
-.legal-production-notice {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 0.75rem 1rem;
-  margin-bottom: 1rem;
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
-}
-
-.legal-page ul {
-  padding-left: 1.25rem;
-  margin: 0.5rem 0 1rem;
-  color: var(--text-secondary);
 }
 
 .cookie-consent-banner {

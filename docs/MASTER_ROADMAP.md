@@ -33,7 +33,7 @@ The PRD **core product** is implemented: auth, challenges, teams, submissions, l
 | CI gates | server-test (SQLite), server-test-postgres, client lint/test/build, smoke (server + **`node scripts/check-api-health.mjs`**), Playwright E2E (desktop Chrome) |
 | Prod env validation | Strict startup (Postgres, origins, JWT length, email + `SMTP_FROM`); `/api/health` exposes `transactionalEmail` in production |
 
-### Operator actions (hosting / secrets / legal)
+### Operator actions (hosting / secrets)
 
 | Priority | Item | Notes |
 |----------|------|--------|
@@ -42,7 +42,6 @@ The PRD **core product** is implemented: auth, challenges, teams, submissions, l
 | P0 | First deploy + `npm run check:api -- <url> --strict` | Gates `release`, `transactionalEmail`, CSP, db |
 | P1 | Sentry DSNs + optional source maps | `SENTRY_DSN`, `VITE_SENTRY_DSN`, `SENTRY_AUTH_TOKEN`/`ORG`/`PROJECT` |
 | P1 | [Post-deploy email smoke](DEPLOYMENT.md#post-deploy-email-smoke-recommended) | After Resend configured |
-| P1 | Legal | Counsel copy; `VITE_LEGAL_CONTENT_REVIEWED` or i18n edits |
 | P2 | Staging | Vercel Preview + per-preview Neon dev branch (Marketplace setting) |
 
 ---

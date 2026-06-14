@@ -91,7 +91,7 @@ Seed users after `db:seed`:
 - `hooks/` — `useAuth`, `useChallenges`, etc.
 - `sentry.ts` — `initSentry()` + `captureException` helper; `ErrorBoundary.componentDidCatch` forwards here
 - `analytics.ts` — `track()` / `identify()` abstraction; lazy-imports `posthog-js` only if `VITE_POSTHOG_KEY` set; wired in `Login` (identify on success), `Submit` (track on submission), `Home` (track on challenge view)
-- `i18n/` — react-i18next setup; `en.json` and `es.json` hold user-visible copy; `LegalFooter` includes a language control (persists `stepsprint-locale`)
+- `i18n/` — react-i18next setup; `en.json` and `es.json` hold user-visible copy; `LanguageSwitcher` exposes a select control (persists `stepsprint-locale`)
 - Styling: CSS-in-JS + `App.css` / `index.css`; no UI framework
 - PWA: `vite-plugin-pwa` with `registerType: 'autoUpdate'`; manifest inlined in vite.config; icons in `public/icons/`
 
@@ -121,7 +121,7 @@ Team assignment supports random and snake-draft at challenge creation.
 
 - **Sentry and PostHog**: Server Sentry is silent until `SENTRY_DSN` is set. Client Sentry needs `VITE_SENTRY_DSN`. Optional **browser source maps**: set `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, and `SENTRY_PROJECT` at Vite build time so `@sentry/vite-plugin` uploads hidden maps (see `client/vite.config.ts`). PostHog loads only when `VITE_POSTHOG_KEY` is set **and** (in production) the user accepts analytics in the banner; in development, analytics runs unless the user chose "Essential only".
 - **No real SMTP provider**: Nodemailer wired, password reset emails no-op without SMTP env.
-- **i18n**: Most screens use `useTranslation` with `en.json`; Spanish lives in `es.json` — language switcher in `LegalFooter` (persists `stepsprint-locale` in `localStorage`).
+- **i18n**: Most screens use `useTranslation` with `en.json`; Spanish lives in `es.json` — language switcher in `LanguageSwitcher` (persists `stepsprint-locale` in `localStorage`).
 - **Health-sync integrations**: Apple Watch via Shortcuts + bearer token to `POST /api/integrations/apple-health`; Fitbit, Google Fit, and Garmin via OAuth when server env credentials are set (`routes/oauth.ts`, `routes/integrations.ts`). In-browser HealthKit/Health Connect pairing is not a PWA goal (see `docs/PRD.md` stretch decision).
 - **Push notifications**: Daily reminders can use Web Push when VAPID keys are configured; email when SMTP/Resend is configured. The hourly sweep runs via Vercel Cron (`vercel.json` → `GET /api/cron/reminder-sweep`); the in-process scheduler in `services/scheduler.ts` is a no-op when `VERCEL=1`. Bearer secret is `CRON_SECRET` (legacy `REMINDER_CRON_SECRET` still accepted).
 - **CSP**: API responses use helmet with pinned CSP (strict for API routes; relaxed only for `/api/docs` and `/api/openapi.json` when OpenAPI docs are enabled).

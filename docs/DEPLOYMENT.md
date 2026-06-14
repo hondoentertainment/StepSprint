@@ -1,6 +1,6 @@
 # StepSprint Deployment Guide
 
-For the **ordered launch-day runbook** (apply this top-to-bottom on cutover), see [LAUNCH.md](LAUNCH.md). For a deeper **production-readiness checklist** (secrets, cron, Sentry releases, legal, monitoring), see [PRODUCTION.md](PRODUCTION.md).
+For the **ordered launch-day runbook** (apply this top-to-bottom on cutover), see [LAUNCH.md](LAUNCH.md). For a deeper **production-readiness checklist** (secrets, cron, Sentry releases, monitoring), see [PRODUCTION.md](PRODUCTION.md).
 
 StepSprint runs as a single Vercel project (SPA + serverless API on the same origin):
 
@@ -139,7 +139,7 @@ In the Vercel dashboard → **Settings → Environment Variables** → set `SENT
 
 ### PostHog analytics
 
-In the Vercel dashboard → set `VITE_POSTHOG_KEY` (and optionally `VITE_POSTHOG_HOST`). The production build shows a cookie banner on first visit: analytics loads only if the visitor accepts. Legal pages (`/privacy`, `/terms`) are linked from the banner and from the app footer; replace placeholder copy with your jurisdiction-specific text before a public launch.
+In the Vercel dashboard → set `VITE_POSTHOG_KEY` (and optionally `VITE_POSTHOG_HOST`). The production build shows a cookie banner on first visit: analytics loads only if the visitor accepts. (No Privacy/Terms pages ship by default — add counsel-reviewed pages and link them from the banner if your launch needs them.)
 
 ### Web Push notifications
 
@@ -198,7 +198,6 @@ All variables live in **Vercel → project → Settings → Environment Variable
 | `SENTRY_DSN` | Server Sentry. |
 | `VITE_SENTRY_DSN` | Browser Sentry. |
 | `VITE_POSTHOG_KEY` | PostHog (loads only after the cookie banner is accepted in production). |
-| `VITE_LEGAL_CONTENT_REVIEWED` | `true` once Privacy/Terms copy is finalized — hides the draft banner. |
 | `SENTRY_AUTH_TOKEN` + `SENTRY_ORG` + `SENTRY_PROJECT` | Upload hidden browser source maps at build time. |
 
 ### Optional

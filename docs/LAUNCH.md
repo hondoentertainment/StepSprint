@@ -27,11 +27,11 @@ Last verified **2026-05-06** against `https://stepsprint.vercel.app` (alias of `
 - **Observability disabled.** No `SENTRY_DSN`, `VITE_SENTRY_DSN`, or `VITE_POSTHOG_KEY`. Errors and analytics are silent.
 - **Source-map upload off.** No `SENTRY_AUTH_TOKEN` / `SENTRY_ORG` / `SENTRY_PROJECT`. Vite emits hidden source maps locally but does not upload — Sentry traces will be minified once a DSN is configured.
 - **Wearables OAuth disabled.** Apple Health via Shortcuts works (no server secrets needed). Fitbit, Google Fit, and Garmin OAuth are off — no `*_CLIENT_ID` / `*_CLIENT_SECRET` pairs configured.
-- **Legal copy not reviewed.** `VITE_LEGAL_CONTENT_REVIEWED` unset → the draft banner renders on `/privacy` and `/terms`. Replace placeholder copy in `client/src/i18n/{en,es}.json` and flip the flag.
+- **No Privacy / Terms pages.** Removed from the SPA; if your launch needs them, add counsel-reviewed pages back and link them from the cookie banner / login footer.
 - **Cron live-fire untested.** Hourly schedule registered via `vercel.json`. The `Authorization: Bearer <CRON_SECRET>` handshake cannot be verified from outside the Vercel dashboard because `vercel env pull` correctly redacts sensitive values. Run from the dashboard: project → **Cron** tab → **Run** on `/api/cron/reminder-sweep`, expect 200.
 - **Manual smoke walkthrough.** §5 below requires a real inbox + browser session — not automatable.
 
-When picking up from this snapshot, see §3 for the env-var operator checklist, §5 for the manual smokes, §6 for OAuth, §7 for legal copy + backup drill.
+When picking up from this snapshot, see §3 for the env-var operator checklist, §5 for the manual smokes, §6 for OAuth, §7 for the backup drill.
 
 ---
 
@@ -141,12 +141,11 @@ Record results in your release notes.
 
 ---
 
-## 7. Compliance / legal (before public sharing, ~30 min)
+## 7. Compliance / backup drill (before public sharing, ~30 min)
 
-1. Replace placeholder copy in `client/src/i18n/en.json` and `client/src/i18n/es.json` for **Privacy** and **Terms** with counsel-approved text and real contact details.
-2. Set `VITE_LEGAL_CONTENT_REVIEWED=true` in Vercel and redeploy — the "draft" banner on `/privacy` and `/terms` disappears.
-3. Confirm the cookie banner appears on first visit and PostHog only loads after **Accept**.
-4. Run `BACKUP_DRILL.md` once: snapshot Postgres → restore to a throwaway DB → boot a Function against it → record RTO/RPO.
+1. Confirm the cookie banner appears on first visit and PostHog only loads after **Accept**.
+2. If your launch requires public Privacy / Terms pages, add counsel-reviewed pages back into `client/src/components/` and link them from the cookie banner / login footer (the placeholder pages were removed).
+3. Run `BACKUP_DRILL.md` once: snapshot Postgres → restore to a throwaway DB → boot a Function against it → record RTO/RPO.
 
 ---
 

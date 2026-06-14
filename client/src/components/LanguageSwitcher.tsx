@@ -1,17 +1,16 @@
-import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { LOCALE_STORAGE_KEY } from "../i18n";
 
-export function LegalFooter() {
+export function LanguageSwitcher() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language.startsWith("es") ? "es" : "en";
 
   return (
-    <footer className="legal-footer" role="contentinfo">
-      <label className="legal-footer-lang">
+    <footer className="language-switcher" role="contentinfo">
+      <label className="language-switcher-label">
         <span className="sr-only">{t("layout.languageSelectAria")}</span>
         <select
-          className="legal-footer-lang-select"
+          className="language-switcher-select"
           aria-label={t("layout.languageSelectAria")}
           value={lang}
           onChange={(e) => {
@@ -28,10 +27,6 @@ export function LegalFooter() {
           <option value="es">{t("layout.localeSpanish")}</option>
         </select>
       </label>
-      <span aria-hidden> · </span>
-      <Link to="/privacy">{t("legal.privacy")}</Link>
-      <span aria-hidden> · </span>
-      <Link to="/terms">{t("legal.terms")}</Link>
     </footer>
   );
 }

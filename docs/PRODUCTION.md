@@ -39,10 +39,10 @@ Companion to [DEPLOYMENT.md](DEPLOYMENT.md). Use this as an internal checklist b
   3. Set `RESEND_API_KEY` and `SMTP_FROM` in Vercel → Settings → Environment Variables. `SMTP_FROM` must match the verified domain.
   4. Run registration + forgot-password smoke tests after deploy.
 
-## 6. Legal and product
+## 6. Product
 
-- **Privacy / Terms**: Replace placeholder copy with counsel-reviewed text and real contact details. The app shows a **production notice** banner on `/privacy` and `/terms` until you set **`VITE_LEGAL_CONTENT_REVIEWED=true`** at client build time (or remove the banner strings in `client/src/i18n/*.json`).
-- **Locale**: Default language uses `localStorage` (`stepsprint-locale`), then **browser** `navigator.language` for Spanish when no preference is stored, then English.
+- **Privacy / Terms**: The app does not ship Privacy or Terms pages — Privacy/Terms routes, the placeholder copy, and the draft banner have been removed. If your launch needs them, add counsel-reviewed pages and link them where appropriate (login footer, cookie banner, etc.).
+- **Locale**: Default language uses `localStorage` (`stepsprint-locale`), then **browser** `navigator.language` for Spanish when no preference is stored, then English. The login and main-app footers expose a language switcher (`client/src/components/LanguageSwitcher.tsx`).
 
 ## 7. Quality gates
 

@@ -33,13 +33,6 @@ test.describe("Desktop viewport", () => {
     ).toBeVisible({ timeout: 15_000 });
   });
 
-  test("privacy and terms pages render without signing in", async ({ page }) => {
-    await page.goto("/privacy");
-    await expect(page.getByRole("heading", { name: /Privacy|Privacidad/i })).toBeVisible();
-    await page.goto("/terms");
-    await expect(page.getByRole("heading", { name: /Terms of use|Términos de uso/i })).toBeVisible();
-  });
-
   test("logout returns to login", async ({ page }) => {
     await loginAsSeededParticipant(page);
     await page.getByRole("button", { name: /log out|cerrar sesión/i }).click();
