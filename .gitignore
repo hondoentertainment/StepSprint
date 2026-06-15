@@ -11,3 +11,7 @@ yarn-error.log*
 pnpm-debug.log*
 
 .vercel
+test-results/
+playwright-report/
+.playwright-cli/
+.deploy-launch.log
