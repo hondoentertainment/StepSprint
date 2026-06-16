@@ -42,13 +42,6 @@ jobs:
         working-directory: server
         run: npm ci
 
-      - name: Use PostgreSQL schema and migrations
-        working-directory: server
-        run: |
-          cp prisma/schema.postgresql.prisma prisma/schema.prisma
-          rm -rf prisma/migrations
-          cp -r prisma/migrations_postgres prisma/migrations
-
       - name: Generate Prisma client and migrate
         working-directory: server
         run: |
@@ -100,8 +93,22 @@ jobs:
     runs-on: ubuntu-latest
     env:
       JWT_SECRET: test-jwt-secret-ci-stepsprint-minimum-32-chars
-      DATABASE_URL: "file:./e2e.db"
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/stepsprint?schema=public
       NODE_ENV: test
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: stepsprint
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d stepsprint"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
 
@@ -131,7 +138,7 @@ jobs:
         working-directory: client
         env:
           JWT_SECRET: test-jwt-secret-ci-stepsprint-minimum-32-chars
-          DATABASE_URL: "file:./e2e.db"
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/stepsprint?schema=public
         run: npx playwright test --project=desktop-chrome
 
   smoke-test:
@@ -139,8 +146,22 @@ jobs:
     runs-on: ubuntu-latest
     env:
       JWT_SECRET: test-jwt-secret-ci-stepsprint-minimum-32-chars
-      DATABASE_URL: "file:./smoke.db"
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/stepsprint?schema=public
       NODE_ENV: test
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: stepsprint
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d stepsprint"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
 
