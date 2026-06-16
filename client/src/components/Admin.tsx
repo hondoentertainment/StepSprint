@@ -18,12 +18,15 @@ type Props = {
 
 export function Admin({
   user,
+  // challenges kept for stable Admin shell props from App.tsx
+  challenges: _challenges,
   selectedChallengeId,
   selectedChallenge,
   onChallengesRefresh,
   weekYear,
   weekNumber,
-}: Omit<Props, "challenges">) {
+}: Props) {
+  void _challenges;
   const [createForm, setCreateForm] = useState({
     name: "",
     startDate: "",
