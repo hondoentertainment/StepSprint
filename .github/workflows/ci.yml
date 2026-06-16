@@ -10,40 +10,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  server-test:
-    runs-on: ubuntu-latest
-    env:
-      JWT_SECRET: test-jwt-secret-ci-stepsprint-minimum-32-chars
-      DATABASE_URL: "file:./test.db"
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: ".nvmrc"
-          cache: "npm"
-          cache-dependency-path: server/package-lock.json
-
-      - name: Install server deps
-        working-directory: server
-        run: npm ci
-
-      - name: Generate Prisma client
-        working-directory: server
-        run: npx prisma generate
-
-      - name: Run migrations
-        working-directory: server
-        run: npx prisma migrate deploy
-
-      - name: Seed database
-        working-directory: server
-        run: npx prisma db seed
-
-      - name: Run server tests
-        working-directory: server
-        run: npm run test:run
-
   server-test-postgres:
     runs-on: ubuntu-latest
     env:
@@ -130,7 +96,7 @@ jobs:
         run: npm run build
 
   e2e:
-    needs: [server-test, client-test]
+    needs: [server-test-postgres, client-test]
     runs-on: ubuntu-latest
     env:
       JWT_SECRET: test-jwt-secret-ci-stepsprint-minimum-32-chars
@@ -169,7 +135,7 @@ jobs:
         run: npx playwright test --project=desktop-chrome
 
   smoke-test:
-    needs: [server-test, client-test]
+    needs: [server-test-postgres, client-test]
     runs-on: ubuntu-latest
     env:
       JWT_SECRET: test-jwt-secret-ci-stepsprint-minimum-32-chars

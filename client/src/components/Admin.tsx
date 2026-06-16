@@ -18,13 +18,12 @@ type Props = {
 
 export function Admin({
   user,
-  challenges: _challenges,
   selectedChallengeId,
   selectedChallenge,
   onChallengesRefresh,
   weekYear,
   weekNumber,
-}: Props) {
+}: Omit<Props, "challenges">) {
   const [createForm, setCreateForm] = useState({
     name: "",
     startDate: "",

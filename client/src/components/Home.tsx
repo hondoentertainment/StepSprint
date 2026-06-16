@@ -35,16 +35,14 @@ export function Home({
   const [summary, setSummary] = useState<Summary | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const [welcomeMessage, setWelcomeMessage] = useState(false);
+  const [welcomeMessage] = useState(() => {
+    if (typeof sessionStorage === "undefined") return false;
+    if (!sessionStorage.getItem("stepSprintJustLoggedIn")) return false;
+    sessionStorage.removeItem("stepSprintJustLoggedIn");
+    return true;
+  });
   const [dailyReminder, setDailyReminder] = useState(false);
   const [streakReminder, setStreakReminder] = useState(false);
-
-  useEffect(() => {
-    if (typeof sessionStorage !== "undefined" && sessionStorage.getItem("stepSprintJustLoggedIn")) {
-      sessionStorage.removeItem("stepSprintJustLoggedIn");
-      setWelcomeMessage(true);
-    }
-  }, []);
 
   useEffect(() => {
     api<{ dailyReminder: boolean; streakAtRiskReminder: boolean }>("/api/me/notifications/preferences")
@@ -78,8 +76,13 @@ export function Home({
   useEffect(() => {
     if (!challengeId) return;
 
-    setIsLoading(true);
-    setError("");
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) {
+        setIsLoading(true);
+        setError("");
+      }
+    });
     api<Summary>(`/api/me/summary?challengeId=${challengeId}`)
       .then(setSummary)
       .catch((err) => {
@@ -90,7 +93,12 @@ export function Home({
         }
         setError(getErrorMessage(err));
       })
-      .finally(() => setIsLoading(false));
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [challengeId]);
 
   return (
