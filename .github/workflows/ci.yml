@@ -45,6 +45,8 @@ jobs:
       - name: Generate Prisma client and migrate
         working-directory: server
         run: |
+          rm -rf prisma/migrations
+          cp -r prisma/migrations_postgres prisma/migrations
           npx prisma generate
           npx prisma migrate deploy
 
@@ -124,6 +126,8 @@ jobs:
         working-directory: server
         run: |
           npm ci
+          rm -rf prisma/migrations
+          cp -r prisma/migrations_postgres prisma/migrations
           npx prisma generate
           npx prisma migrate deploy
           npx prisma db seed
@@ -183,7 +187,10 @@ jobs:
 
       - name: Run migrations
         working-directory: server
-        run: npx prisma migrate deploy
+        run: |
+          rm -rf prisma/migrations
+          cp -r prisma/migrations_postgres prisma/migrations
+          npx prisma migrate deploy
 
       - name: Build server
         working-directory: server
