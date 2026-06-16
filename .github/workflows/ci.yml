@@ -42,13 +42,11 @@ jobs:
         working-directory: server
         run: npm ci
 
-      - name: Generate Prisma client and migrate
+      - name: Generate Prisma client and sync schema
         working-directory: server
         run: |
-          rm -rf prisma/migrations
-          cp -r prisma/migrations_postgres prisma/migrations
           npx prisma generate
-          npx prisma migrate deploy
+          npx prisma db push --accept-data-loss
 
       - name: Seed database
         working-directory: server
@@ -126,10 +124,8 @@ jobs:
         working-directory: server
         run: |
           npm ci
-          rm -rf prisma/migrations
-          cp -r prisma/migrations_postgres prisma/migrations
           npx prisma generate
-          npx prisma migrate deploy
+          npx prisma db push --accept-data-loss
           npx prisma db seed
 
       - name: Client install and Playwright (Chromium)
@@ -185,12 +181,10 @@ jobs:
         working-directory: server
         run: npx prisma generate
 
-      - name: Run migrations
+      - name: Sync database schema
         working-directory: server
         run: |
-          rm -rf prisma/migrations
-          cp -r prisma/migrations_postgres prisma/migrations
-          npx prisma migrate deploy
+          npx prisma db push --accept-data-loss
 
       - name: Build server
         working-directory: server
