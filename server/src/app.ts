@@ -15,6 +15,8 @@ import inviteRoutes from "./routes/invites";
 import analyticsRoutes from "./routes/analytics";
 import integrationsRoutes from "./routes/integrations";
 import notificationsRoutes from "./routes/notifications";
+import oauthRoutes from "./routes/oauth";
+import cronRoutes from "./routes/cron";
 
 const app = express();
 
@@ -43,7 +45,9 @@ app.use("/api/leaderboards", leaderboardRoutes);
 app.use("/api/me/summary", summaryRoutes);
 app.use("/api/invites", inviteRoutes);
 app.use("/api/integrations", integrationsRoutes);
+app.use("/api/integrations", oauthRoutes);
 app.use("/api/me/notifications", notificationsRoutes);
+app.use("/api/cron", cronRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({ error: "Not found" });

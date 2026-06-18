@@ -16,7 +16,10 @@ import { PrismaClient } from "@prisma/client";
  */
 export function createPrismaClient(databaseUrl: string): PrismaClient {
   if (databaseUrl.startsWith("file:")) {
-    const adapterModule = require("@prisma/adapter-better-sqlite3") as typeof import("@prisma/adapter-better-sqlite3");
+    // Loaded lazily and untyped so the dev-only SQLite adapter is not a hard
+    // build/runtime dependency in Postgres (production/CI) environments.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const adapterModule = require("@prisma/adapter-better-sqlite3");
     const adapter = new adapterModule.PrismaBetterSqlite3({ url: databaseUrl });
     return new PrismaClient({ adapter } as never);
   }

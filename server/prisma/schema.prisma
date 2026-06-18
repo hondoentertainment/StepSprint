@@ -26,6 +26,8 @@ model User {
   email                  String                  @unique
   name                   String?
   passwordHash           String?
+  emailVerified          Boolean                 @default(false)
+  tokenVersion           Int                     @default(0)
   role                   Role                    @default(PARTICIPANT)
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
@@ -33,9 +35,56 @@ model User {
   submissions            StepSubmission[]
   auditLogs              AuditLog[]              @relation("AuditActor")
   resetTokens            PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
   notificationPreference NotificationPreference?
   fitnessConnections     FitnessConnection[]
   fitnessOAuthStates     FitnessOAuthState[]
+  pushSubscriptions      PushSubscription[]
+  integrationTokens      IntegrationToken[]
+  oauthConnections       OAuthConnection[]
+}
+
+model IntegrationToken {
+  id         String    @id @default(cuid())
+  userId     String
+  tokenHash  String    @unique
+  label      String    @default("Apple Watch Sync")
+  expiresAt  DateTime?
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model OAuthConnection {
+  id             String    @id @default(cuid())
+  userId         String
+  provider       String
+  accessToken    String
+  refreshToken   String?
+  expiresAt      DateTime?
+  providerUserId String?
+  scopes         String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@index([userId])
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model PasswordResetToken {
@@ -52,11 +101,25 @@ model PasswordResetToken {
 }
 
 model NotificationPreference {
-  id                    String  @id @default(cuid())
-  userId                String  @unique
-  dailyReminder         Boolean @default(false)
-  streakAtRiskReminder  Boolean @default(false)
-  user                  User    @relation(fields: [userId], references: [id])
+  id                    String    @id @default(cuid())
+  userId                String    @unique
+  dailyReminder         Boolean   @default(false)
+  streakAtRiskReminder  Boolean   @default(false)
+  lastDailyReminderSentAt DateTime?
+  user                  User      @relation(fields: [userId], references: [id])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 /** Short-lived CSRF/state row for OAuth redirect flow */
@@ -95,6 +158,8 @@ model Challenge {
   timezone    String
   teamSize    Int
   locked      Boolean          @default(false)
+  inviteCode          String?  @unique
+  inviteCodeExpiresAt DateTime?
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
   teams       Team[]
