@@ -11,7 +11,9 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: 1,
-  reporter: "html",
+  // In CI also emit a line-by-line list so failing tests are visible in the
+  // job log (the html report is an artifact that isn't printed to stdout).
+  reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "html",
   timeout: 60_000,
   use: {
     baseURL: "http://localhost:5173",
