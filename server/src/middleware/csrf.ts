@@ -48,6 +48,23 @@ export function csrfCookieMiddleware(
 }
 
 /**
+ * GET endpoint that hands the client a CSRF token and (outside tests) sets the
+ * matching double-submit cookie. Reuses an existing cookie token if present so
+ * repeated calls stay stable within a session.
+ */
+export function csrfTokenHandler(req: Request, res: Response): void {
+  const existing = req.cookies?.[CSRF_COOKIE] as string | undefined;
+  const token = existing && existing.length > 0 ? existing : crypto.randomBytes(32).toString("hex");
+  res.cookie(CSRF_COOKIE, token, {
+    httpOnly: false,
+    sameSite: "strict",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+  });
+  res.json({ token });
+}
+
+/**
  * Rejects mutating requests whose X-CSRF-Token header doesn't match the
  * cookie. Safe methods (GET/HEAD/OPTIONS) pass through without checking.
  *

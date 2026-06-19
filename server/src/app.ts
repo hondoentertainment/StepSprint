@@ -17,6 +17,8 @@ import integrationsRoutes from "./routes/integrations";
 import notificationsRoutes from "./routes/notifications";
 import oauthRoutes from "./routes/oauth";
 import cronRoutes from "./routes/cron";
+import openapiRoutes from "./routes/openapi";
+import { csrfTokenHandler } from "./middleware/csrf";
 
 const app = express();
 
@@ -36,6 +38,7 @@ app.use(
 app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
 
+app.get("/api/csrf-token", csrfTokenHandler);
 app.use("/api/auth", authLimiter, authRoutes);
 app.use("/api/admin/analytics", analyticsRoutes);
 app.use("/api/admin", adminRoutes);
@@ -48,6 +51,12 @@ app.use("/api/integrations", integrationsRoutes);
 app.use("/api/integrations", oauthRoutes);
 app.use("/api/me/notifications", notificationsRoutes);
 app.use("/api/cron", cronRoutes);
+
+// OpenAPI docs are public outside production; in production they are gated
+// behind OPENAPI_DOCS_ENABLED so internal API shape isn't exposed by default.
+if (process.env.NODE_ENV !== "production" || process.env.OPENAPI_DOCS_ENABLED === "true") {
+  app.use("/api", openapiRoutes);
+}
 
 app.use((_req, res) => {
   res.status(404).json({ error: "Not found" });
