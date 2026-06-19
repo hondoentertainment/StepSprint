@@ -16,8 +16,12 @@ export async function healthHandler(_req: Request, res: Response): Promise<void>
   const body = {
     ok: database === "ok",
     database,
+    // `db` mirrors `database` using the up/down vocabulary the smoke-check
+    // script (scripts/check-api-health.mjs) asserts against.
+    db: database === "ok" ? "up" : "down",
     uptimeSeconds,
     commit: config.commitSha,
+    release: config.commitSha ?? null,
   };
 
   if (database !== "ok") {
