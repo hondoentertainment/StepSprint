@@ -11,6 +11,9 @@ const router = Router();
 
 const INVITE_EXPIRY = "7d";
 
+/** How long a shareable challenge invite code stays valid (7 days). */
+export const INVITE_CODE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
 /** Admin: create invite link for a challenge */
 router.post("/", authRequired, roleRequired(Role.ADMIN), async (req: AuthenticatedRequest, res) => {
   const parsed = z.object({ challengeId: z.string(), email: z.string().email() }).safeParse(req.body);
@@ -105,6 +108,27 @@ router.get("/accept", async (req, res) => {
     user: { id: user.id, email: user.email, name: user.name, role: user.role },
     challengeId: payload.challengeId,
     challengeName: challenge?.name,
+  });
+});
+
+/** Public: look up a shareable invite code (without enrolling). */
+router.get("/:code", async (req, res) => {
+  const challenge = await prisma.challenge.findUnique({
+    where: { inviteCode: req.params.code },
+    select: { id: true, name: true, inviteCodeExpiresAt: true },
+  });
+  if (!challenge) {
+    res.status(404).json({ error: "Invite code not found" });
+    return;
+  }
+  if (challenge.inviteCodeExpiresAt && challenge.inviteCodeExpiresAt < new Date()) {
+    res.status(410).json({ error: "This invite code has expired" });
+    return;
+  }
+  res.json({
+    challengeId: challenge.id,
+    challengeName: challenge.name,
+    expiresAt: challenge.inviteCodeExpiresAt,
   });
 });
 

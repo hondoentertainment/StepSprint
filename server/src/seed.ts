@@ -29,12 +29,13 @@ async function main() {
 
   const admin = await prisma.user.upsert({
     where: { email: "admin@stepsprint.local" },
-    update: { passwordHash },
+    update: { passwordHash, emailVerified: true },
     create: {
       email: "admin@stepsprint.local",
       name: "Admin User",
       role: Role.ADMIN,
       passwordHash,
+      emailVerified: true,
     },
   });
 
@@ -42,12 +43,13 @@ async function main() {
     Array.from({ length: 12 }).map((_, idx) =>
       prisma.user.upsert({
         where: { email: `user${idx + 1}@stepsprint.local` },
-        update: { passwordHash },
+        update: { passwordHash, emailVerified: true },
         create: {
           email: `user${idx + 1}@stepsprint.local`,
           name: `Walker ${idx + 1}`,
           role: Role.PARTICIPANT,
           passwordHash,
+          emailVerified: true,
         },
       })
     )
