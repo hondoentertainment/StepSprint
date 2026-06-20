@@ -5,6 +5,8 @@ import { useChallenges } from "./hooks/useChallenges";
 import { WeekProvider, useWeek } from "./contexts/WeekContext";
 import { Login } from "./components/Login";
 import { InvitePage } from "./components/InvitePage";
+import { ForgotPassword } from "./components/ForgotPassword";
+import { ResetPassword } from "./components/ResetPassword";
 import { Layout } from "./components/Layout";
 import { Home } from "./components/Home";
 import { Submit } from "./components/Submit";
@@ -166,6 +168,8 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/invite" element={<InvitePage onAccepted={(u) => setUser(u)} />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="*" element={<Login onLogin={login} onRegister={register} />} />
         </Routes>
       </BrowserRouter>

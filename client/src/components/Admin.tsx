@@ -50,7 +50,7 @@ export function Admin({
     avgActiveDays: number;
     totalSubmissions: number;
     totalSteps: number;
-    weeklyTrend: { weekYear: number; weekNumber: number; label: string; submissionCount: number }[];
+    submissionTrend: { weekYear: number; weekNumber: number; label: string; submissionCount: number }[];
     inactiveParticipants?: { email: string; name: string }[];
   } | null>(null);
 
@@ -70,7 +70,7 @@ export function Admin({
       avgActiveDays: number;
       totalSubmissions: number;
       totalSteps: number;
-      weeklyTrend: { weekYear: number; weekNumber: number; label: string; submissionCount: number }[];
+      submissionTrend: { weekYear: number; weekNumber: number; label: string; submissionCount: number }[];
       inactiveParticipants?: { email: string; name: string }[];
     }>(`/api/admin/analytics?challengeId=${selectedChallengeId}`)
       .then(setAnalytics)
@@ -307,8 +307,9 @@ export function Admin({
               <span>Total steps: {analytics.totalSteps.toLocaleString()}</span>
               <div className="analytics-bars" aria-label="Weekly submission totals">
                 {(() => {
-                  const max = Math.max(1, ...analytics.weeklyTrend.map((w) => w.submissionCount));
-                  return analytics.weeklyTrend.map((w) => (
+                  const trend = analytics.submissionTrend ?? [];
+                  const max = Math.max(1, ...trend.map((w) => w.submissionCount));
+                  return trend.map((w) => (
                     <div key={`${w.weekYear}-W${w.weekNumber}`} className="analytics-bar-col">
                       <div className="analytics-bar-track" title={`${w.submissionCount} submissions`}>
                         <div
@@ -328,7 +329,7 @@ export function Admin({
               <div className="analytics-trend" role="list">
                 <strong>Recent weeks (submissions)</strong>
                 <ul>
-                  {analytics.weeklyTrend.map((w) => (
+                  {(analytics.submissionTrend ?? []).map((w) => (
                     <li key={`${w.weekYear}-W${w.weekNumber}-list`}>
                       W{w.weekNumber} ({w.label}): {w.submissionCount}
                     </li>
