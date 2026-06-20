@@ -27,8 +27,9 @@ export function Layout({
   const tabToPath: Record<string, string> = {
     Home: "/home",
     Submit: "/submit",
-    "Weekly Top Steppers": "/weekly",
-    "Team Standings": "/teams",
+    Devices: "/devices",
+    Leaderboard: "/weekly",
+    Teams: "/teams",
     Admin: "/admin",
   };
 

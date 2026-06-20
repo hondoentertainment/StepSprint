@@ -141,6 +141,17 @@ jobs:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/stepsprint?schema=public
         run: npx playwright test --project=desktop-chrome --retries=0 --max-failures=6
 
+      - name: Upload Playwright artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: |
+            client/test-results
+            client/playwright-report
+          retention-days: 3
+          if-no-files-found: ignore
+
   smoke-test:
     needs: [server-test-postgres, client-test]
     runs-on: ubuntu-latest

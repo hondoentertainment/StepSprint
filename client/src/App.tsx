@@ -11,6 +11,7 @@ import { Submit } from "./components/Submit";
 import { WeeklyLeaderboard } from "./components/WeeklyLeaderboard";
 import { TeamStandings } from "./components/TeamStandings";
 import { Admin } from "./components/Admin";
+import { IntegrationsPage } from "./components/IntegrationsPage";
 import type { User, Challenge } from "./types";
 
 function AuthenticatedAppRoutes({
@@ -77,6 +78,18 @@ function AuthenticatedAppRoutes({
           path="weekly"
           element={
             <WeeklyLeaderboard challengeId={selectedChallengeId} selectedChallenge={selectedChallenge} />
+          }
+        />
+        <Route
+          path="devices"
+          element={
+            <IntegrationsPage
+              challengeId={selectedChallengeId}
+              challengeTimezone={selectedChallenge?.timezone}
+              challengeStart={selectedChallenge?.startDate}
+              challengeEnd={selectedChallenge?.endDate}
+              challengesLoading={challengesLoading}
+            />
           }
         />
         <Route path="teams" element={<TeamStandings challengeId={selectedChallengeId} user={user} />} />
