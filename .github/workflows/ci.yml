@@ -139,7 +139,7 @@ jobs:
         env:
           JWT_SECRET: test-jwt-secret-ci-stepsprint-minimum-32-chars
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/stepsprint?schema=public
-        run: npx playwright test --project=desktop-chrome
+        run: npx playwright test --project=desktop-chrome --retries=0 --max-failures=6
 
   smoke-test:
     needs: [server-test-postgres, client-test]
