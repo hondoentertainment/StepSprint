@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import type { User } from "../types";
 import type { Challenge } from "../types";
 import { TABS } from "../types";
@@ -20,7 +21,8 @@ export function Layout({
   onLogout,
   challengesLoading,
 }: Props) {
-  const visibleTabs = TABS.filter((t) => t !== "Admin" || user.role === "ADMIN");
+  const { t } = useTranslation();
+  const visibleTabs = TABS.filter((tab) => tab !== "Admin" || user.role === "ADMIN");
 
   const tabToPath: Record<string, string> = {
     Home: "/home",
@@ -39,11 +41,14 @@ export function Layout({
         </div>
         <div className="topbar-actions">
           <select
+            aria-label={t("layout.selectChallenge")}
             value={selectedChallengeId}
             onChange={(e) => onChallengeChange(e.target.value)}
             disabled={challengesLoading || challenges.length === 0}
           >
-            {!challenges.length && <option value="">No challenges available</option>}
+            {!challenges.length && (
+              <option value="">{t("layout.noChallenges")}</option>
+            )}
             {challenges.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
