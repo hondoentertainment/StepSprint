@@ -119,8 +119,7 @@ function AuthenticatedAppRoutes({
   );
 }
 
-function AuthenticatedApp() {
-  const { user, logout } = useAuth();
+function AuthenticatedApp({ user, logout }: { user: User; logout: () => void }) {
   const {
     challenges,
     selectedChallengeId,
@@ -130,8 +129,6 @@ function AuthenticatedApp() {
     error: challengesError,
     refreshChallenges,
   } = useChallenges();
-
-  if (!user) return null;
 
   return (
     <WeekProvider timezone={selectedChallenge?.timezone}>
@@ -151,7 +148,7 @@ function AuthenticatedApp() {
 }
 
 function App() {
-  const { user, setUser, isLoading, login, register } = useAuth();
+  const { user, setUser, isLoading, login, register, logout } = useAuth();
 
   if (isLoading) {
     return (
@@ -178,7 +175,7 @@ function App() {
 
   return (
     <BrowserRouter>
-      <AuthenticatedApp />
+      <AuthenticatedApp user={user} logout={logout} />
     </BrowserRouter>
   );
 }

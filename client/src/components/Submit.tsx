@@ -38,6 +38,7 @@ export function Submit({
 }: Props) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [date, setDate] = useState(() => todayInTimezone());
+  const [dateTouched, setDateTouched] = useState(false);
   const [steps, setSteps] = useState(8000);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -79,6 +80,16 @@ export function Submit({
   useEffect(() => {
     if (fitnessOpen) loadFitness();
   }, [fitnessOpen, loadFitness]);
+
+  // The date input initializes to "today" in the browser timezone, but the
+  // challenge's timezone may differ (e.g. CI runs in UTC while the challenge is
+  // America/Chicago). Until the user picks a date, keep it pinned to "today" in
+  // the challenge timezone so a valid same-day entry isn't rejected as future.
+  useEffect(() => {
+    if (!dateTouched) {
+      setDate(todayInTimezone(selectedChallenge?.timezone));
+    }
+  }, [selectedChallenge?.timezone, dateTouched]);
 
   function resetDate() {
     setDate(todayInTimezone(selectedChallenge?.timezone));
@@ -173,7 +184,14 @@ export function Submit({
       <form onSubmit={handleSubmit}>
         <label>
           Date
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => {
+              setDateTouched(true);
+              setDate(e.target.value);
+            }}
+          />
         </label>
         <label>
           Steps
